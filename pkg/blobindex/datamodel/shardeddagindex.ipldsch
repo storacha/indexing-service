@@ -1,0 +1,25 @@
+type ShardedDagIndex union {
+  | ShardedDagIndex_0_1 "index/sharded/dag@0.1"
+} representation keyed
+
+type ShardedDagIndex_0_1 struct {
+  content Link
+  shards [Link]
+} representation map
+
+type Multihash bytes
+
+type Position struct {
+  offset Int
+  length Int
+} representation tuple
+
+type BlobSlice struct {
+  multihash Multihash
+  position Position
+} representation tuple
+
+type BlobIndex struct {
+  multihash Multihash
+  slices [BlobSlice]
+} representation tuple
