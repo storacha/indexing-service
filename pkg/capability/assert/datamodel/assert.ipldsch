@@ -1,0 +1,21 @@
+
+type Range struct {
+	offset Int
+	length optional Int
+}
+
+type LocationCaveats struct {
+	content  Any
+	location [String]
+	range    optional Range
+}
+
+type Digest struct {
+  digest bytes
+}
+
+type InclusionCaveats struct {
+	content  Any
+	includes &Any
+	range    optional &Any
+}
