@@ -29,6 +29,22 @@ func InclusionCaveatsType() schema.Type {
 	return assertTS.TypeByName("InclusionCaveats")
 }
 
+func IndexCaveatsType() schema.Type {
+	return assertTS.TypeByName("IndexCaveats")
+}
+
+func PartitionCaveatsType() schema.Type {
+	return assertTS.TypeByName("PartitionCaveats")
+}
+
+func RelationCaveatsType() schema.Type {
+	return assertTS.TypeByName("RelationCaveats")
+}
+
+func EqualsCaveatsType() schema.Type {
+	return assertTS.TypeByName("EqualsCaveats")
+}
+
 func DigestType() schema.Type {
 	return assertTS.TypeByName("Digest")
 }
@@ -52,4 +68,36 @@ type InclusionCaveatsModel struct {
 	Content  datamodel.Node
 	Includes ipld.Link
 	Proof    *ipld.Link
+}
+
+type IndexCaveatsModel struct {
+	Content ipld.Link
+	Index   ipld.Link
+}
+
+type PartitionCaveatsModel struct {
+	Content datamodel.Node
+	Blocks  *ipld.Link
+	Parts   []ipld.Link
+}
+
+type RelationPartInclusionModel struct {
+	Content ipld.Link
+	Parts   *[]ipld.Link
+}
+
+type RelationPartModel struct {
+	Content  ipld.Link
+	Includes *RelationPartInclusionModel
+}
+
+type RelationCaveatsModel struct {
+	Content  datamodel.Node
+	Children []ipld.Link
+	Parts    []RelationPartModel
+}
+
+type EqualsCaveatsModel struct {
+	Content datamodel.Node
+	Equals  ipld.Link
 }

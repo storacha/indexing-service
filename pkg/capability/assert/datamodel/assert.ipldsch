@@ -19,3 +19,35 @@ type InclusionCaveats struct {
 	includes &Any
 	range    optional &Any
 }
+
+type IndexCaveats struct {
+	content  &Any
+	index &Any
+}
+
+type InclusionCaveats struct {
+	content  Any
+	blocks 	 optional &Any
+	parts    [&Any]
+}
+
+type RelationPartInclusion struct {
+	content &Any
+	parts   optional [&Any]
+}
+
+type RelationPart struct {
+	Content  &Any
+	Includes optional RelationPartInclusion
+}
+
+type RelationCaveats struct {
+	Content  Any
+	Children [&Any]
+	Parts    [RelationPart]
+}
+
+type EqualsCaveats struct {
+	Content Any
+	Equals &Any
+}

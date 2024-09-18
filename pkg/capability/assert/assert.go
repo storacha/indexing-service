@@ -124,6 +124,20 @@ type InclusionCaveats struct {
 	Proof    *ipld.Link
 }
 
+func (ic InclusionCaveats) Build() (datamodel.Node, error) {
+	cn, err := ic.Content.ToIPLD()
+	if err != nil {
+		return nil, err
+	}
+
+	md := &adm.InclusionCaveatsModel{
+		Content:  cn,
+		Includes: ic.Includes,
+		Proof:    ic.Proof,
+	}
+	return ipld.WrapWithRecovery(md, adm.InclusionCaveatsType())
+}
+
 const InclusionAbility = "assert/inclusion"
 
 var Inclusion = validator.NewCapability(InclusionAbility, schema.DIDString(),
@@ -150,71 +164,237 @@ var Inclusion = validator.NewCapability(InclusionAbility, schema.DIDString(),
 			Proof:    proof}, nil
 	}), nil)
 
-// /**
-//  * Claims that a content graph can be found in blob(s) that are identified and
-//  * indexed in the given index CID.
-//  */
-// export const index = capability({
-//   can: 'assert/index',
-//   with: URI.match({ protocol: 'did:' }),
-//   nb: Schema.struct({
-//     /** DAG root CID */
-//     content: Schema.link(),
-//     /**
-//      * Link to a Content Archive that contains the index.
-//      * e.g. `index/sharded/dag@0.1`
-//      * @see https://github.com/w3s-project/specs/blob/main/w3-index.md
-//      */
-//     index: Schema.link({ version: 1 })
-//   })
-// })
+/**
+ * Claims that a content graph can be found in blob(s) that are identified and
+ * indexed in the given index CID.
+ */
 
-// /**
-//  * Claims that a CID's graph can be read from the blocks found in parts.
-//  */
-// export const partition = capability({
-//   can: 'assert/partition',
-//   with: URI.match({ protocol: 'did:' }),
-//   nb: Schema.struct({
-//     /** Content root CID */
-//     content: linkOrDigest(),
-//     /** CIDs CID */
-//     blocks: Schema.link({ version: 1 }).optional(),
-//     parts: Schema.array(Schema.link({ version: 1 }))
-//   })
-// })
+type IndexCaveats struct {
+	Content ipld.Link
+	Index   ipld.Link
+}
 
-// /**
-//  * Claims that a CID links to other CIDs.
-//  */
-// export const relation = capability({
-//   can: 'assert/relation',
-//   with: URI.match({ protocol: 'did:' }),
-//   nb: Schema.struct({
-//     content: linkOrDigest(),
-//     /** CIDs this content links to directly. */
-//     children: Schema.array(Schema.link()),
-//     /** Parts this content and it's children can be read from. */
-//     parts: Schema.array(Schema.struct({
-//       content: Schema.link({ version: 1 }),
-//       /** CID of contents (CARv2 index) included in this part. */
-//       includes: Schema.struct({
-//         content: Schema.link({ version: 1 }),
-//         /** CIDs of parts this index may be found in. */
-//         parts: Schema.array(Schema.link({ version: 1 })).optional()
-//       }).optional()
-//     }))
-//   })
-// })
+func (ic IndexCaveats) Build() (datamodel.Node, error) {
 
-// /**
-//  * Claim data is referred to by another CID and/or multihash. e.g CAR CID & CommP CID
-//  */
-// export const equals = capability({
-//   can: 'assert/equals',
-//   with: URI.match({ protocol: 'did:' }),
-//   nb: Schema.struct({
-//     content: linkOrDigest(),
-//     equals: Schema.link()
-//   })
-// })
+	md := &adm.IndexCaveatsModel{
+		Content: ic.Content,
+		Index:   ic.Index,
+	}
+	return ipld.WrapWithRecovery(md, adm.IndexCaveatsType())
+}
+
+const IndexAbility = "assert/index"
+
+var Index = validator.NewCapability(
+	IndexAbility,
+	schema.DIDString(),
+	schema.Mapped(schema.Struct[adm.IndexCaveatsModel](adm.IndexCaveatsType(), nil), func(model adm.IndexCaveatsModel) (IndexCaveats, failure.Failure) {
+		content, err := schema.Link().Read(model.Content)
+		if err != nil {
+			return IndexCaveats{}, err
+		}
+		index, err := schema.Link(schema.WithVersion(1)).Read(model.Index)
+		if err != nil {
+			return IndexCaveats{}, err
+		}
+		return IndexCaveats{content, index}, nil
+	}),
+	nil,
+)
+
+/**
+ * Claims that a CID's graph can be read from the blocks found in parts.
+ */
+
+type PartitionCaveats struct {
+	Content HasMultihash
+	Blocks  *ipld.Link
+	Parts   []ipld.Link
+}
+
+func (pc PartitionCaveats) Build() (datamodel.Node, error) {
+	cn, err := pc.Content.ToIPLD()
+	if err != nil {
+		return nil, err
+	}
+
+	md := &adm.PartitionCaveatsModel{
+		Content: cn,
+		Blocks:  pc.Blocks,
+		Parts:   pc.Parts,
+	}
+	return ipld.WrapWithRecovery(md, adm.PartitionCaveatsType())
+}
+
+const PartitionAbility = "assert/partition"
+
+var Partition = validator.NewCapability(
+	PartitionAbility,
+	schema.DIDString(),
+	schema.Mapped(schema.Struct[adm.PartitionCaveatsModel](adm.PartitionCaveatsType(), nil), func(model adm.PartitionCaveatsModel) (PartitionCaveats, failure.Failure) {
+		hasMultihash, err := linkOrDigest.Read(model.Content)
+		if err != nil {
+			return PartitionCaveats{}, err
+		}
+
+		blocks := model.Blocks
+		if blocks != nil {
+			output, err := schema.Link(schema.WithVersion(1)).Read(*model.Blocks)
+			if err != nil {
+				return PartitionCaveats{}, err
+			}
+			blocks = &output
+		}
+		parts := make([]ipld.Link, 0, len(model.Parts))
+		for _, p := range model.Parts {
+			part, err := schema.Link(schema.WithVersion(1)).Read(p)
+			if err != nil {
+				return PartitionCaveats{}, err
+			}
+			parts = append(parts, part)
+		}
+		return PartitionCaveats{
+			Content: hasMultihash,
+			Blocks:  blocks,
+			Parts:   parts}, nil
+	}), nil)
+
+/**
+ * Claims that a CID links to other CIDs.
+ */
+
+type RelationPartInclusion struct {
+	Content ipld.Link
+	Parts   *[]ipld.Link
+}
+
+type RelationPart struct {
+	Content  ipld.Link
+	Includes *RelationPartInclusion
+}
+
+type RelationCaveats struct {
+	Content  HasMultihash
+	Children []ipld.Link
+	Parts    []RelationPart
+}
+
+func (rc RelationCaveats) Build() (datamodel.Node, error) {
+	cn, err := rc.Content.ToIPLD()
+	if err != nil {
+		return nil, err
+	}
+
+	parts := make([]adm.RelationPartModel, 0, len(rc.Parts))
+	for _, part := range rc.Parts {
+		var includes *adm.RelationPartInclusionModel
+		if part.Includes != nil {
+			includes = &adm.RelationPartInclusionModel{
+				Content: part.Includes.Content,
+				Parts:   part.Includes.Parts,
+			}
+		}
+		parts = append(parts, adm.RelationPartModel{
+			Content:  part.Content,
+			Includes: includes,
+		})
+	}
+	md := &adm.RelationCaveatsModel{
+		Content:  cn,
+		Children: rc.Children,
+		Parts:    parts,
+	}
+	return ipld.WrapWithRecovery(md, adm.RelationCaveatsType())
+}
+
+const RelationAbility = "assert/relation"
+
+var Relation = validator.NewCapability(
+	RelationAbility,
+	schema.DIDString(),
+	schema.Mapped(schema.Struct[adm.RelationCaveatsModel](adm.RelationCaveatsType(), nil), func(model adm.RelationCaveatsModel) (RelationCaveats, failure.Failure) {
+		hasMultihash, err := linkOrDigest.Read(model.Content)
+		if err != nil {
+			return RelationCaveats{}, err
+		}
+		parts := make([]RelationPart, 0, len(model.Parts))
+		for _, part := range model.Parts {
+			var includes *RelationPartInclusion
+			if part.Includes != nil {
+				content, err := schema.Link(schema.WithVersion(1)).Read(part.Content)
+				if err != nil {
+					return RelationCaveats{}, err
+				}
+				var parts *[]ipld.Link
+				if part.Includes.Parts != nil {
+					*parts = make([]datamodel.Link, 0, len(*part.Includes.Parts))
+					for _, p := range *part.Includes.Parts {
+						part, err := schema.Link(schema.WithVersion(1)).Read(p)
+						if err != nil {
+							return RelationCaveats{}, err
+						}
+						*parts = append(*parts, part)
+					}
+				}
+				includes = &RelationPartInclusion{
+					Content: content,
+					Parts:   parts,
+				}
+			}
+			content, err := schema.Link(schema.WithVersion(1)).Read(part.Content)
+			if err != nil {
+				return RelationCaveats{}, err
+			}
+			parts = append(parts, RelationPart{
+				Content:  content,
+				Includes: includes,
+			})
+		}
+		return RelationCaveats{
+			Content:  hasMultihash,
+			Children: model.Children,
+			Parts:    parts,
+		}, nil
+	}),
+	nil,
+)
+
+/**
+ * Claim data is referred to by another CID and/or multihash. e.g CAR CID & CommP CID
+ */
+
+type EqualsCaveats struct {
+	Content HasMultihash
+	Equals  ipld.Link
+}
+
+func (ec EqualsCaveats) Build() (datamodel.Node, error) {
+	content, err := ec.Content.ToIPLD()
+	if err != nil {
+		return nil, err
+	}
+
+	md := &adm.EqualsCaveatsModel{
+		Content: content,
+		Equals:  ec.Equals,
+	}
+	return ipld.WrapWithRecovery(md, adm.EqualsCaveatsType())
+}
+
+const EqualsAbility = "assert/equals"
+
+var Equals = validator.NewCapability(
+	EqualsAbility,
+	schema.DIDString(),
+	schema.Mapped(schema.Struct[adm.EqualsCaveatsModel](adm.EqualsCaveatsType(), nil), func(model adm.EqualsCaveatsModel) (EqualsCaveats, failure.Failure) {
+		hasMultihash, err := linkOrDigest.Read(model.Content)
+		if err != nil {
+			return EqualsCaveats{}, err
+		}
+		return EqualsCaveats{
+			Content: hasMultihash,
+			Equals:  model.Equals,
+		}, nil
+	}),
+	nil,
+)
