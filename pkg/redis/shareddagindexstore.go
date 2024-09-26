@@ -12,10 +12,12 @@ var (
 	_ types.ShardedDagIndexStore = (*ShardedDagIndexStore)(nil)
 )
 
-type ShardedDagIndexStore = RedisStore[types.EncodedContextID, blobindex.ShardedDagIndexView]
+// ShardedDagIndexStore is a RedisStore for storing sharded dag indexes that implements types.ShardedDagIndexStore
+type ShardedDagIndexStore = Store[types.EncodedContextID, blobindex.ShardedDagIndexView]
 
-func NewShardedDagIndexStore(client RedisClient) *ShardedDagIndexStore {
-	return &RedisStore[types.EncodedContextID, blobindex.ShardedDagIndexView]{shardedDagIndexFromRedis, shardedDagIndexToRedis, encodedContextIDKeyString, client}
+// NewShardedDagIndexStore returns a new instance of a ShardedDagIndex store using the given redis client
+func NewShardedDagIndexStore(client Client) *ShardedDagIndexStore {
+	return &Store[types.EncodedContextID, blobindex.ShardedDagIndexView]{shardedDagIndexFromRedis, shardedDagIndexToRedis, encodedContextIDKeyString, client}
 }
 
 func shardedDagIndexFromRedis(data string) (blobindex.ShardedDagIndexView, error) {

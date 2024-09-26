@@ -1,6 +1,7 @@
 package redis
 
 import (
+	// imported for embedding
 	_ "embed"
 	"fmt"
 
@@ -32,10 +33,12 @@ func init() {
 	providerResultsType = typeSystem.TypeByName("ProviderResults")
 }
 
-type IPNIStore = RedisStore[multihash.Multihash, []model.ProviderResult]
+// IPNIStore is a RedisStore for storing IPNI data that implements types.IPNIStore
+type IPNIStore = Store[multihash.Multihash, []model.ProviderResult]
 
-func NewIPNIStore(client RedisClient) *IPNIStore {
-	return NewRedisStore(providerResultsFromRedis, providerResultsToRedis, multihashKeyString, client)
+// NewIPNIStore returns a new instance of an IPNI store using the given redis client
+func NewIPNIStore(client Client) *IPNIStore {
+	return NewStore(providerResultsFromRedis, providerResultsToRedis, multihashKeyString, client)
 }
 
 func bytesToPeerID(data []byte) (interface{}, error) {

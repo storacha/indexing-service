@@ -12,10 +12,12 @@ var (
 	_ types.ContentClaimsStore = (*ContentClaimsStore)(nil)
 )
 
-type ContentClaimsStore = RedisStore[cid.Cid, delegation.Delegation]
+// ContentClaimsStore is a RedisStore for storing content claims that implements types.ContentClaimsStore
+type ContentClaimsStore = Store[cid.Cid, delegation.Delegation]
 
-func NewContentClaimsStore(client RedisClient) *ContentClaimsStore {
-	return &RedisStore[cid.Cid, delegation.Delegation]{delegationFromRedis, delegationToRedis, cidKeyString, client}
+// NewContentClaimsStore returns a new instance of a Content Claims Store using the given redis client
+func NewContentClaimsStore(client Client) *ContentClaimsStore {
+	return &Store[cid.Cid, delegation.Delegation]{delegationFromRedis, delegationToRedis, cidKeyString, client}
 }
 
 func delegationFromRedis(data string) (delegation.Delegation, error) {

@@ -18,12 +18,12 @@ func TestRedisStore(t *testing.T) {
 	testCases := []struct {
 		name       string
 		opts       []MockOption
-		behavior   func(t *testing.T, store *redis.RedisStore[string, string])
+		behavior   func(t *testing.T, store *redis.Store[string, string])
 		finalState map[string]*redisValue
 	}{
 		{
 			name: "normal behavior",
-			behavior: func(t *testing.T, store *redis.RedisStore[string, string]) {
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
 				store.Set(ctx, "key1", "value1", true)
 				store.Set(ctx, "key2", "value2", false)
 				store.Set(ctx, "key3", "value3", true)
@@ -47,7 +47,7 @@ func TestRedisStore(t *testing.T) {
 		{
 			name: "get errors",
 			opts: []MockOption{WithErrorOnGet(errors.New("something went wrong"))},
-			behavior: func(t *testing.T, store *redis.RedisStore[string, string]) {
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
 				_, err := store.Get(ctx, "key1")
 				require.EqualError(t, err, "error accessing redis: something went wrong")
 			},
@@ -55,7 +55,7 @@ func TestRedisStore(t *testing.T) {
 		{
 			name: "set errors",
 			opts: []MockOption{WithErrorOnSet(errors.New("something went wrong"))},
-			behavior: func(t *testing.T, store *redis.RedisStore[string, string]) {
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
 				err := store.Set(ctx, "key1", "value1", true)
 				require.EqualError(t, err, "error accessing redis: something went wrong")
 			},
@@ -63,7 +63,7 @@ func TestRedisStore(t *testing.T) {
 		{
 			name: "set expiration errors",
 			opts: []MockOption{WithErrorOnSetExpiration(errors.New("something went wrong"))},
-			behavior: func(t *testing.T, store *redis.RedisStore[string, string]) {
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
 				err := store.SetExpirable(ctx, "key1", true)
 				require.EqualError(t, err, "error accessing redis: something went wrong")
 			},
@@ -72,7 +72,7 @@ func TestRedisStore(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			mockRedis := NewMockRedis(testCase.opts...)
-			redisStore := redis.NewRedisStore[string, string](
+			redisStore := redis.NewStore[string, string](
 				func(s string) (string, error) { return s, nil },
 				func(s string) (string, error) { return s, nil },
 				func(s string) string { return s },
@@ -99,7 +99,7 @@ type MockRedis struct {
 	errSetExpiration error
 }
 
-var _ redis.RedisClient = (*MockRedis)(nil)
+var _ redis.Client = (*MockRedis)(nil)
 
 type MockOption func(*MockRedis)
 
