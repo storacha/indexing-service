@@ -28,6 +28,10 @@ type IPNIIndex interface {
 	//  2. With returned provider results, filter additionally for claim type. If space dids are set, calculate an encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
 	//     Future TODO: kick off a conversion task to update the recrds
 	Find(QueryKey) []model.ProviderResult
+
+	// Write entries to the cache without publishing
+	Cache([]mh.Multihash, model.ProviderResult)
+
 	// Publish should do the following:
 	// 1. Write the entries to the cache with no expiration until publishing is complete
 	// 2. Generate an advertisement for the advertised hashes and publish/announce it

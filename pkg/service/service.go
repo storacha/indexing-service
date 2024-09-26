@@ -31,16 +31,18 @@ type IndexingService interface {
 	// 6. Read the requisite claims from the ClaimLookup
 	// 7. Return all discovered claims and sharded dag indexes
 	Query(Query) (QueryResult, error)
+
+	// CacheClaim is used to cache a claim without publishing it to IPNI
+	// this is used cache a location commitment that come from a storage provider on blob/accept, without publishing, since the SP will publish themselves
+	// (a delegation for a location commitment is already generated on blob/accept)
+	// ideally however, IPNI would enable UCAN chains for publishing so that we could publish it directly from the storage service
+	// it doesn't for now, so we let SPs publish themselves them direct cache with us
+	CacheClaim(delegation.Delegation) error
+
 	// I imagine publish claim to work as follows
 	// For all claims except index, just use the publish API on IPNIIndex
 	// For index claims, let's assume they fail if a location claim for the index car cid is not already published
 	// The service should lookup the index cid location claim, and fetch the ShardedDagIndexView, then use the hashes inside
 	// to assemble all the multihashes in the index advertisement
-	// still not 100% sure how location claim publishing works
-	// generally I would expect the call to publish a location commitment to come from the storage provider on blob/accept (a delegation for a location commitment is already
-	// generated on blob/accept)
-	// the publishing should happen throught his service so that the location commitment is read-on-write
-	// ideally however, IPNI would support UCAN chains for publishing so that the claim could be published on the storage provider's PeerAddr
-	// it doesn't for now, so either we publish on the services address, or we develop some kind of signing scheme for advertisements (seems complicated)
 	PublishClaim(delegation.Delegation) error
 }
