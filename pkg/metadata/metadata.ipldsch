@@ -1,5 +1,5 @@
 type ContentClaimMetadata struct {
   ClaimType Int
   ShortCut Bytes
-  ClaimCID &Any
+  Claim Link
 }
