@@ -32,6 +32,7 @@ package metadata
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"

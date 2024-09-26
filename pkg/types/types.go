@@ -2,13 +2,15 @@ package types
 
 import (
 	"bytes"
+	"context"
+	"errors"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/did"
 	"github.com/storacha-network/indexing-service/pkg/blobindex"
-	"github.com/web3-storage/go-ucanto/core/delegation"
 )
 
 // ContextID describes the data used to calculate a context id for IPNI
@@ -30,11 +32,14 @@ func (c ContextID) ToEncoded() (EncodedContextID, error) {
 	return EncodedContextID(mh), err
 }
 
+// ErrKeyNotFound means the key did not exist in the cache
+var ErrKeyNotFound = errors.New("cache key not found")
+
 // Cache describes a generic cache interface
 type Cache[Key, Value any] interface {
-	Set(key Key, value Value, expires bool) error
-	SetExpirable(key Key, expires bool)
-	Get(key Key) (Value, error)
+	Set(ctx context.Context, key Key, value Value, expires bool) error
+	SetExpirable(ctx context.Context, key Key, expires bool) error
+	Get(ctx context.Context, key Key) (Value, error)
 }
 
 // IPNIStore caches queries to IPNI

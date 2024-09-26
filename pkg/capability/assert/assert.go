@@ -44,24 +44,22 @@ func Link(l datamodel.Link) (HasMultihash, failure.Failure) {
 	return link{l}, nil
 }
 
-type digest struct {
-	Digest mh.Multihash
-}
+type digest mh.Multihash
 
 func (d digest) hasMultihash() {}
 
 func (d digest) Hash() mh.Multihash {
-	return d.Digest
+	return mh.Multihash(d)
 }
 
 func (d digest) ToIPLD() (datamodel.Node, error) {
 	return qp.BuildMap(basicnode.Prototype.Map, 1, func(ma datamodel.MapAssembler) {
-		qp.MapEntry(ma, "digest", qp.Bytes(d.Digest))
+		qp.MapEntry(ma, "digest", qp.Bytes(d))
 	})
 }
 
 func Digest(d adm.DigestModel) (HasMultihash, failure.Failure) {
-	return digest{Digest: d.Digest}, nil
+	return digest(d.Digest), nil
 }
 
 var linkOrDigest = schema.Or(schema.Mapped(schema.Link(), Link), schema.Mapped(schema.Struct[adm.DigestModel](adm.DigestType(), nil), Digest))
