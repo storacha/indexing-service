@@ -1,5 +1,5 @@
 type ContentClaimMetadata struct {
   ClaimType Int
-  ShortCut Bytes
+  EmbeddedData Bytes
   Claim Link
-}
+} representation tuple

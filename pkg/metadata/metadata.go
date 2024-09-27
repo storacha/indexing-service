@@ -92,7 +92,7 @@ type ContentClaimMetadata struct {
 	// kind of claim
 	ClaimType ClaimType
 	// based on the claim type, this can be used to access the key information in the claim without fetching the whole claim
-	ShortCut []byte
+	EmbeddedData []byte
 	// ClaimCID indicates the cid of the claim - the claim should be fetchable by combining the http multiaddr of the provider with the claim cid
 	ClaimCID cid.Cid
 }
@@ -137,7 +137,7 @@ func (ccm *ContentClaimMetadata) ReadFrom(r io.Reader) (n int64, err error) {
 	nd := nb.Build()
 	read := bindnode.Unwrap(nd).(*ContentClaimMetadata)
 	ccm.ClaimType = read.ClaimType
-	ccm.ShortCut = read.ShortCut
+	ccm.EmbeddedData = read.EmbeddedData
 	ccm.ClaimCID = read.ClaimCID
 	return cr.readCount, nil
 }
@@ -170,7 +170,7 @@ func (EqualsClaimPreview) isClaimPreview() {}
 func (ccm *ContentClaimMetadata) ClaimPreview() (ClaimPreview, error) {
 	switch ccm.ClaimType {
 	case LocationCommitment:
-		location, err := url.ParseRequestURI(string(ccm.ShortCut))
+		location, err := url.ParseRequestURI(string(ccm.EmbeddedData))
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +178,7 @@ func (ccm *ContentClaimMetadata) ClaimPreview() (ClaimPreview, error) {
 			Location: *location,
 		}, nil
 	case IndexClaim:
-		_, index, err := cid.CidFromBytes(ccm.ShortCut)
+		_, index, err := cid.CidFromBytes(ccm.EmbeddedData)
 		if err != nil {
 			return nil, err
 		}
@@ -186,7 +186,7 @@ func (ccm *ContentClaimMetadata) ClaimPreview() (ClaimPreview, error) {
 			Index: index,
 		}, nil
 	case EqualsClaim:
-		_, equals, err := cid.CidFromBytes(ccm.ShortCut)
+		_, equals, err := cid.CidFromBytes(ccm.EmbeddedData)
 		if err != nil {
 			return nil, err
 		}
