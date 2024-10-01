@@ -39,10 +39,8 @@ func randomProviderResults(num int) (multihash.Multihash, []model.ProviderResult
 	if err != nil {
 		return nil, nil, err
 	}
-	metadata, err := (&metadata.ContentClaimMetadata{
-		ClaimType:    metadata.LocationCommitment,
-		EmbeddedData: testutil.RandomBytes(30),
-		ClaimCID:     testutil.RandomCID().(cidlink.Link).Cid,
+	metadata, err := (&metadata.LocationCommitmentMetadata{
+		ClaimCID: testutil.RandomCID().(cidlink.Link).Cid,
 	}).MarshalBinary()
 	if err != nil {
 		return nil, nil, err

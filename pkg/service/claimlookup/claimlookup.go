@@ -1,15 +1,25 @@
 package claimlookup
 
 import (
-	"github.com/ipni/go-libipni/find/model"
+	"context"
+	"errors"
+	"net/url"
+
+	"github.com/ipfs/go-cid"
 	"github.com/storacha-network/go-ucanto/core/delegation"
+	"github.com/storacha-network/indexing-service/pkg/types"
 )
 
-// ClaimLookup is used to get full claims from a claim cid
-// I'll be honest, I'm not exactly sure whether these claims should be stored or simply synthesized
-// from the information in IPNI combined with having private keys stored in this service
-// I THINK it's possible you can synthesize Index & Equals claims from the information in IPNI + a private key
-// Location commitments are more complicated cause they really ought to be signed by the storer of the commitment?
-type ClaimLookup interface {
-	LookupClaim(model.ProviderResult) (delegation.Delegation, error)
+type ClaimLookup struct {
+	claimStore types.ContentClaimsStore
+}
+
+func NewClaimLookup(claimStore types.ContentClaimsStore) *ClaimLookup {
+	return &ClaimLookup{
+		claimStore: claimStore,
+	}
+}
+
+func (cl *ClaimLookup) LookupClaim(ctx context.Context, claimCid cid.Cid, fetchURL url.URL) (delegation.Delegation, error) {
+	return nil, errors.New("not implemented")
 }
