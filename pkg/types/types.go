@@ -42,8 +42,8 @@ type Cache[Key, Value any] interface {
 	Get(ctx context.Context, key Key) (Value, error)
 }
 
-// IPNIStore caches queries to IPNI
-type IPNIStore Cache[mh.Multihash, []model.ProviderResult]
+// ProviderStore caches queries to IPNI
+type ProviderStore Cache[mh.Multihash, []model.ProviderResult]
 
 // ContentClaimsStore caches fetched content claims
 type ContentClaimsStore Cache[cid.Cid, delegation.Delegation]

@@ -16,18 +16,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIPNIStore(t *testing.T) {
+func TestProviderStore(t *testing.T) {
 	mockRedis := NewMockRedis()
-	ipniStore := redis.NewIPNIStore(mockRedis)
+	providerStore := redis.NewProviderStore(mockRedis)
 	mh1, results1 := testutil.Must2(randomProviderResults(4))(t)
 	mh2, results2 := testutil.Must2(randomProviderResults(4))(t)
 
 	ctx := context.Background()
-	require.NoError(t, ipniStore.Set(ctx, mh1, results1, false))
-	require.NoError(t, ipniStore.Set(ctx, mh2, results2, true))
+	require.NoError(t, providerStore.Set(ctx, mh1, results1, false))
+	require.NoError(t, providerStore.Set(ctx, mh2, results2, true))
 
-	returnedResults1 := testutil.Must(ipniStore.Get(ctx, mh1))(t)
-	returnedResults2 := testutil.Must(ipniStore.Get(ctx, mh2))(t)
+	returnedResults1 := testutil.Must(providerStore.Get(ctx, mh1))(t)
+	returnedResults2 := testutil.Must(providerStore.Get(ctx, mh2))(t)
 	require.Equal(t, results1, returnedResults1)
 	require.Equal(t, results2, returnedResults2)
 }

@@ -72,9 +72,9 @@ type BlobIndexLookup interface {
 	// 1. attempt to read the sharded dag index from the cache from the encoded contextID
 	// 2. if not found, attempt to fetch the index from the provided URL. Store the result in cache
 	// 3. return the index
-	// 4. asyncronously, add records to the IPNICache from the parsed blob index so that we can avoid future queries to IPNI for
+	// 4. asyncronously, add records to the ProviderStore from the parsed blob index so that we can avoid future queries to IPNI for
 	// other multihashes in the index
-	Find(ctx context.Context, contextID types.EncodedContextID, fetchURL url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error)
+	Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error)
 }
 
 // IndexingService implements read/write logic for indexing data with IPNI, content claims, sharded dag indexes, and a cache layer
@@ -86,9 +86,10 @@ type IndexingService struct {
 }
 
 type job struct {
-	mh         multihash.Multihash
-	indexForMh *multihash.Multihash
-	jobType    jobType
+	mh                  multihash.Multihash
+	indexForMh          *multihash.Multihash
+	indexProviderRecord *model.ProviderResult
+	jobType             jobType
 }
 
 type jobKey string
@@ -182,19 +183,19 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 				// we follow with a query for location claim on the OTHER side of the multihash
 				if string(typedProtocol.Equals.Hash()) != string(j.mh) {
 					// lookup was the content hash, queue the equals hash
-					if err := spawn(job{typedProtocol.Equals.Hash(), nil, locationJobType}); err != nil {
+					if err := spawn(job{typedProtocol.Equals.Hash(), nil, nil, locationJobType}); err != nil {
 						return err
 					}
 				} else {
 					// lookup was the equals hash, queue the content hash
-					if err := spawn(job{multihash.Multihash(result.ContextID), nil, locationJobType}); err != nil {
+					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, locationJobType}); err != nil {
 						return err
 					}
 				}
 			case *metadata.IndexClaimMetadata:
 				// for an index claim, we follow by looking for a location claim for the index, and fetching the index
 				mh := j.mh
-				if err := spawn(job{typedProtocol.Index.Hash(), &mh, equalsOrLocationJobType}); err != nil {
+				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, equalsOrLocationJobType}); err != nil {
 					return err
 				}
 			case *metadata.LocationCommitmentMetadata:
@@ -207,7 +208,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 						shard = &c
 					}
 					url := is.fetchRetrievalUrl(*result.Provider, *shard)
-					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, url, typedProtocol.Range)
+					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
 					if err != nil {
 						return err
 					}
@@ -225,7 +226,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					shards := index.Shards().Iterator()
 					for shard, index := range shards {
 						if index.Has(*j.indexForMh) {
-							if err := spawn(job{shard, nil, equalsOrLocationJobType}); err != nil {
+							if err := spawn(job{shard, nil, nil, equalsOrLocationJobType}); err != nil {
 								return err
 							}
 						}
@@ -248,7 +249,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 func (is *IndexingService) Query(ctx context.Context, q Query) (QueryResult, error) {
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
-		initialJobs = append(initialJobs, job{mh, nil, standardJobType})
+		initialJobs = append(initialJobs, job{mh, nil, nil, standardJobType})
 	}
 	qs, err := is.jobWalker(ctx, initialJobs, queryState{
 		q: &q,

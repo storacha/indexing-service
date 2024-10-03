@@ -22,7 +22,7 @@ var (
 	peerIDConverter      = bindnode.NamedBytesConverter("PeerID", bytesToPeerID, peerIDtoBytes)
 	multiaddrConverter   = bindnode.NamedBytesConverter("Multiaddr", bytesToMultiaddr, multiaddrToBytes)
 	providerResultsType  schema.Type
-	_                    types.IPNIStore = (*IPNIStore)(nil)
+	_                    types.ProviderStore = (*ProviderStore)(nil)
 )
 
 func init() {
@@ -33,11 +33,11 @@ func init() {
 	providerResultsType = typeSystem.TypeByName("ProviderResults")
 }
 
-// IPNIStore is a RedisStore for storing IPNI data that implements types.IPNIStore
-type IPNIStore = Store[multihash.Multihash, []model.ProviderResult]
+// ProviderStore is a RedisStore for storing IPNI data that implements types.ProviderStore
+type ProviderStore = Store[multihash.Multihash, []model.ProviderResult]
 
-// NewIPNIStore returns a new instance of an IPNI store using the given redis client
-func NewIPNIStore(client Client) *IPNIStore {
+// NewProviderStore returns a new instance of an IPNI store using the given redis client
+func NewProviderStore(client Client) *ProviderStore {
 	return NewStore(providerResultsFromRedis, providerResultsToRedis, multihashKeyString, client)
 }
 

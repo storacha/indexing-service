@@ -28,6 +28,10 @@ func Must2[T, U any](val1 T, val2 U, err error) func(*testing.T) (T, U) {
 
 // RequireEqualIndex compares two sharded dag indexes to verify their equality
 func RequireEqualIndex(t *testing.T, expectedIndex blobindex.ShardedDagIndexView, actualIndex blobindex.ShardedDagIndexView) {
+	if expectedIndex == nil {
+		require.Nil(t, actualIndex)
+		return
+	}
 	require.NotZero(t, actualIndex.Shards().Size())
 	require.Equal(t, expectedIndex.Shards().Size(), actualIndex.Shards().Size())
 	for key, shard := range actualIndex.Shards().Iterator() {
@@ -43,6 +47,10 @@ func RequireEqualIndex(t *testing.T, expectedIndex blobindex.ShardedDagIndexView
 
 // RequireEqualDelegation compares two delegations to verify their equality
 func RequireEqualDelegation(t *testing.T, expectedDelegation delegation.Delegation, actualDelegation delegation.Delegation) {
+	if expectedDelegation == nil {
+		require.Nil(t, actualDelegation)
+		return
+	}
 	require.Equal(t, expectedDelegation.Issuer(), actualDelegation.Issuer())
 	require.Equal(t, expectedDelegation.Audience(), actualDelegation.Audience())
 	require.Equal(t, expectedDelegation.Capabilities(), actualDelegation.Capabilities())

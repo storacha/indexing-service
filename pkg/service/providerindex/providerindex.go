@@ -25,18 +25,18 @@ type QueryKey struct {
 
 // ProviderIndex is a read/write interface to a local cache of providers that falls back to IPNI
 type ProviderIndex struct {
-	ipniCache  types.IPNIStore
-	findClient ipnifind.Client
+	providerStore types.ProviderStore
+	findClient    ipnifind.Client
 }
 
 // TBD access to legacy systems
 type LegacySystems interface{}
 
 // TODO: This assumes using low level primitives for publishing from IPNI but maybe we want to go ahead and use index-provider?
-func NewProviderIndex(ipniCache types.IPNIStore, findClient ipnifind.Client, sender announce.Sender, publisher dagsync.Publisher, advertisementsLsys ipld.LinkSystem, legacySystems LegacySystems) *ProviderIndex {
+func NewProviderIndex(ipniCache types.ProviderStore, findClient ipnifind.Client, sender announce.Sender, publisher dagsync.Publisher, advertisementsLsys ipld.LinkSystem, legacySystems LegacySystems) *ProviderIndex {
 	return &ProviderIndex{
-		ipniCache:  ipniCache,
-		findClient: findClient,
+		providerStore: ipniCache,
+		findClient:    findClient,
 	}
 }
 
@@ -60,7 +60,7 @@ func (pi *ProviderIndex) Find(ctx context.Context, qk QueryKey) ([]model.Provide
 }
 
 func (pi *ProviderIndex) getProviderResults(ctx context.Context, mh mh.Multihash) ([]model.ProviderResult, error) {
-	res, err := pi.ipniCache.Get(ctx, mh)
+	res, err := pi.providerStore.Get(ctx, mh)
 	if err == nil {
 		return res, nil
 	}
@@ -76,7 +76,7 @@ func (pi *ProviderIndex) getProviderResults(ctx context.Context, mh mh.Multihash
 	for _, mhres := range findRes.MultihashResults {
 		results = append(results, mhres.ProviderResults...)
 	}
-	err = pi.ipniCache.Set(ctx, mh, results, true)
+	err = pi.providerStore.Set(ctx, mh, results, true)
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"net/url"
 	"strconv"
 
 	"github.com/ipfs/go-cid"
@@ -16,7 +17,10 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha-network/go-ucanto/core/car"
+	"github.com/storacha-network/go-ucanto/core/delegation"
 	"github.com/storacha-network/go-ucanto/core/ipld/block"
+	"github.com/storacha-network/go-ucanto/ucan"
+	"github.com/storacha-network/indexing-service/pkg/capability/assert"
 )
 
 func RandomBytes(size int) []byte {
@@ -79,4 +83,28 @@ func RandomCID() datamodel.Link {
 
 func RandomMultihash() mh.Multihash {
 	return RandomCID().(cidlink.Link).Hash()
+}
+
+func RandomLocationClaim() ucan.Capability[assert.LocationCaveats] {
+	return assert.Location.New(Service.DID().String(), assert.LocationCaveats{
+		Content:  assert.FromHash(RandomMultihash()),
+		Location: []url.URL{*TestURL},
+	})
+}
+
+func RandomLocationDelection() delegation.Delegation {
+	delegation, _ := delegation.Delegate(Service, Alice, []ucan.Capability[assert.LocationCaveats]{RandomLocationClaim()})
+	return delegation
+}
+
+func RandomIndexClaim() ucan.Capability[assert.IndexCaveats] {
+	return assert.Index.New(Service.DID().String(), assert.IndexCaveats{
+		Content: RandomCID(),
+		Index:   RandomCID(),
+	})
+}
+
+func RandomIndexDelegation() delegation.Delegation {
+	delegation, _ := delegation.Delegate(Service, Service, []ucan.Capability[assert.IndexCaveats]{RandomIndexClaim()})
+	return delegation
 }

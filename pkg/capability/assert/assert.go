@@ -62,6 +62,10 @@ func Digest(d adm.DigestModel) (HasMultihash, failure.Failure) {
 	return digest(d.Digest), nil
 }
 
+func FromHash(mh mh.Multihash) HasMultihash {
+	return digest(mh)
+}
+
 var linkOrDigest = schema.Or(schema.Mapped(schema.Link(), Link), schema.Mapped(schema.Struct[adm.DigestModel](adm.DigestType(), nil), Digest))
 
 type LocationCaveats struct {
