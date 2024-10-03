@@ -8,9 +8,9 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/indexing-service/pkg/blobindex"
 )
 
 // ContextID describes the data used to calculate a context id for IPNI

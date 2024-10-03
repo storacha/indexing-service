@@ -12,10 +12,10 @@ import (
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/indexing-service/pkg/internal/testutil"
-	"github.com/storacha-network/indexing-service/pkg/service/claimlookup"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/indexing-service/pkg/service/claimlookup"
+	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 

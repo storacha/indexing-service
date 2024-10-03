@@ -12,9 +12,9 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/indexing-service/pkg/metadata"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/indexing-service/pkg/metadata"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 type QueryKey struct {

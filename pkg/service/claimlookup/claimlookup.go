@@ -9,8 +9,8 @@ import (
 	"net/url"
 
 	"github.com/ipfs/go-cid"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 // ClaimLookup is a read through cache for fetching content claims

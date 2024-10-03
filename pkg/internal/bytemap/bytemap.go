@@ -4,7 +4,7 @@ import (
 	"iter"
 	"maps"
 
-	"github.com/storacha-network/go-ucanto/core/iterable"
+	"github.com/storacha/go-ucanto/core/iterable"
 )
 
 type byteMap[K ~[]byte, T any] struct {

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 var (
