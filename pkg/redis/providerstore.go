@@ -13,7 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	multihash "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 var (

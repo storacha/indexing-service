@@ -8,11 +8,11 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	"github.com/storacha-network/go-ucanto/core/schema"
-	"github.com/storacha-network/go-ucanto/validator"
-	adm "github.com/storacha-network/indexing-service/pkg/capability/assert/datamodel"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	"github.com/storacha/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/validator"
+	adm "github.com/storacha/indexing-service/pkg/capability/assert/datamodel"
 )
 
 // export const assert = capability({
@@ -74,7 +74,7 @@ type LocationCaveats struct {
 	Range    *adm.Range
 }
 
-func (lc LocationCaveats) Build() (datamodel.Node, error) {
+func (lc LocationCaveats) ToIPLD() (datamodel.Node, error) {
 	cn, err := lc.Content.ToIPLD()
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ type InclusionCaveats struct {
 	Proof    *ipld.Link
 }
 
-func (ic InclusionCaveats) Build() (datamodel.Node, error) {
+func (ic InclusionCaveats) ToIPLD() (datamodel.Node, error) {
 	cn, err := ic.Content.ToIPLD()
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ type IndexCaveats struct {
 	Index   ipld.Link
 }
 
-func (ic IndexCaveats) Build() (datamodel.Node, error) {
+func (ic IndexCaveats) ToIPLD() (datamodel.Node, error) {
 
 	md := &adm.IndexCaveatsModel{
 		Content: ic.Content,
@@ -214,7 +214,7 @@ type PartitionCaveats struct {
 	Parts   []ipld.Link
 }
 
-func (pc PartitionCaveats) Build() (datamodel.Node, error) {
+func (pc PartitionCaveats) ToIPLD() (datamodel.Node, error) {
 	cn, err := pc.Content.ToIPLD()
 	if err != nil {
 		return nil, err
@@ -281,7 +281,7 @@ type RelationCaveats struct {
 	Parts    []RelationPart
 }
 
-func (rc RelationCaveats) Build() (datamodel.Node, error) {
+func (rc RelationCaveats) ToIPLD() (datamodel.Node, error) {
 	cn, err := rc.Content.ToIPLD()
 	if err != nil {
 		return nil, err
@@ -370,7 +370,7 @@ type EqualsCaveats struct {
 	Equals  ipld.Link
 }
 
-func (ec EqualsCaveats) Build() (datamodel.Node, error) {
+func (ec EqualsCaveats) ToIPLD() (datamodel.Node, error) {
 	content, err := ec.Content.ToIPLD()
 	if err != nil {
 		return nil, err
@@ -400,3 +400,18 @@ var Equals = validator.NewCapability(
 	}),
 	nil,
 )
+
+// Unit is a success type that can be used when there is no data to return from
+// a capability handler.
+type Unit struct{}
+
+func (u Unit) ToIPLD() (datamodel.Node, error) {
+	np := basicnode.Prototype.Any
+	nb := np.NewBuilder()
+	ma, err := nb.BeginMap(0)
+	if err != nil {
+		return nil, err
+	}
+	ma.Finish()
+	return nb.Build(), nil
+}

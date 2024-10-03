@@ -4,8 +4,8 @@ import (
 	"io"
 
 	cid "github.com/ipfs/go-cid"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 var (

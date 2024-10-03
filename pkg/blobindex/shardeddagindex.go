@@ -10,13 +10,13 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/car"
-	"github.com/storacha-network/go-ucanto/core/ipld"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/go-ucanto/core/ipld/codec/cbor"
-	"github.com/storacha-network/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha-network/go-ucanto/core/result/failure"
-	dm "github.com/storacha-network/indexing-service/pkg/blobindex/datamodel"
+	"github.com/storacha/go-ucanto/core/car"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
+	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/core/result/failure"
+	dm "github.com/storacha/indexing-service/pkg/blobindex/datamodel"
 )
 
 // ExtractError is a union type of UnknownFormatError and DecodeFailureErorr

@@ -10,9 +10,9 @@ import (
 	"strconv"
 
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
-	"github.com/storacha-network/indexing-service/pkg/metadata"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/indexing-service/pkg/metadata"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 type IndexProviderCacher interface {

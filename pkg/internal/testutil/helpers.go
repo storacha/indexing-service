@@ -3,8 +3,8 @@ package testutil
 import (
 	"testing"
 
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/stretchr/testify/require"
 )
 

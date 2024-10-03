@@ -9,9 +9,9 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/car"
-	"github.com/storacha-network/go-ucanto/core/ipld/block"
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-ucanto/core/car"
+	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/stretchr/testify/require"
 )
 

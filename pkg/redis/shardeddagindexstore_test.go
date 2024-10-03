@@ -7,10 +7,10 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
-	"github.com/storacha-network/indexing-service/pkg/internal/testutil"
-	"github.com/storacha-network/indexing-service/pkg/redis"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/indexing-service/pkg/redis"
+	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 

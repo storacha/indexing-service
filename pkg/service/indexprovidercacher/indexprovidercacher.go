@@ -9,8 +9,8 @@ import (
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
-	"github.com/storacha-network/indexing-service/pkg/types"
+	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 type (

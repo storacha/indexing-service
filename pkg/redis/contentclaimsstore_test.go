@@ -8,12 +8,12 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/ucan"
-	"github.com/storacha-network/indexing-service/pkg/capability/assert"
-	adm "github.com/storacha-network/indexing-service/pkg/capability/assert/datamodel"
-	"github.com/storacha-network/indexing-service/pkg/internal/testutil"
-	"github.com/storacha-network/indexing-service/pkg/redis"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/indexing-service/pkg/capability/assert"
+	adm "github.com/storacha/indexing-service/pkg/capability/assert/datamodel"
+	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/stretchr/testify/require"
 )
 
