@@ -62,7 +62,7 @@ func init() {
 	}
 	indexClaimMetadata = bindnode.Prototype((*IndexClaimMetadata)(nil), typeSystem.TypeByName("IndexClaimMetadata"))
 	equalsClaimMetadata = bindnode.Prototype((*EqualsClaimMetadata)(nil), typeSystem.TypeByName("EqualsClaimMetadata"))
-	locationCommitmentMetadata = bindnode.Prototype((*LocationCommitmentMetadata)(nil), typeSystem.TypeByName("LocationCommitmentMetdata"))
+	locationCommitmentMetadata = bindnode.Prototype((*LocationCommitmentMetadata)(nil), typeSystem.TypeByName("LocationCommitmentMetadata"))
 }
 
 // metadata identifiers

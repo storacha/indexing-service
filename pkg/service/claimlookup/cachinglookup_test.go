@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -19,46 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockContentClaimsStore is a mock implementation of the ContentClaimsStore interface
-type MockContentClaimsStore struct {
-	setErr, getErr error
-	claims         map[string]delegation.Delegation
-}
-
-var _ types.ContentClaimsStore = &MockContentClaimsStore{}
-
-// SetExpirable implements types.ContentClaimsStore.
-func (m *MockContentClaimsStore) SetExpirable(ctx context.Context, key cid.Cid, expires bool) error {
-	return nil
-}
-
-func (m *MockContentClaimsStore) Get(ctx context.Context, claimCid cid.Cid) (delegation.Delegation, error) {
-	if m.getErr != nil {
-		return nil, m.getErr
-	}
-	claim, exists := m.claims[claimCid.String()]
-	if !exists {
-		return nil, types.ErrKeyNotFound
-	}
-	return claim, nil
-}
-
-func (m *MockContentClaimsStore) Set(ctx context.Context, claimCid cid.Cid, claim delegation.Delegation, overwrite bool) error {
-	if m.setErr != nil {
-		return m.setErr
-	}
-	m.claims[claimCid.String()] = claim
-	return nil
-}
-
-func TestClaimLookup_LookupClaim(t *testing.T) {
-	// Initialize mock store and HTTP client
+func TestWithCache__LookupClaim(t *testing.T) {
 
 	// Create a test CID
 	cachedCid := testutil.RandomCID().(cidlink.Link).Cid
 	notCachedCid := testutil.RandomCID().(cidlink.Link).Cid
 	// Create a cached claim
-	cachedClaim := testutil.RandomLocationDelection()
+	cachedClaim := testutil.RandomLocationDelegation()
 	notCachedClaim := testutil.RandomIndexDelegation()
 
 	// sample error
@@ -69,8 +33,8 @@ func TestClaimLookup_LookupClaim(t *testing.T) {
 		claimCid      cid.Cid
 		setErr        error
 		getErr        error
-		httpHandler   http.HandlerFunc
 		expectedErr   error
+		baseLookup    *mockClaimLookup
 		expectedClaim delegation.Delegation
 		finalState    map[string]delegation.Delegation
 	}{
@@ -112,11 +76,11 @@ func TestClaimLookup_LookupClaim(t *testing.T) {
 			},
 		},
 		{
-			name:          "http response error",
+			name:          "underlying lookup error",
 			claimCid:      notCachedCid,
 			expectedClaim: nil,
-			httpHandler:   http.NotFound,
-			expectedErr:   errors.New("failure response fetching claim. status: 404 Not Found, message: 404 page not found\n"),
+			baseLookup:    &mockClaimLookup{nil, anError},
+			expectedErr:   fmt.Errorf("fetching underlying claim: %w", anError),
 			finalState: map[string]delegation.Delegation{
 				cachedCid.String(): cachedClaim,
 			},
@@ -134,20 +98,14 @@ func TestClaimLookup_LookupClaim(t *testing.T) {
 				},
 			}
 			// generate a test server for requests
-			handler := tc.httpHandler
-			if handler == nil {
-				handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					claimBytes := testutil.Must(io.ReadAll(notCachedClaim.Archive()))(t)
-					testutil.Must(w.Write(claimBytes))(t)
-				})
+			lookup := tc.baseLookup
+			if lookup == nil {
+				lookup = &mockClaimLookup{notCachedClaim, nil}
 			}
-			testServer := httptest.NewServer(handler)
-			defer func() { testServer.Close() }()
-
 			// Create ClaimLookup instance
-			cl := claimlookup.NewClaimLookup(mockStore, testServer.Client())
+			cl := claimlookup.WithCache(lookup, mockStore)
 
-			claim, err := cl.LookupClaim(context.Background(), tc.claimCid, *testutil.Must(url.Parse(testServer.URL))(t))
+			claim, err := cl.LookupClaim(context.Background(), tc.claimCid, *testutil.TestURL)
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {
@@ -165,4 +123,45 @@ func TestClaimLookup_LookupClaim(t *testing.T) {
 			}
 		})
 	}
+}
+
+// MockContentClaimsStore is a mock implementation of the ContentClaimsStore interface
+type MockContentClaimsStore struct {
+	setErr, getErr error
+	claims         map[string]delegation.Delegation
+}
+
+var _ types.ContentClaimsStore = &MockContentClaimsStore{}
+
+// SetExpirable implements types.ContentClaimsStore.
+func (m *MockContentClaimsStore) SetExpirable(ctx context.Context, key cid.Cid, expires bool) error {
+	return nil
+}
+
+func (m *MockContentClaimsStore) Get(ctx context.Context, claimCid cid.Cid) (delegation.Delegation, error) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	claim, exists := m.claims[claimCid.String()]
+	if !exists {
+		return nil, types.ErrKeyNotFound
+	}
+	return claim, nil
+}
+
+func (m *MockContentClaimsStore) Set(ctx context.Context, claimCid cid.Cid, claim delegation.Delegation, overwrite bool) error {
+	if m.setErr != nil {
+		return m.setErr
+	}
+	m.claims[claimCid.String()] = claim
+	return nil
+}
+
+type mockClaimLookup struct {
+	claim delegation.Delegation
+	err   error
+}
+
+func (m *mockClaimLookup) LookupClaim(ctx context.Context, claimCid cid.Cid, fetchURL url.URL) (delegation.Delegation, error) {
+	return m.claim, m.err
 }

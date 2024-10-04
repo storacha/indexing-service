@@ -33,9 +33,9 @@ type ProviderIndex struct {
 type LegacySystems interface{}
 
 // TODO: This assumes using low level primitives for publishing from IPNI but maybe we want to go ahead and use index-provider?
-func NewProviderIndex(ipniCache types.ProviderStore, findClient ipnifind.Client, sender announce.Sender, publisher dagsync.Publisher, advertisementsLsys ipld.LinkSystem, legacySystems LegacySystems) *ProviderIndex {
+func NewProviderIndex(providerStore types.ProviderStore, findClient ipnifind.Client, sender announce.Sender, publisher dagsync.Publisher, advertisementsLsys ipld.LinkSystem, legacySystems LegacySystems) *ProviderIndex {
 	return &ProviderIndex{
-		providerStore: ipniCache,
+		providerStore: providerStore,
 		findClient:    findClient,
 	}
 }

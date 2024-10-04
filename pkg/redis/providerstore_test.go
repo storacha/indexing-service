@@ -6,13 +6,9 @@ import (
 
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/metadata"
 	"github.com/storacha/indexing-service/pkg/redis"
-	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,27 +30,9 @@ func TestProviderStore(t *testing.T) {
 
 func randomProviderResults(num int) (multihash.Multihash, []model.ProviderResult, error) {
 	randomHash := testutil.RandomCID().(cidlink.Link).Cid.Hash()
-	aliceDid := testutil.Alice.DID()
-	encodedContextID, err := types.ContextID{Space: &aliceDid, Hash: randomHash}.ToEncoded()
-	if err != nil {
-		return nil, nil, err
-	}
-	metadata, err := (&metadata.LocationCommitmentMetadata{
-		ClaimCID: testutil.RandomCID().(cidlink.Link).Cid,
-	}).MarshalBinary()
-	if err != nil {
-		return nil, nil, err
-	}
 	providerResults := make([]model.ProviderResult, 0, num)
 	for i := 0; i < num; i++ {
-		providerResults = append(providerResults, model.ProviderResult{
-			ContextID: encodedContextID,
-			Metadata:  metadata,
-			Provider: &peer.AddrInfo{
-				ID:    testutil.RandomPeer(),
-				Addrs: []multiaddr.Multiaddr{testutil.RandomMultiaddr()},
-			},
-		})
+		providerResults = append(providerResults, testutil.RandomProviderResult())
 	}
 
 	return randomHash, providerResults, nil
