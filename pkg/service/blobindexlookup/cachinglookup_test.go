@@ -38,7 +38,7 @@ func TestWithCache__Find(t *testing.T) {
 		getErr         error
 		expectedErr    error
 		baseLookup     *mockBlobIndexLookup
-		providerCacher *mockProviderCacher
+		providerCacher *mockCachingQueue
 		expectedIndex  blobindex.ShardedDagIndexView
 		finalState     map[string]blobindex.ShardedDagIndexView
 	}{
@@ -93,7 +93,7 @@ func TestWithCache__Find(t *testing.T) {
 			name:           "provider cacher error",
 			contextID:      notCachedContextID,
 			expectedIndex:  nil,
-			providerCacher: &mockProviderCacher{anError},
+			providerCacher: &mockCachingQueue{anError},
 			expectedErr:    fmt.Errorf("queueing provider caching for index failed: %w", anError),
 			finalState: map[string]blobindex.ShardedDagIndexView{
 				string(cachedContextID):    cachedIndex,
@@ -118,7 +118,7 @@ func TestWithCache__Find(t *testing.T) {
 			}
 			providerCacher := tc.providerCacher
 			if providerCacher == nil {
-				providerCacher = &mockProviderCacher{nil}
+				providerCacher = &mockCachingQueue{nil}
 			}
 			// Create ClaimLookup instance
 			cl := blobindexlookup.WithCache(lookup, mockStore, providerCacher)
@@ -184,11 +184,11 @@ func (m *mockBlobIndexLookup) Find(ctx context.Context, contextID types.EncodedC
 	return m.index, m.err
 }
 
-type mockProviderCacher struct {
+type mockCachingQueue struct {
 	err error
 }
 
-// CacheProviderForIndex implements blobindexlookup.ProviderCacher.
-func (m *mockProviderCacher) CacheProviderForIndex(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error {
+// QueueProviderCaching implements blobindexlookup.ProviderCacher.
+func (m *mockCachingQueue) QueueProviderCaching(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error {
 	return m.err
 }

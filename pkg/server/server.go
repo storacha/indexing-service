@@ -1,25 +1,39 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-ucanto/core/car"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
 	ucanhttp "github.com/storacha/go-ucanto/transport/http"
+	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
+	"github.com/storacha/indexing-service/pkg/service/queryresult"
 )
 
 var log = logging.Logger("server")
 
+type Service interface {
+	CacheClaim(ctx context.Context, claim delegation.Delegation) error
+	PublishClaim(ctx context.Context, claim delegation.Delegation) error
+	Query(ctx context.Context, q service.Query) (queryresult.QueryResult, error)
+}
+
 type config struct {
-	id principal.Signer
+	id      principal.Signer
+	service Service
 }
 
 type Option func(*config)
@@ -28,6 +42,12 @@ type Option func(*config)
 func WithIdentity(s principal.Signer) Option {
 	return func(c *config) {
 		c.id = s
+	}
+}
+
+func WithService(service Service) Option {
+	return func(c *config) {
+		c.service = service
 	}
 }
 
@@ -70,7 +90,7 @@ func NewServer(opts ...Option) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", getRootHandler(c.id))
 	mux.HandleFunc("POST /claims", postClaimsHandler(c.id))
-	mux.HandleFunc("GET /claims/{multihash}", getClaimsHandler())
+	mux.HandleFunc("GET /claims", getClaimsHandler(c.service))
 	return mux
 }
 
@@ -114,27 +134,41 @@ func postClaimsHandler(id principal.Signer) func(http.ResponseWriter, *http.Requ
 
 // getClaimsHandler retrieves content claims when a GET request is sent to
 // "/claims/{multihash}".
-func getClaimsHandler() func(http.ResponseWriter, *http.Request) {
+func getClaimsHandler(s Service) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, bytes, err := multibase.Decode(r.PathValue("multihash"))
-		if err != nil {
-			w.WriteHeader(400)
-			w.Write([]byte("invalid multibase encoding"))
-			return
+		mhStrings := r.URL.Query()["multihash"]
+		hashes := make([]multihash.Multihash, 0, len(mhStrings))
+		for _, mhString := range mhStrings {
+			_, bytes, err := multibase.Decode(mhString)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("invalid multibase encoding: %s", err.Error()), 400)
+				return
+			}
+			hashes = append(hashes, bytes)
+		}
+		spaceStrings := r.URL.Query()["spaces"]
+		spaces := make([]did.DID, 0, len(spaceStrings))
+		for _, spaceString := range spaceStrings {
+			space, err := did.Parse(spaceString)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("invalid did: %s", err.Error()), 400)
+				return
+			}
+			spaces = append(spaces, space)
 		}
 
-		mh, err := multihash.Decode(bytes)
+		qr, err := s.Query(r.Context(), service.Query{
+			Hashes: hashes,
+			Match: service.Match{
+				Subject: spaces,
+			},
+		})
 		if err != nil {
-			w.WriteHeader(400)
-			w.Write([]byte("invalid multihash"))
-			return
+			http.Error(w, fmt.Sprintf("processing queury: %s", err.Error()), 400)
 		}
 
-		// TODO: implement me
-		// Just echo it back for now...
-		enc, _ := multihash.Encode(mh.Digest, mh.Code)
-		str, _ := multibase.Encode(multibase.Base58BTC, enc)
-
-		w.Write([]byte(str))
+		body := car.Encode([]datamodel.Link{qr.Root().Link()}, qr.Blocks())
+		w.WriteHeader(http.StatusOK)
+		io.Copy(w, body)
 	}
 }

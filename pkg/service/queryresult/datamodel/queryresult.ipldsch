@@ -1,0 +1,8 @@
+type QueryResult union {
+  | QueryResult0_1 "index/query/result@0.1"
+}
+
+type QueryResult0_1 struct {
+  claims optional [Link]
+  indexes optional {String:Link}
+}

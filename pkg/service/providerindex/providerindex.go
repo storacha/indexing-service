@@ -26,14 +26,14 @@ type QueryKey struct {
 // ProviderIndex is a read/write interface to a local cache of providers that falls back to IPNI
 type ProviderIndex struct {
 	providerStore types.ProviderStore
-	findClient    ipnifind.Client
+	findClient    ipnifind.Finder
 }
 
 // TBD access to legacy systems
 type LegacySystems interface{}
 
 // TODO: This assumes using low level primitives for publishing from IPNI but maybe we want to go ahead and use index-provider?
-func NewProviderIndex(providerStore types.ProviderStore, findClient ipnifind.Client, sender announce.Sender, publisher dagsync.Publisher, advertisementsLsys ipld.LinkSystem, legacySystems LegacySystems) *ProviderIndex {
+func NewProviderIndex(providerStore types.ProviderStore, findClient ipnifind.Finder, sender announce.Sender, publisher dagsync.Publisher, advertisementsLsys ipld.LinkSystem, legacySystems LegacySystems) *ProviderIndex {
 	return &ProviderIndex{
 		providerStore: providerStore,
 		findClient:    findClient,

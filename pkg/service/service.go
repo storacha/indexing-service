@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"strings"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/ipni/go-libipni/maurl"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
@@ -19,6 +21,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/singlewalk"
 	"github.com/storacha/indexing-service/pkg/metadata"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -33,12 +36,6 @@ type Match struct {
 type Query struct {
 	Hashes []multihash.Multihash
 	Match  Match
-}
-
-// QueryResult describes the found claims and indexes for a given query
-type QueryResult struct {
-	Claims  map[cid.Cid]delegation.Delegation
-	Indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]
 }
 
 // ProviderIndex is a read/write interface to a local cache of providers that falls back to IPNI
@@ -114,9 +111,14 @@ var targetClaims = map[jobType][]multicodec.Code{
 	equalsOrLocationJobType: {metadata.IndexClaimID, metadata.LocationCommitmentID},
 }
 
+type queryResult struct {
+	Claims  map[cid.Cid]delegation.Delegation
+	Indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]
+}
+
 type queryState struct {
 	q      *Query
-	qr     *QueryResult
+	qr     *queryResult
 	visits map[jobKey]struct{}
 }
 
@@ -154,14 +156,17 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 		for _, code := range md.Protocols() {
 			protocol := md.Get(code)
 			// make sure this is some kind of claim protocol, ignore if not
-			hasClaimCid, ok := protocol.(metadata.HasClaimCid)
+			hasClaimCid, ok := protocol.(metadata.HasClaim)
 			if !ok {
 				continue
 			}
 			// fetch (from cache or url) the actual content claim
-			claimCid := hasClaimCid.GetClaimCid()
-			url := is.fetchClaimUrl(*result.Provider, claimCid)
-			claim, err := is.claimLookup.LookupClaim(mhCtx, claimCid, url)
+			claimCid := hasClaimCid.GetClaim()
+			url, err := is.fetchClaimURL(*result.Provider, claimCid)
+			if err != nil {
+				return err
+			}
+			claim, err := is.claimLookup.LookupClaim(mhCtx, claimCid, *url)
 			if err != nil {
 				return err
 			}
@@ -207,8 +212,11 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 						c := cid.NewCidV1(cid.Raw, j.mh)
 						shard = &c
 					}
-					url := is.fetchRetrievalUrl(*result.Provider, *shard)
-					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
+					url, err := is.fetchRetrievalURL(*result.Provider, *shard)
+					if err != nil {
+						return err
+					}
+					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, *url, typedProtocol.Range)
 					if err != nil {
 						return err
 					}
@@ -246,30 +254,54 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 // 5. Query IPNIIndex for any location claims for any shards that contain the multihash based on the ShardedDagIndex
 // 6. Read the requisite claims from the ClaimLookup
 // 7. Return all discovered claims and sharded dag indexes
-func (is *IndexingService) Query(ctx context.Context, q Query) (QueryResult, error) {
+func (is *IndexingService) Query(ctx context.Context, q Query) (queryresult.QueryResult, error) {
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
 		initialJobs = append(initialJobs, job{mh, nil, nil, standardJobType})
 	}
 	qs, err := is.jobWalker(ctx, initialJobs, queryState{
 		q: &q,
-		qr: &QueryResult{
+		qr: &queryResult{
 			Claims:  make(map[cid.Cid]delegation.Delegation),
 			Indexes: bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1),
 		},
 		visits: map[jobKey]struct{}{},
 	}, is.jobHandler)
-	return *qs.qr, err
+	if err != nil {
+		return nil, err
+	}
+	return queryresult.Build(qs.qr.Claims, qs.qr.Indexes)
 }
 
-func (is *IndexingService) fetchClaimUrl(provider peer.AddrInfo, claimCid cid.Cid) url.URL {
-	// Todo figure out how this works
-	return url.URL{}
+func (is *IndexingService) urlForResource(provider peer.AddrInfo, resourceType string, resourceID string) (*url.URL, error) {
+	for _, addr := range provider.Addrs {
+		// first, attempt to convert the addr to a url scheme
+		url, err := maurl.ToURL(addr)
+		// if it can't be converted, skip
+		if err != nil {
+			continue
+		}
+		// must be an http url
+		if !(url.Scheme == "http" || url.Scheme == "https") {
+			continue
+		}
+		// we must have a place to place the resourceId in the path
+		if !strings.Contains(url.Path, resourceType) {
+			continue
+		}
+		// ok we have a matching URL, return with all resource type components replaced with the id
+		url.Path = strings.ReplaceAll(url.Path, resourceType, resourceID)
+		return url, nil
+	}
+	return nil, errors.New("no claim endpoint found")
 }
 
-func (is *IndexingService) fetchRetrievalUrl(provider peer.AddrInfo, shard cid.Cid) url.URL {
-	// Todo figure out how this works
-	return url.URL{}
+func (is *IndexingService) fetchClaimURL(provider peer.AddrInfo, claimCid cid.Cid) (*url.URL, error) {
+	return is.urlForResource(provider, "{claim}", claimCid.String())
+}
+
+func (is *IndexingService) fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) {
+	return is.urlForResource(provider, "{shard}", shard.String())
 }
 
 // CacheClaim is used to cache a claim without publishing it to IPNI
