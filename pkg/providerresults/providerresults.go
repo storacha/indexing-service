@@ -1,7 +1,9 @@
-package redis
+// Package providerresults implements utilities for the IPNI provider result type
+package providerresults
 
 import (
-	// imported for embedding
+	"bytes"
+	// for importing schema
 	_ "embed"
 	"fmt"
 
@@ -10,19 +12,16 @@ import (
 	"github.com/ipld/go-ipld-prime/node/bindnode"
 	"github.com/ipld/go-ipld-prime/schema"
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/libp2p/go-libp2p/core/peer"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	multihash "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/indexing-service/pkg/types"
 )
 
 var (
-	//go:embed providerresult.ipldsch
+	//go:embed providerresults.ipldsch
 	providerResultsBytes []byte
 	peerIDConverter      = bindnode.NamedBytesConverter("PeerID", bytesToPeerID, peerIDtoBytes)
 	multiaddrConverter   = bindnode.NamedBytesConverter("Multiaddr", bytesToMultiaddr, multiaddrToBytes)
 	providerResultsType  schema.Type
-	_                    types.IPNIStore = (*IPNIStore)(nil)
 )
 
 func init() {
@@ -31,14 +30,6 @@ func init() {
 		panic(fmt.Errorf("failed to load schema: %w", err))
 	}
 	providerResultsType = typeSystem.TypeByName("ProviderResults")
-}
-
-// IPNIStore is a RedisStore for storing IPNI data that implements types.IPNIStore
-type IPNIStore = Store[multihash.Multihash, []model.ProviderResult]
-
-// NewIPNIStore returns a new instance of an IPNI store using the given redis client
-func NewIPNIStore(client Client) *IPNIStore {
-	return NewStore(providerResultsFromRedis, providerResultsToRedis, multihashKeyString, client)
 }
 
 func bytesToPeerID(data []byte) (interface{}, error) {
@@ -59,7 +50,8 @@ func multiaddrToBytes(ma interface{}) ([]byte, error) {
 	return (*ma.(*multiaddr.Multiaddr)).Bytes(), nil
 }
 
-func providerResultsFromRedis(data string) ([]model.ProviderResult, error) {
+// UnmarshalCBOR decodes a list provider results from CBOR-encoded bytes
+func UnmarshalCBOR(data []byte) ([]model.ProviderResult, error) {
 	var records []model.ProviderResult
 	_, err := ipld.Unmarshal([]byte(data), dagcbor.Decode, &records, providerResultsType, peerIDConverter, multiaddrConverter)
 	if err != nil {
@@ -68,11 +60,21 @@ func providerResultsFromRedis(data string) ([]model.ProviderResult, error) {
 	return records, nil
 }
 
-func providerResultsToRedis(records []model.ProviderResult) (string, error) {
-	data, err := ipld.Marshal(dagcbor.Encode, &records, providerResultsType, peerIDConverter, multiaddrConverter)
-	return string(data), err
+// MarshalCBOR encodes a list provider results in CBOR
+func MarshalCBOR(records []model.ProviderResult) ([]byte, error) {
+	return ipld.Marshal(dagcbor.Encode, &records, providerResultsType, peerIDConverter, multiaddrConverter)
 }
 
-func multihashKeyString(k multihash.Multihash) string {
-	return string(k)
+func equalProvider(a, b *peer.AddrInfo) bool {
+	if a == nil {
+		return b == nil
+	}
+	return b != nil && a.String() == b.String()
+}
+
+// Equals compares two ProviderResults
+func Equals(a, b model.ProviderResult) bool {
+	return bytes.Equal(a.ContextID, b.ContextID) &&
+		bytes.Equal(a.Metadata, b.Metadata) &&
+		equalProvider(a.Provider, b.Provider)
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha-network/go-ucanto/core/delegation"
-	"github.com/storacha-network/go-ucanto/did"
-	"github.com/storacha-network/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/indexing-service/pkg/blobindex"
 )
 
 // ContextID describes the data used to calculate a context id for IPNI
@@ -42,8 +42,8 @@ type Cache[Key, Value any] interface {
 	Get(ctx context.Context, key Key) (Value, error)
 }
 
-// IPNIStore caches queries to IPNI
-type IPNIStore Cache[mh.Multihash, []model.ProviderResult]
+// ProviderStore caches queries to IPNI
+type ProviderStore Cache[mh.Multihash, []model.ProviderResult]
 
 // ContentClaimsStore caches fetched content claims
 type ContentClaimsStore Cache[cid.Cid, delegation.Delegation]
