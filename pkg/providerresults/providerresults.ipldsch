@@ -1,0 +1,18 @@
+type PeerID bytes
+type Multiaddr bytes
+
+type Provider struct {
+  ID PeerID
+  Addrs [Multiaddr]
+} representation tuple
+
+type ProviderResult struct {
+  # ContextID identifies the metadata that is part of this value.
+	ContextID Bytes
+	# Metadata contains information for the provider to use to retrieve data.
+	Metadata Bytes
+	# Provider is the peer ID and addresses of the provider.
+	Provider Provider
+} representation tuple
+
+type ProviderResults [ProviderResult]

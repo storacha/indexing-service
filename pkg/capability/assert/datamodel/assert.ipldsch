@@ -11,7 +11,7 @@ type LocationCaveats struct {
 }
 
 type Digest struct {
-  digest bytes
+  digest Bytes
 }
 
 type InclusionCaveats struct {
@@ -25,7 +25,7 @@ type IndexCaveats struct {
 	index &Any
 }
 
-type InclusionCaveats struct {
+type PartitionCaveats struct {
 	content  Any
 	blocks 	 optional &Any
 	parts    [&Any]

@@ -1,6 +1,7 @@
 package datamodel
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/ipld/go-ipld-prime"
@@ -16,7 +17,7 @@ var assertTS *schema.TypeSystem
 func init() {
 	ts, err := ipld.LoadSchemaBytes(assert)
 	if err != nil {
-		panic(fmt.Errorf("loading sharded dag index schema: %w", err))
+		panic(fmt.Errorf("loading assert schema: %w", err))
 	}
 	assertTS = ts
 }
