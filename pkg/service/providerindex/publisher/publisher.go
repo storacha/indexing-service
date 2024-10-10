@@ -9,6 +9,7 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
@@ -23,6 +24,15 @@ import (
 
 var log = logging.Logger("publisher")
 var remoteHeadPrefix = datastore.NewKey("head/remote/")
+
+// The below definitions allow us to actually read entry blocks from the
+// IPNI datastore. For some reason there's not accessor for this.
+// https://github.com/ipni/index-provider/blob/69eb98045424f6074fc351b9d4771d0725a28620/engine/engine.go#L39
+var entriesNamespace = datastore.NewKey("/cache/links")
+
+// maxEntryChunkSize is the maximum number of multihashes each advertisement
+// entry chunk may contain.
+var maxEntryChunkSize = 16384
 
 type Publisher interface {
 	// Publish publishes an advert to indexer(s). Note: it is not necessary to
@@ -121,6 +131,7 @@ func New(id crypto.PrivKey, opts ...Option) (*IPNIPublisher, error) {
 		engine.WithPublisherKind(engine.HttpPublisher),
 		engine.WithHttpPublisherListenAddr(listenAddr),
 		engine.WithDatastore(ds),
+		engine.WithChainedEntries(maxEntryChunkSize),
 	}
 	for _, addr := range o.announceAddrs {
 		engopts = append(engopts, engine.WithHttpPublisherAnnounceAddr(addr))
@@ -134,10 +145,11 @@ func New(id crypto.PrivKey, opts ...Option) (*IPNIPublisher, error) {
 		return nil, fmt.Errorf("creating IPNI index provider: %w", err)
 	}
 
-	pub := IPNIPublisher{engine: engine, store: NewAdvertStore(ds)}
+	ads := NewAdvertStore(ds, namespace.Wrap(ds, entriesNamespace))
+	pubr := IPNIPublisher{engine: engine, store: ads}
 	if o.remoteSyncNotifyAddr == "" {
 		log.Warnf("no HTTP address configured for remote sync notifications")
-		return &pub, nil
+		return &pubr, nil
 	}
 
 	peer, err := peer.IDFromPrivateKey(id)
@@ -178,8 +190,8 @@ func New(id crypto.PrivKey, opts ...Option) (*IPNIPublisher, error) {
 		}
 	})
 
-	pub.notifier = notifier
-	return &pub, nil
+	pubr.notifier = notifier
+	return &pubr, nil
 }
 
 func asCID(link ipld.Link) cid.Cid {
