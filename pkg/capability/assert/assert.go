@@ -11,6 +11,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/core/schema"
+	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/validator"
 	adm "github.com/storacha/indexing-service/pkg/capability/assert/datamodel"
 )
@@ -72,6 +73,7 @@ type LocationCaveats struct {
 	Content  HasMultihash
 	Location []url.URL
 	Range    *adm.Range
+	Space    did.DID
 }
 
 func (lc LocationCaveats) ToIPLD() (datamodel.Node, error) {
@@ -89,6 +91,7 @@ func (lc LocationCaveats) ToIPLD() (datamodel.Node, error) {
 		Content:  cn,
 		Location: asStrings,
 		Range:    lc.Range,
+		Space:    lc.Space.Bytes(),
 	}
 	return ipld.WrapWithRecovery(md, adm.LocationCaveatsType())
 }
@@ -109,10 +112,20 @@ var Location = validator.NewCapability(LocationAbility, schema.DIDString(),
 			}
 			location = append(location, url)
 		}
+
+		space := did.Undef
+		if len(model.Space) > 0 {
+			var serr error
+			space, serr = did.Decode(model.Space)
+			if serr != nil {
+				return LocationCaveats{}, failure.FromError(serr)
+			}
+		}
 		return LocationCaveats{
 			Content:  hasMultihash,
 			Location: location,
 			Range:    model.Range,
+			Space:    space,
 		}, nil
 	}), nil)
 
