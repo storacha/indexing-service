@@ -59,6 +59,7 @@ type LocationCaveatsModel struct {
 	Content  datamodel.Node
 	Location []string
 	Range    *Range
+	Space    []byte
 }
 
 type DigestModel struct {

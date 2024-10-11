@@ -1,3 +1,4 @@
+type DID bytes
 
 type Range struct {
 	offset Int
@@ -8,6 +9,7 @@ type LocationCaveats struct {
 	content  Any
 	location [String]
 	range    optional Range
+	space optional DID
 }
 
 type Digest struct {
