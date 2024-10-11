@@ -31,4 +31,4 @@ Early days PRs are welcome!
 
 This library is dual-licensed under Apache 2.0 and MIT terms.
 
-Copyright 2022. Protocol Labs, Inc.
+Copyright 2024. Storacha Network Inc.
