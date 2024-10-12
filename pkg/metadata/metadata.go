@@ -1,7 +1,7 @@
 /*
 	 Package metadata implements protocols for publishing content claims on IPNI
 
-	  The goal of is to enable partial publishing of content claims to IPNI
+	  The goal is to enable partial publishing of content claims to IPNI
 
 		The rules for publishing content claims records to IPNI are as follows:
 

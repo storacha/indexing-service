@@ -5,7 +5,7 @@ type IndexClaimMetadata struct {
 }
 
 type EqualsClaimMetadata struct {
-  equals Link (rename "e")
+  equals Link (rename "=")
   expiration Int (rename "e")
   claim Link (rename "c")
 }
