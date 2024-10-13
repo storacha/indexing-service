@@ -55,7 +55,7 @@ func TestNotifier(t *testing.T) {
 		ts, ads := mockIpniApi(pid)
 		defer ts.Close()
 
-		notifier, err := NewRemoteSyncNotifier(ts.URL, pid, nil)
+		notifier, err := NewRemoteSyncNotifier(ts.URL, priv, &mockHead{})
 		require.NoError(t, err)
 
 		var wg sync.WaitGroup
@@ -78,7 +78,7 @@ func TestNotifier(t *testing.T) {
 		ts, chain := mockIpniApi(pid)
 		defer ts.Close()
 
-		notifier, err := NewRemoteSyncNotifier(ts.URL, pid, chain[0])
+		notifier, err := NewRemoteSyncNotifier(ts.URL, priv, &mockHead{chain[0]})
 		require.NoError(t, err)
 
 		var wg sync.WaitGroup
@@ -96,4 +96,16 @@ func TestNotifier(t *testing.T) {
 
 		require.Equal(t, chain[1:], notifications)
 	})
+}
+
+type mockHead struct {
+	head ipld.Link
+}
+
+func (m *mockHead) Get(context.Context) ipld.Link {
+	return m.head
+}
+
+func (m *mockHead) Set(_ context.Context, head ipld.Link) {
+	m.head = head
 }

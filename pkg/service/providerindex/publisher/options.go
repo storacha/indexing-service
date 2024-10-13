@@ -8,10 +8,9 @@ import (
 type Option func(cfg *options) error
 
 type options struct {
-	datastore            datastore.Batching
-	listenAddr           string
-	announceAddrs        []string
-	remoteSyncNotifyAddr string
+	datastore     datastore.Batching
+	listenAddr    string
+	announceAddrs []string
 }
 
 // WithDatastore configures the data store for adverts and entries.
@@ -36,15 +35,6 @@ func WithListenAddr(addr string) Option {
 func WithAnnounceAddr(addrs ...string) Option {
 	return func(opts *options) error {
 		opts.announceAddrs = addrs
-		return nil
-	}
-}
-
-// WithRemoteSyncNotifyAddr configures the URL of a remote IPNI node that
-// should be used to provide remote sync notifications.
-func WithRemoteSyncNotifyAddr(addr string) Option {
-	return func(opts *options) error {
-		opts.remoteSyncNotifyAddr = addr
 		return nil
 	}
 }

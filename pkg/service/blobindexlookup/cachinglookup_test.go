@@ -12,6 +12,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/metadata"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
+	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -189,6 +190,6 @@ type mockCachingQueue struct {
 }
 
 // QueueProviderCaching implements blobindexlookup.ProviderCacher.
-func (m *mockCachingQueue) QueueProviderCaching(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error {
+func (m *mockCachingQueue) Queue(ctx context.Context, job providercacher.ProviderCachingJob) error {
 	return m.err
 }
