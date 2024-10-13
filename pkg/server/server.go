@@ -88,14 +88,14 @@ func NewServer(opts ...Option) *http.ServeMux {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", getRootHandler(c.id))
-	mux.HandleFunc("POST /claims", postClaimsHandler(c.id))
-	mux.HandleFunc("GET /claims", getClaimsHandler(c.service))
+	mux.HandleFunc("GET /", GetRootHandler(c.id))
+	mux.HandleFunc("POST /claims", PostClaimsHandler(c.id))
+	mux.HandleFunc("GET /claims", GetClaimsHandler(c.service))
 	return mux
 }
 
-// getRootHandler displays version info when a GET request is sent to "/".
-func getRootHandler(id principal.Signer) func(http.ResponseWriter, *http.Request) {
+// GetRootHandler displays version info when a GET request is sent to "/".
+func GetRootHandler(id principal.Signer) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("🔥 indexing-service v0.0.0\n"))
 		w.Write([]byte("- https://github.com/storacha/indexing-service\n"))
@@ -107,9 +107,9 @@ func getRootHandler(id principal.Signer) func(http.ResponseWriter, *http.Request
 	}
 }
 
-// postClaimsHandler invokes the ucanto service when a POST request is sent to
+// PostClaimsHandler invokes the ucanto service when a POST request is sent to
 // "/claims".
-func postClaimsHandler(id principal.Signer) func(http.ResponseWriter, *http.Request) {
+func PostClaimsHandler(id principal.Signer) func(http.ResponseWriter, *http.Request) {
 	server, err := contentclaims.NewServer(id)
 	if err != nil {
 		log.Fatalf("creating ucanto server: %s", err)
@@ -132,9 +132,9 @@ func postClaimsHandler(id principal.Signer) func(http.ResponseWriter, *http.Requ
 	}
 }
 
-// getClaimsHandler retrieves content claims when a GET request is sent to
+// GetClaimsHandler retrieves content claims when a GET request is sent to
 // "/claims/{multihash}".
-func getClaimsHandler(s Service) func(http.ResponseWriter, *http.Request) {
+func GetClaimsHandler(s Service) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mhStrings := r.URL.Query()["multihash"]
 		hashes := make([]multihash.Multihash, 0, len(mhStrings))

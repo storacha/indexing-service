@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"slices"
 
-	cid "github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-ipld-prime"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	"github.com/ipni/go-libipni/find/model"
 	meta "github.com/ipni/go-libipni/metadata"
@@ -42,60 +39,11 @@ type ProviderIndex struct {
 type LegacySystems interface{}
 
 func NewProviderIndex(providerStore types.ProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacySystems LegacySystems) *ProviderIndex {
-	publisher.NotifyRemoteSync(func(ctx context.Context, head, prev ipld.Link) {
-		HandleRemoteSync(ctx, providerStore, publisher, head, prev)
-	})
-
 	return &ProviderIndex{
 		providerStore: providerStore,
 		findClient:    findClient,
 		publisher:     publisher,
 	}
-}
-
-func HandleRemoteSync(ctx context.Context, providerStore types.ProviderStore, publisher publisher.Publisher, head, prev ipld.Link) {
-	log.Infof("handling IPNI remote sync from %s to %s", prev, head)
-
-	q := jobqueue.NewJobQueue(
-		func(ctx context.Context, digest mh.Multihash) error {
-			return providerStore.SetExpirable(ctx, digest, true)
-		},
-		jobqueue.WithConcurrency(5),
-		jobqueue.WithErrorHandler(func(err error) {
-			log.Errorf("setting expirable: %w", err)
-		}),
-	)
-	q.Startup()
-
-	cur := head
-	for {
-		ad, err := publisher.Store().Advert(ctx, cur)
-		if err != nil {
-			log.Errorf("getting advert: %s: %w", cur, err)
-			return
-		}
-		for d, err := range publisher.Store().Entries(ctx, ad.Entries) {
-			if err != nil {
-				log.Errorf("iterating advert entries: %s (advert) -> %s (entries): %w", cur, ad.Entries, err)
-				return
-			}
-			err := q.Queue(ctx, d)
-			if err != nil {
-				log.Errorf("adding digest to queue: %s: %w", d.B58String(), err)
-				return
-			}
-		}
-		if ad.PreviousCid() == cid.Undef || ad.PreviousCid().String() == prev.String() {
-			break
-		}
-		cur = cidlink.Link{Cid: ad.PreviousCid()}
-	}
-
-	err := q.Shutdown(ctx)
-	if err != nil {
-		log.Errorf("shutting down IPNI remote sync job queue: %w", err)
-	}
-	log.Infof("handled IPNI remote sync from %s to %s", prev, head)
 }
 
 // Find should do the following

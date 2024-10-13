@@ -2,11 +2,15 @@ package publisher
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"time"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	ipnifind "github.com/ipni/go-libipni/find/client"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -23,10 +27,15 @@ type RemoteSyncNotifier interface {
 	Notify(NotifyRemoteSyncFunc)
 }
 
+type Head interface {
+	Get(context.Context) ipld.Link
+	Set(context.Context, ipld.Link)
+}
+
 type Notifier struct {
 	client   *ipnifind.Client
 	provider peer.ID
-	head     ipld.Link
+	head     Head
 	ts       time.Time
 	done     chan bool
 	notify   []NotifyRemoteSyncFunc
@@ -50,14 +59,15 @@ func (n *Notifier) Start(ctx context.Context) {
 					log.Errorf("fetching last advert CID: %w", err)
 					continue
 				}
-				if !DidSync(head, n.head) {
+				prev := n.head.Get(ctx)
+				if !DidSync(head, prev) {
 					log.Warnf("remote IPNI subscriber did not sync for %s", time.Since(n.ts))
 					continue
 				}
 				for _, f := range n.notify {
-					f(ctx, head, n.head)
+					f(ctx, head, prev)
 				}
-				n.head = head
+				n.head.Set(ctx, head)
 				n.ts = time.Now()
 			}
 		}
@@ -89,10 +99,27 @@ func DidSync(head, prev ipld.Link) bool {
 // it's latest advertisement has changed. The head parameter is optional.
 //
 // Note: not guaranteed to notify for every sync event.
-func NewRemoteSyncNotifier(addr string, provider peer.ID, head ipld.Link) (*Notifier, error) {
+func NewRemoteSyncNotifier(addr string, id crypto.PrivKey, head Head) (*Notifier, error) {
+	provider, err := peer.IDFromPrivateKey(id)
+	if err != nil {
+		return nil, fmt.Errorf("creating peer ID for IPNI publisher: %w", err)
+	}
 	c, err := ipnifind.New(addr)
 	if err != nil {
 		return nil, err
 	}
 	return &Notifier{client: c, head: head, ts: time.Now(), provider: provider}, nil
+}
+
+func NewNotifierWithStorage(addr string, id crypto.PrivKey, ds datastore.Batching) (*Notifier, error) {
+
+	addrURL, err := url.Parse(addr)
+	if err != nil {
+		return nil, fmt.Errorf("parsing URL for remote sync notifications: %w", err)
+	}
+	headState, err := NewHeadState(ds, addrURL.Hostname())
+	if err != nil {
+		return nil, fmt.Errorf("error setting up notification tracking")
+	}
+	return NewRemoteSyncNotifier(addr, id, headState)
 }
