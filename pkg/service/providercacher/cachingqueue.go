@@ -9,8 +9,8 @@ import (
 
 type (
 	ProviderCachingJob struct {
-		provider model.ProviderResult
-		index    blobindex.ShardedDagIndexView
+		Provider model.ProviderResult
+		Index    blobindex.ShardedDagIndexView
 	}
 
 	JobQueue interface {
@@ -19,10 +19,6 @@ type (
 
 	JobHandler struct {
 		providerCacher ProviderCacher
-	}
-
-	CachingQueue struct {
-		jobQueue JobQueue
 	}
 )
 
@@ -33,16 +29,6 @@ func NewJobHandler(providerCacher ProviderCacher) *JobHandler {
 }
 
 func (j *JobHandler) Handle(ctx context.Context, job ProviderCachingJob) error {
-	_, err := j.providerCacher.CacheProviderForIndexRecords(ctx, job.provider, job.index)
+	_, err := j.providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
 	return err
-}
-
-func NewCachingQueue(jobQueue JobQueue) *CachingQueue {
-	return &CachingQueue{
-		jobQueue: jobQueue,
-	}
-}
-
-func (q *CachingQueue) QueueProviderCaching(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error {
-	return q.jobQueue.Queue(ctx, ProviderCachingJob{provider: provider, index: index})
 }

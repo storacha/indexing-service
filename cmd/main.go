@@ -6,12 +6,13 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/redis/go-redis/v9"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
+	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/server"
-	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/urfave/cli/v2"
 )
 
@@ -107,12 +108,22 @@ func main() {
 								}
 								opts = append(opts, server.WithIdentity(id))
 							}
-							var sc service.ServiceConfig
-							sc.RedisURL = cCtx.String("redis-url")
-							sc.RedisPasswd = cCtx.String("redis-passwd")
-							sc.ProvidersDB = cCtx.Int("providers-redis-db")
-							sc.ClaimsDB = cCtx.Int("claims-redis-db")
-							sc.IndexesDB = cCtx.Int("indexes-redis-db")
+							var sc construct.ServiceConfig
+							sc.ProvidersRedis = redis.Options{
+								Addr:     cCtx.String("redis-url"),
+								Password: cCtx.String("redis-passwd"),
+								DB:       cCtx.Int("providers-redis-db"),
+							}
+							sc.ClaimsRedis = redis.Options{
+								Addr:     cCtx.String("redis-url"),
+								Password: cCtx.String("redis-passwd"),
+								DB:       cCtx.Int("claims-redis-db"),
+							}
+							sc.IndexesRedis = redis.Options{
+								Addr:     cCtx.String("redis-url"),
+								Password: cCtx.String("redis-passwd"),
+								DB:       cCtx.Int("indexes-redis-db"),
+							}
 							sc.IndexerURL = cCtx.String("ipni-endpoint")
 
 							privKey, err := crypto.UnmarshalEd25519PrivateKey(id.Raw())
@@ -121,12 +132,16 @@ func main() {
 							}
 							sc.PrivateKey = privKey
 
-							indexingService, shutdown, err := service.Construct(cCtx.Context, sc)
+							indexingService, err := construct.Construct(sc)
+							if err != nil {
+								return err
+							}
+							err = indexingService.Startup(cCtx.Context)
 							if err != nil {
 								return err
 							}
 							defer func() {
-								shutdown(cCtx.Context)
+								indexingService.Shutdown(cCtx.Context)
 							}()
 							opts = append(opts, server.WithService(indexingService))
 							return server.ListenAndServe(addr, opts...)

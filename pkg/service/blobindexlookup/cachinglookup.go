@@ -9,12 +9,13 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/metadata"
+	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
 // CachingQueue can queue a provider record to be cached for all CIDs in an index
 type CachingQueue interface {
-	QueueProviderCaching(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error
+	Queue(ctx context.Context, job providercacher.ProviderCachingJob) error
 }
 
 type cachingLookup struct {
@@ -56,7 +57,10 @@ func (b *cachingLookup) Find(ctx context.Context, contextID types.EncodedContext
 	}
 
 	// queue a background cache of an provider record for all cids in the index without one
-	if err := b.cachingQueue.QueueProviderCaching(ctx, provider, index); err != nil {
+	if err := b.cachingQueue.Queue(ctx, providercacher.ProviderCachingJob{
+		Provider: provider,
+		Index:    index,
+	}); err != nil {
 		return nil, fmt.Errorf("queueing provider caching for index failed: %w", err)
 	}
 
