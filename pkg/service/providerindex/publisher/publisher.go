@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"iter"
-	"net/url"
 	"slices"
 
 	cid "github.com/ipfs/go-cid"
@@ -21,7 +20,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/multiformats/go-multihash"
 	mh "github.com/multiformats/go-multihash"
 )
 
@@ -33,16 +31,6 @@ const (
 )
 
 var log = logging.Logger("publisher")
-
-var announceURL *url.URL
-
-func init() {
-	var err error
-	announceURL, err = url.Parse("https://cid.contact")
-	if err != nil {
-		panic(err)
-	}
-}
 
 type Publisher interface {
 	// Publish publishes an advert to indexer(s). Note: it is not necessary to
@@ -111,7 +99,7 @@ func asCID(link ipld.Link) cid.Cid {
 	return cid.MustParse(link.String())
 }
 
-func (p *IPNIPublisher) publishAdvForIndex(ctx context.Context, peer peer.ID, addrs []multiaddr.Multiaddr, contextID []byte, md metadata.Metadata, isRm bool, mhs iter.Seq[multihash.Multihash]) (ipld.Link, error) {
+func (p *IPNIPublisher) publishAdvForIndex(ctx context.Context, peer peer.ID, addrs []multiaddr.Multiaddr, contextID []byte, md metadata.Metadata, isRm bool, mhs iter.Seq[mh.Multihash]) (ipld.Link, error) {
 	var err error
 
 	log := log.With("providerID", peer).With("contextID", base64.StdEncoding.EncodeToString(contextID))
