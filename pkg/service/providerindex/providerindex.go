@@ -140,7 +140,7 @@ func (pi *ProviderIndex) filterBySpace(results []model.ProviderResult, mh mh.Mul
 // Publish should do the following:
 // 1. Write the entries to the cache with no expiration until publishing is complete
 // 2. Generate an advertisement for the advertised hashes and publish/announce it
-func (pi *ProviderIndex) Publish(ctx context.Context, provider *peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+func (pi *ProviderIndex) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
 	mdb, err := meta.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("marshaling metadata: %w", err)
@@ -149,7 +149,7 @@ func (pi *ProviderIndex) Publish(ctx context.Context, provider *peer.AddrInfo, c
 	pr := model.ProviderResult{
 		ContextID: []byte(contextID),
 		Metadata:  mdb,
-		Provider:  provider,
+		Provider:  &provider,
 	}
 
 	q := jobqueue.NewJobQueue(
