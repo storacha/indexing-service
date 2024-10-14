@@ -1,4 +1,4 @@
-package publisher
+package notifier
 
 import (
 	"context"
@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/ipfs/go-datastore"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
+
+var log = logging.Logger("publisher")
 
 var NotifierPollInterval = time.Second * 30
 
@@ -27,15 +30,15 @@ type RemoteSyncNotifier interface {
 	Notify(NotifyRemoteSyncFunc)
 }
 
-type Head interface {
+type NotifierHead interface {
 	Get(context.Context) ipld.Link
-	Set(context.Context, ipld.Link)
+	Set(context.Context, ipld.Link) error
 }
 
 type Notifier struct {
 	client   *ipnifind.Client
 	provider peer.ID
-	head     Head
+	head     NotifierHead
 	ts       time.Time
 	done     chan bool
 	notify   []NotifyRemoteSyncFunc
@@ -99,7 +102,7 @@ func DidSync(head, prev ipld.Link) bool {
 // it's latest advertisement has changed. The head parameter is optional.
 //
 // Note: not guaranteed to notify for every sync event.
-func NewRemoteSyncNotifier(addr string, id crypto.PrivKey, head Head) (*Notifier, error) {
+func NewRemoteSyncNotifier(addr string, id crypto.PrivKey, head NotifierHead) (*Notifier, error) {
 	provider, err := peer.IDFromPrivateKey(id)
 	if err != nil {
 		return nil, fmt.Errorf("creating peer ID for IPNI publisher: %w", err)
