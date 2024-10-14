@@ -17,7 +17,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/multiformats/go-varint v0.0.7
 	github.com/redis/go-redis/v9 v9.6.1
-	github.com/storacha/go-ucanto v0.1.1-0.20241009142711-2be8af85133c
+	github.com/storacha/go-ucanto v0.1.1-0.20241013210933-3949fc84d5ab
 	github.com/stretchr/testify v1.9.0
 )
 
@@ -42,6 +42,7 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/ipld/go-car/v2 v2.13.1 // indirect
 	github.com/ipld/go-ipld-adl-hamt v0.0.0-20240322071803-376decb85801 // indirect
+	github.com/ipld/go-ipld-prime/storage/dsadapter v0.0.0-20240917223228-6148356a4c2e // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
