@@ -112,12 +112,15 @@ func PostClaimsHandler(id principal.Signer, indexer types.Service) func(http.Res
 			w.WriteHeader(res.Status())
 		}
 
-		io.Copy(w, res.Body())
+		_, err := io.Copy(w, res.Body())
+		if err != nil {
+			log.Errorf("sending UCAN response: %w", err)
+		}
 	}
 }
 
 // GetClaimsHandler retrieves content claims when a GET request is sent to
-// "/claims/{multihash}".
+// "/claims?multihash={multihash}".
 func GetClaimsHandler(s types.Service) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mhStrings := r.URL.Query()["multihash"]
@@ -130,6 +133,11 @@ func GetClaimsHandler(s types.Service) func(http.ResponseWriter, *http.Request) 
 			}
 			hashes = append(hashes, bytes)
 		}
+		if len(hashes) == 0 {
+			http.Error(w, "missing digests", 400)
+			return
+		}
+
 		spaceStrings := r.URL.Query()["spaces"]
 		spaces := make([]did.DID, 0, len(spaceStrings))
 		for _, spaceString := range spaceStrings {
@@ -148,12 +156,15 @@ func GetClaimsHandler(s types.Service) func(http.ResponseWriter, *http.Request) 
 			},
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("processing queury: %s", err.Error()), 400)
+			http.Error(w, fmt.Sprintf("processing query: %s", err.Error()), 400)
 			return
 		}
 
 		body := car.Encode([]datamodel.Link{qr.Root().Link()}, qr.Blocks())
 		w.WriteHeader(http.StatusOK)
-		io.Copy(w, body)
+		_, err = io.Copy(w, body)
+		if err != nil {
+			log.Errorf("sending claims response: %w", err)
+		}
 	}
 }

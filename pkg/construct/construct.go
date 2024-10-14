@@ -12,6 +12,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/redis"
@@ -260,10 +261,16 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		cachingQueue,
 	)
 
+	peerID, err := peer.IDFromPrivateKey(sc.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("creating peer ID: %w", err)
+	}
+	provider := peer.AddrInfo{ID: peerID}
+
 	// with concurrency will still get overridden if a different walker setting is used
 	serviceOpts := append([]service.Option{service.WithConcurrency(5)}, cfg.opts...)
 
-	s.IndexingService = service.NewIndexingService(blobIndexLookup, claimLookup, providerIndex, serviceOpts...)
+	s.IndexingService = service.NewIndexingService(blobIndexLookup, claimLookup, provider, providerIndex, serviceOpts...)
 
 	return s, nil
 }
