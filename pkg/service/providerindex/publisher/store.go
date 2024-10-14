@@ -388,10 +388,10 @@ func (d *directoryStore) Put(ctx context.Context, key string, data io.Reader) er
 		return err
 	}
 	file, err := os.Create(path)
-	defer file.Close()
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	_, err = io.Copy(file, data)
 	return err
 }
