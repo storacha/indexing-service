@@ -7,8 +7,6 @@ import (
 	"iter"
 	"slices"
 
-	cid "github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
@@ -21,13 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
-)
-
-const (
-	keyToMetadataMapPrefix  = "map/keyMD/"
-	keyToChunkLinkMapPrefix = "map/keyChunkLink/"
-	entriesPrefix           = "entries/"
-	latestAdvKey            = "sync/adv"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 )
 
 var log = logging.Logger("publisher")
@@ -36,14 +28,13 @@ type Publisher interface {
 	// Publish publishes an advert to indexer(s). Note: it is not necessary to
 	// sign the advert - this is done automatically.
 	Publish(ctx context.Context, provider *peer.AddrInfo, contextID string, digests []mh.Multihash, meta metadata.Metadata) (ipld.Link, error)
-	// Store returns the storage interface used to access published data.
-	Store() AdvertStore
 }
 
 type IPNIPublisher struct {
 	*options
 	sender announce.Sender
 	key    crypto.PrivKey
+	store  store.PublisherStore
 }
 
 func (p *IPNIPublisher) Publish(ctx context.Context, providerInfo *peer.AddrInfo, contextID string, digests []mh.Multihash, meta metadata.Metadata) (ipld.Link, error) {
@@ -54,11 +45,7 @@ func (p *IPNIPublisher) Publish(ctx context.Context, providerInfo *peer.AddrInfo
 	return link, nil
 }
 
-func (p *IPNIPublisher) Store() AdvertStore {
-	return p.store
-}
-
-func New(id crypto.PrivKey, opts ...Option) (*IPNIPublisher, error) {
+func New(id crypto.PrivKey, store store.PublisherStore, opts ...Option) (*IPNIPublisher, error) {
 	o := &options{
 		topic: "/indexer/ingest/mainnet",
 	}
@@ -69,18 +56,11 @@ func New(id crypto.PrivKey, opts ...Option) (*IPNIPublisher, error) {
 		}
 	}
 
-	if o.store == nil {
-		// generate a new memory store
-		ds := datastore.NewMapDatastore()
-		o.store = fromDatastore(ds)
-		log.Warnf("no datastore configured, just using memory")
-	}
-
 	peer, err := peer.IDFromPrivateKey(id)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get peer ID from private key: %w", err)
 	}
-	pub := &IPNIPublisher{key: id, options: o}
+	pub := &IPNIPublisher{key: id, store: store, options: o}
 	if len(o.announceURLs) > 0 {
 		sender, err := httpsender.New(o.announceURLs, peer)
 		if err != nil {
@@ -92,13 +72,6 @@ func New(id crypto.PrivKey, opts ...Option) (*IPNIPublisher, error) {
 	return pub, nil
 }
 
-func asCID(link ipld.Link) cid.Cid {
-	if cl, ok := link.(cidlink.Link); ok {
-		return cl.Cid
-	}
-	return cid.MustParse(link.String())
-}
-
 func (p *IPNIPublisher) publishAdvForIndex(ctx context.Context, peer peer.ID, addrs []multiaddr.Multiaddr, contextID []byte, md metadata.Metadata, isRm bool, mhs iter.Seq[mh.Multihash]) (ipld.Link, error) {
 	var err error
 
@@ -106,7 +79,7 @@ func (p *IPNIPublisher) publishAdvForIndex(ctx context.Context, peer peer.ID, ad
 
 	chunkLink, err := p.store.ChunkLinkForProviderAndContextID(ctx, peer, contextID)
 	if err != nil {
-		if !IsNotFound(err) {
+		if !store.IsNotFound(err) {
 			return nil, fmt.Errorf("cound not not get entries cid by provider + context id: %s", err)
 		}
 	}
@@ -141,7 +114,7 @@ func (p *IPNIPublisher) publishAdvForIndex(ctx context.Context, peer peer.ID, ad
 			// Lookup metadata for this providerID and contextID.
 			prevMetadata, err := p.store.MetadataForProviderAndContextID(ctx, peer, contextID)
 			if err != nil {
-				if !IsNotFound(err) {
+				if !store.IsNotFound(err) {
 					return nil, fmt.Errorf("could not get metadata for provider + context id: %s", err)
 				}
 				log.Warn("No metadata for existing provider + context ID, generating new advertisement")
@@ -209,7 +182,7 @@ func (p *IPNIPublisher) publishAdvForIndex(ctx context.Context, peer peer.ID, ad
 	// Get the previous advertisement that was generated.
 	prevHead, err := p.store.Head(ctx)
 	if err != nil {
-		if !IsNotFound(err) {
+		if !store.IsNotFound(err) {
 			return nil, fmt.Errorf("could not get latest advertisement: %s", err)
 		}
 	}

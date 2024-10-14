@@ -6,12 +6,16 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipni/go-libipni/metadata"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,18 +31,20 @@ func TestPublish(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("single advert", func(t *testing.T) {
-		publisher, err := New(priv)
+		dstore := dssync.MutexWrap(datastore.NewMapDatastore())
+		st := store.FromDatastore(dstore)
+		publisher, err := New(priv, st)
 		require.NoError(t, err)
 
 		digests := testutil.RandomMultihashes(rand.IntN(10) + 1)
 		adlnk, err := publisher.Publish(ctx, &provInfo, testutil.RandomCID().String(), digests, metadata.Default.New())
 		require.NoError(t, err)
 
-		ad, err := publisher.Store().Advert(ctx, adlnk)
+		ad, err := st.Advert(ctx, adlnk)
 		require.NoError(t, err)
 
 		var ents []multihash.Multihash
-		for e, err := range publisher.Store().Entries(ctx, ad.Entries) {
+		for e, err := range st.Entries(ctx, ad.Entries) {
 			require.NoError(t, err)
 			ents = append(ents, e)
 		}
@@ -47,18 +53,20 @@ func TestPublish(t *testing.T) {
 	})
 
 	t.Run("single advert, chunked entries", func(t *testing.T) {
-		publisher, err := New(priv)
+		dstore := dssync.MutexWrap(datastore.NewMapDatastore())
+		st := store.FromDatastore(dstore)
+		publisher, err := New(priv, st)
 		require.NoError(t, err)
 
-		digests := testutil.RandomMultihashes(maxEntryChunkSize + 1)
+		digests := testutil.RandomMultihashes(store.MaxEntryChunkSize + 1)
 		adlnk, err := publisher.Publish(ctx, &provInfo, testutil.RandomCID().String(), digests, metadata.Default.New())
 		require.NoError(t, err)
 
-		ad, err := publisher.Store().Advert(ctx, adlnk)
+		ad, err := st.Advert(ctx, adlnk)
 		require.NoError(t, err)
 
 		var estrs []string
-		for e, err := range publisher.Store().Entries(ctx, ad.Entries) {
+		for e, err := range st.Entries(ctx, ad.Entries) {
 			require.NoError(t, err)
 			estrs = append(estrs, e.B58String())
 		}
@@ -75,7 +83,10 @@ func TestPublish(t *testing.T) {
 	})
 
 	t.Run("multiple adverts", func(t *testing.T) {
-		publisher, err := New(priv)
+
+		dstore := dssync.MutexWrap(datastore.NewMapDatastore())
+		st := store.FromDatastore(dstore)
+		publisher, err := New(priv, st)
 		require.NoError(t, err)
 
 		var adLinks []ipld.Link
@@ -94,11 +105,11 @@ func TestPublish(t *testing.T) {
 		}
 
 		for i, adLink := range adLinks {
-			ad, err := publisher.Store().Advert(ctx, adLink)
+			ad, err := st.Advert(ctx, adLink)
 			require.NoError(t, err)
 
 			var digests []multihash.Multihash
-			for e, err := range publisher.Store().Entries(ctx, ad.Entries) {
+			for e, err := range st.Entries(ctx, ad.Entries) {
 				require.NoError(t, err)
 				digests = append(digests, e)
 			}

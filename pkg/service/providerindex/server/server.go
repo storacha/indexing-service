@@ -8,7 +8,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/publisher"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 )
 
 type Server struct {
-	advertStore publisher.AdvertStore
+	advertStore store.EncodeableStore
 	handlerPath string
 	srv         *http.Server
 }
@@ -33,7 +33,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.srv.Close()
 }
 
-func NewServer(store publisher.AdvertStore, options ...Option) (*Server, error) {
+func NewServer(store store.EncodeableStore, options ...Option) (*Server, error) {
 	opts, err := getOpts(options)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		err := s.advertStore.EncodeHead(r.Context(), w)
 		if err != nil {
-			if publisher.IsNotFound(err) {
+			if store.IsNotFound(err) {
 				http.Error(w, "", http.StatusNoContent)
 				return
 			}
@@ -101,7 +101,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	err = s.advertStore.Encode(r.Context(), cidlink.Link{Cid: c}, w)
 	if err != nil {
-		if publisher.IsNotFound(err) {
+		if store.IsNotFound(err) {
 			http.Error(w, "cid not found", http.StatusNotFound)
 			return
 		}

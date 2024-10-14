@@ -8,19 +8,24 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/publisher"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-type RemoteSyncer struct {
-	providerStore types.ProviderStore
-	publisher     publisher.Publisher
+type Store interface {
+	store.EntriesReadable
+	store.AdvertReadable
 }
 
-func NewRemoteSyncer(providerStore types.ProviderStore, publisher publisher.Publisher) *RemoteSyncer {
+type RemoteSyncer struct {
+	providerStore types.ProviderStore
+	store         Store
+}
+
+func NewRemoteSyncer(providerStore types.ProviderStore, store Store) *RemoteSyncer {
 	return &RemoteSyncer{
 		providerStore: providerStore,
-		publisher:     publisher,
+		store:         store,
 	}
 }
 
@@ -40,12 +45,12 @@ func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Li
 
 	cur := head
 	for {
-		ad, err := rs.publisher.Store().Advert(ctx, cur)
+		ad, err := rs.store.Advert(ctx, cur)
 		if err != nil {
 			log.Errorf("getting advert: %s: %w", cur, err)
 			return
 		}
-		for d, err := range rs.publisher.Store().Entries(ctx, ad.Entries) {
+		for d, err := range rs.store.Entries(ctx, ad.Entries) {
 			if err != nil {
 				log.Errorf("iterating advert entries: %s (advert) -> %s (entries): %w", cur, ad.Entries, err)
 				return
