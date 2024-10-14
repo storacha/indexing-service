@@ -9,6 +9,7 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 )
@@ -50,3 +51,31 @@ type ContentClaimsStore Cache[cid.Cid, delegation.Delegation]
 
 // ShardedDagIndexStore caches fetched sharded dag indexes
 type ShardedDagIndexStore Cache[EncodedContextID, blobindex.ShardedDagIndexView]
+
+// Match narrows parameters for locating providers/claims for a set of multihashes
+type Match struct {
+	Subject []did.DID
+}
+
+// Query is a query for several multihashes
+type Query struct {
+	Hashes []mh.Multihash
+	Match  Match
+}
+
+// QueryResult is an encodable result of a query
+type QueryResult interface {
+	ipld.View
+	// Claims is a list of links to the root bock of claims that can be found in this message
+	Claims() []ipld.Link
+	// Indexes is a list of links to the CID hash of archived sharded dag indexes that can be found in this
+	// message
+	Indexes() []ipld.Link
+}
+
+// Service is the core methods of the indexing service.
+type Service interface {
+	CacheClaim(ctx context.Context, claim delegation.Delegation) error
+	PublishClaim(ctx context.Context, claim delegation.Delegation) error
+	Query(ctx context.Context, q Query) (QueryResult, error)
+}

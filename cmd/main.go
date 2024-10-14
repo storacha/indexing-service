@@ -132,19 +132,18 @@ func main() {
 							}
 							sc.PrivateKey = privKey
 
-							indexingService, err := construct.Construct(sc)
+							indexer, err := construct.Construct(sc)
 							if err != nil {
 								return err
 							}
-							err = indexingService.Startup(cCtx.Context)
+							err = indexer.Startup(cCtx.Context)
 							if err != nil {
 								return err
 							}
 							defer func() {
-								indexingService.Shutdown(cCtx.Context)
+								indexer.Shutdown(cCtx.Context)
 							}()
-							opts = append(opts, server.WithService(indexingService))
-							return server.ListenAndServe(addr, opts...)
+							return server.ListenAndServe(addr, indexer, opts...)
 						},
 					},
 				},

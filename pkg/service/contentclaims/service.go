@@ -7,11 +7,12 @@ import (
 	"github.com/storacha/go-ucanto/server"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/capability/assert"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 var log = logging.Logger("contentclaims")
 
-func NewService() map[ucan.Ability]server.ServiceMethod[assert.Unit] {
+func NewService(indexer types.Service) map[ucan.Ability]server.ServiceMethod[assert.Unit] {
 	return map[ucan.Ability]server.ServiceMethod[assert.Unit]{
 		assert.Equals.Can(): server.Provide(
 			assert.Equals,

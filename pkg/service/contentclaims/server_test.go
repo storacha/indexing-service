@@ -25,7 +25,7 @@ var rcptsch = []byte(`
 `)
 
 func TestServer(t *testing.T) {
-	server, err := NewServer(testutil.Service)
+	server, err := NewServer(testutil.Service, nil)
 	require.NoError(t, err)
 
 	conn, err := client.NewConnection(testutil.Service, server)
