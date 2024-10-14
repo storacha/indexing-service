@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,28 +11,19 @@ import (
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/car"
-	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
 	ucanhttp "github.com/storacha/go-ucanto/transport/http"
-	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
-	"github.com/storacha/indexing-service/pkg/service/queryresult"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 var log = logging.Logger("server")
 
-type Service interface {
-	CacheClaim(ctx context.Context, claim delegation.Delegation) error
-	PublishClaim(ctx context.Context, claim delegation.Delegation) error
-	Query(ctx context.Context, q service.Query) (queryresult.QueryResult, error)
-}
-
 type config struct {
-	id      principal.Signer
-	service Service
+	id principal.Signer
 }
 
 type Option func(*config)
@@ -45,17 +35,11 @@ func WithIdentity(s principal.Signer) Option {
 	}
 }
 
-func WithService(service Service) Option {
-	return func(c *config) {
-		c.service = service
-	}
-}
-
 // ListenAndServe creates a new indexing service HTTP server, and starts it up.
-func ListenAndServe(addr string, opts ...Option) error {
+func ListenAndServe(addr string, indexer types.Service, opts ...Option) error {
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: NewServer(opts...),
+		Handler: NewServer(indexer, opts...),
 	}
 	log.Infof("Listening on %s", addr)
 	err := srv.ListenAndServe()
@@ -66,7 +50,7 @@ func ListenAndServe(addr string, opts ...Option) error {
 }
 
 // NewServer creates a new indexing service HTTP server.
-func NewServer(opts ...Option) *http.ServeMux {
+func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 	c := &config{}
 	for _, opt := range opts {
 		opt(c)
@@ -89,8 +73,8 @@ func NewServer(opts ...Option) *http.ServeMux {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", GetRootHandler(c.id))
-	mux.HandleFunc("POST /claims", PostClaimsHandler(c.id))
-	mux.HandleFunc("GET /claims", GetClaimsHandler(c.service))
+	mux.HandleFunc("POST /claims", PostClaimsHandler(c.id, indexer))
+	mux.HandleFunc("GET /claims", GetClaimsHandler(indexer))
 	return mux
 }
 
@@ -109,8 +93,8 @@ func GetRootHandler(id principal.Signer) func(http.ResponseWriter, *http.Request
 
 // PostClaimsHandler invokes the ucanto service when a POST request is sent to
 // "/claims".
-func PostClaimsHandler(id principal.Signer) func(http.ResponseWriter, *http.Request) {
-	server, err := contentclaims.NewServer(id)
+func PostClaimsHandler(id principal.Signer, indexer types.Service) func(http.ResponseWriter, *http.Request) {
+	server, err := contentclaims.NewServer(id, indexer)
 	if err != nil {
 		log.Fatalf("creating ucanto server: %s", err)
 	}
@@ -134,7 +118,7 @@ func PostClaimsHandler(id principal.Signer) func(http.ResponseWriter, *http.Requ
 
 // GetClaimsHandler retrieves content claims when a GET request is sent to
 // "/claims/{multihash}".
-func GetClaimsHandler(s Service) func(http.ResponseWriter, *http.Request) {
+func GetClaimsHandler(s types.Service) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mhStrings := r.URL.Query()["multihash"]
 		hashes := make([]multihash.Multihash, 0, len(mhStrings))
@@ -157,14 +141,15 @@ func GetClaimsHandler(s Service) func(http.ResponseWriter, *http.Request) {
 			spaces = append(spaces, space)
 		}
 
-		qr, err := s.Query(r.Context(), service.Query{
+		qr, err := s.Query(r.Context(), types.Query{
 			Hashes: hashes,
-			Match: service.Match{
+			Match: types.Match{
 				Subject: spaces,
 			},
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("processing queury: %s", err.Error()), 400)
+			return
 		}
 
 		body := car.Encode([]datamodel.Link{qr.Root().Link()}, qr.Blocks())

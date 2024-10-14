@@ -12,7 +12,6 @@ import (
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service"
@@ -23,7 +22,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providerindex/notifier"
 	"github.com/storacha/indexing-service/pkg/service/providerindex/publisher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex/server"
-	"github.com/storacha/indexing-service/pkg/service/queryresult"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 var log = logging.Logger("service")
@@ -105,12 +104,11 @@ func WithDatastore(ds datastore.Batching) Option {
 }
 
 // Service is the core methods of the indexing service but with additional
+// lifecycle methods.
 type Service interface {
+	types.Service
 	Startup(ctx context.Context) error
 	Shutdown(ctx context.Context) error
-	CacheClaim(ctx context.Context, claim delegation.Delegation) error
-	PublishClaim(ctx context.Context, claim delegation.Delegation) error
-	Query(ctx context.Context, q service.Query) (queryresult.QueryResult, error)
 }
 
 type serviceWithLifeCycle struct {

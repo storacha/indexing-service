@@ -20,23 +20,13 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-// QueryResult is an encodable result of a query
-type QueryResult interface {
-	ipld.View
-	// Claims is a list of links to the root bock of claims that can be found in this message
-	Claims() []ipld.Link
-	// Indexes is a list of links to the CID hash of archived sharded dag indexes that can be found in this
-	// message
-	Indexes() []ipld.Link
-}
-
 type queryResult struct {
 	root ipld.Block
 	data *qdm.QueryResultModel0_1
 	blks blockstore.BlockReader
 }
 
-var _ QueryResult = (*queryResult)(nil)
+var _ types.QueryResult = (*queryResult)(nil)
 
 func (q *queryResult) Blocks() iter.Seq2[block.Block, error] {
 	return q.blks.Iterator()
@@ -62,7 +52,7 @@ func (q *queryResult) Root() block.Block {
 }
 
 // Build generates a new encodable QueryResult
-func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]) (QueryResult, error) {
+func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]) (types.QueryResult, error) {
 	bs, err := blockstore.NewBlockStore()
 	if err != nil {
 		return nil, err
