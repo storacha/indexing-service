@@ -1,4 +1,4 @@
-package publisher
+package store
 
 import (
 	"bytes"
@@ -11,6 +11,8 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/namespace"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
@@ -25,15 +27,20 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
 )
 
+var log = logging.Logger("store")
 var ErrNotFound = errors.New("not found")
 
 const (
-	headKey = "head"
+	keyToMetadataMapPrefix  = "map/keyMD/"
+	keyToChunkLinkMapPrefix = "map/keyChunkLink/"
+	entriesPrefix           = "entries/"
+	latestAdvKey            = "sync/adv"
+	headKey                 = "head"
 )
 
-// maxEntryChunkSize is the maximum number of multihashes each advertisement
+// MaxEntryChunkSize is the maximum number of multihashes each advertisement
 // entry chunk may contain.
-var maxEntryChunkSize = 16384
+var MaxEntryChunkSize = 16384
 
 type Store interface {
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
@@ -46,25 +53,73 @@ type ProviderContextTable interface {
 	Delete(ctx context.Context, p peer.ID, contextID []byte) error
 }
 
-type AdvertStore interface {
+type EncodeableStore interface {
 	Encode(ctx context.Context, id ipld.Link, w io.Writer) error
-	PutAdvert(ctx context.Context, ad schema.Advertisement) (ipld.Link, error)
+	EncodeHead(ctx context.Context, w io.Writer) error
+}
+
+type AdvertReadable interface {
 	// Advert retrieves an existing advert from the store.
 	Advert(ctx context.Context, id ipld.Link) (schema.Advertisement, error)
+}
+
+type AdvertWritable interface {
+	PutAdvert(ctx context.Context, ad schema.Advertisement) (ipld.Link, error)
+}
+
+type AdvertStore interface {
+	AdvertReadable
+	AdvertWritable
+}
+
+type EntriesReadable interface {
+
 	// Entries returns an iterable of multihashes from the store for the
 	// given root of an existing advertisement entries chain.
 	Entries(ctx context.Context, root ipld.Link) iter.Seq2[multihash.Multihash, error]
+}
+
+type EntriesWritable interface {
 	// PutEntries writes a given set of multihash entries to do the store and returns the root cid
 	PutEntries(ctx context.Context, entries iter.Seq[multihash.Multihash]) (ipld.Link, error)
+}
+
+type EntriesStore interface {
+	EntriesReadable
+	EntriesWritable
+}
+
+type HeadReadable interface {
+}
+
+type HeadStore interface {
 	Head(ctx context.Context) (*head.SignedHead, error)
 	PutHead(ctx context.Context, newHead *head.SignedHead) (ipld.Link, error)
-	EncodeHead(ctx context.Context, w io.Writer) error
+}
+
+type ChunkLinkStore interface {
 	ChunkLinkForProviderAndContextID(ctx context.Context, p peer.ID, contextID []byte) (ipld.Link, error)
 	PutChunkLinkForProviderAndContextID(ctx context.Context, p peer.ID, contextID []byte, adCid ipld.Link) error
 	DeleteChunkLinkForProviderAndContextID(ctx context.Context, p peer.ID, contextID []byte) error
+}
+
+type MetadataStore interface {
 	MetadataForProviderAndContextID(ctx context.Context, p peer.ID, contextID []byte) (metadata.Metadata, error)
 	PutMetadataForProviderAndContextID(ctx context.Context, p peer.ID, contextID []byte, md metadata.Metadata) error
 	DeleteMetadataForProviderAndContextID(ctx context.Context, p peer.ID, contextID []byte) error
+}
+
+type PublisherStore interface {
+	AdvertStore
+	EntriesStore
+	HeadStore
+	ChunkLinkStore
+	MetadataStore
+}
+
+type FullStore interface {
+	EncodeableStore
+	PublisherStore
 }
 
 type AdStore struct {
@@ -73,7 +128,7 @@ type AdStore struct {
 	metadata   ProviderContextTable
 }
 
-var _ AdvertStore = (*AdStore)(nil)
+var _ FullStore = (*AdStore)(nil)
 
 func (s *AdStore) PutAdvert(ctx context.Context, ad schema.Advertisement) (ipld.Link, error) {
 	return PutAdvert(ctx, s.store, ad)
@@ -88,7 +143,7 @@ func (s *AdStore) Entries(ctx context.Context, root ipld.Link) iter.Seq2[multiha
 }
 
 func (s *AdStore) PutEntries(ctx context.Context, mhs iter.Seq[multihash.Multihash]) (ipld.Link, error) {
-	return PutEntries(ctx, s.store, mhs, maxEntryChunkSize)
+	return PutEntries(ctx, s.store, mhs, MaxEntryChunkSize)
 }
 
 func (s *AdStore) Encode(ctx context.Context, id datamodel.Link, w io.Writer) error {
@@ -397,3 +452,25 @@ func (d *directoryStore) Put(ctx context.Context, key string, data io.Reader) er
 }
 
 var _ Store = (*directoryStore)(nil)
+
+func asCID(link ipld.Link) cid.Cid {
+	if cl, ok := link.(cidlink.Link); ok {
+		return cl.Cid
+	}
+	return cid.MustParse(link.String())
+}
+
+func FromDatastore(ds datastore.Batching) FullStore {
+	return NewAdvertStore(
+		&dsStoreAdapter{ds},
+		&dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToChunkLinkMapPrefix))},
+		&dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToMetadataMapPrefix))},
+	)
+}
+
+func FromLocalStore(storagePath string, ds datastore.Batching) FullStore {
+	store := &directoryStore{storagePath}
+	chunkLinksStore := &dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToChunkLinkMapPrefix))}
+	mdStore := &dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToMetadataMapPrefix))}
+	return NewAdvertStore(store, chunkLinksStore, mdStore)
+}

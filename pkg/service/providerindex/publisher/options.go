@@ -3,8 +3,6 @@ package publisher
 import (
 	"net/url"
 
-	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/namespace"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -12,7 +10,6 @@ import (
 type Option func(cfg *options) error
 
 type options struct {
-	store                AdvertStore
 	pubHTTPAnnounceAddrs []multiaddr.Multiaddr
 	topic                string
 	announceURLs         []*url.URL
@@ -28,30 +25,6 @@ func WithDirectAnnounce(announceURLs ...string) Option {
 			}
 			o.announceURLs = append(o.announceURLs, u)
 		}
-		return nil
-	}
-}
-
-func fromDatastore(ds datastore.Batching) AdvertStore {
-	return NewAdvertStore(
-		&dsStoreAdapter{ds},
-		&dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToChunkLinkMapPrefix))},
-		&dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToMetadataMapPrefix))},
-	)
-}
-
-func WithDatastoreStore(ds datastore.Batching) Option {
-	return func(opts *options) error {
-		opts.store = fromDatastore(ds)
-		return nil
-	}
-}
-func WithLocalStore(storagePath string, ds datastore.Batching) Option {
-	return func(opts *options) error {
-		store := &directoryStore{storagePath}
-		chunkLinksStore := &dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToChunkLinkMapPrefix))}
-		mdStore := &dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToMetadataMapPrefix))}
-		opts.store = NewAdvertStore(store, chunkLinksStore, mdStore)
 		return nil
 	}
 }
