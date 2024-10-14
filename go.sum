@@ -393,6 +393,8 @@ github.com/ipld/go-ipld-adl-hamt v0.0.0-20240322071803-376decb85801 h1:B5P5TdYpN
 github.com/ipld/go-ipld-adl-hamt v0.0.0-20240322071803-376decb85801/go.mod h1:xisTNW7Sm8GTyY+n3XfQKScTPcOlVyZrzU71lTb7kuE=
 github.com/ipld/go-ipld-prime v0.21.1-0.20240917223228-6148356a4c2e h1:0Anxx6pMS8U/qjTLVxPhpTYuuDMssHDtUEvzIz2Skw4=
 github.com/ipld/go-ipld-prime v0.21.1-0.20240917223228-6148356a4c2e/go.mod h1:LN+1Tx6867lbDCmf8bErp1TNw3Kh9eY2n0eJ+whRx38=
+github.com/ipld/go-ipld-prime/storage/dsadapter v0.0.0-20240917223228-6148356a4c2e h1:g5MDAsRsO9ZbdALqpbJKKMZFR99b32BY/rB0J9fOtZ0=
+github.com/ipld/go-ipld-prime/storage/dsadapter v0.0.0-20240917223228-6148356a4c2e/go.mod h1:ZEJ+JBJj5NCaiHIPyEJIRRUr1+tH/ncM+fvdSbRAZzE=
 github.com/ipni/go-libipni v0.6.13 h1:6fQU6ZFu8fi0DZIs4VXZrIFbT9r97dNmNl7flWMVblE=
 github.com/ipni/go-libipni v0.6.13/go.mod h1:+hNohg7Tx8ML2a/Ei19zUxCnSqtqXiHySlqHIwPhQyQ=
 github.com/ipni/index-provider v0.15.5 h1:LgbUPCJusSMtKn85IM1S38d7Da+2Op4eJO+q+yv3gjI=
@@ -676,6 +678,8 @@ github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An
 github.com/spf13/viper v1.8.1/go.mod h1:o0Pch8wJ9BVSWGQMbra6iw0oQ5oktSIBaujf1rJH9Ns=
 github.com/storacha/go-ucanto v0.1.1-0.20241009142711-2be8af85133c h1:8zyKhIOqS+788KBhsaRzRTYP8XSNpkjRVmqo//wWGx4=
 github.com/storacha/go-ucanto v0.1.1-0.20241009142711-2be8af85133c/go.mod h1:Bi7DFuo0nj9/QmkqbLNLWf41xnOoJSFGg21G+UtzWoY=
+github.com/storacha/go-ucanto v0.1.1-0.20241013210933-3949fc84d5ab h1:tia+krWb170P42FKtfpD9NK89JLW6lYoom3P49LOxk8=
+github.com/storacha/go-ucanto v0.1.1-0.20241013210933-3949fc84d5ab/go.mod h1:Bi7DFuo0nj9/QmkqbLNLWf41xnOoJSFGg21G+UtzWoY=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=
