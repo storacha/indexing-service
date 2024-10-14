@@ -11,6 +11,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/storage/dsadapter"
 	"github.com/ipni/go-libipni/metadata"
 	provider "github.com/ipni/index-provider"
 	"github.com/ipni/index-provider/engine"
@@ -125,7 +126,7 @@ func New(id crypto.PrivKey, opts ...Option) (*IPNIPublisher, error) {
 		return nil, fmt.Errorf("creating IPNI index provider: %w", err)
 	}
 
-	ads := NewAdvertStore(ds, namespace.Wrap(ds, entriesNamespace))
+	ads := NewAdvertStore(&dsadapter.Adapter{Wrapped: ds}, &dsadapter.Adapter{Wrapped: namespace.Wrap(ds, entriesNamespace)})
 	return &IPNIPublisher{engine: engine, store: ads}, nil
 }
 
