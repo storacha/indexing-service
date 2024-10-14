@@ -30,14 +30,6 @@ func TestPublish(t *testing.T) {
 		publisher, err := New(priv)
 		require.NoError(t, err)
 
-		err = publisher.Start(ctx)
-		require.NoError(t, err)
-
-		defer func() {
-			err := publisher.Shutdown()
-			require.NoError(t, err)
-		}()
-
 		digests := testutil.RandomMultihashes(rand.IntN(10) + 1)
 		adlnk, err := publisher.Publish(ctx, &provInfo, testutil.RandomCID().String(), digests, metadata.Default.New())
 		require.NoError(t, err)
@@ -57,14 +49,6 @@ func TestPublish(t *testing.T) {
 	t.Run("single advert, chunked entries", func(t *testing.T) {
 		publisher, err := New(priv)
 		require.NoError(t, err)
-
-		err = publisher.Start(ctx)
-		require.NoError(t, err)
-
-		defer func() {
-			err := publisher.Shutdown()
-			require.NoError(t, err)
-		}()
 
 		digests := testutil.RandomMultihashes(maxEntryChunkSize + 1)
 		adlnk, err := publisher.Publish(ctx, &provInfo, testutil.RandomCID().String(), digests, metadata.Default.New())
@@ -93,14 +77,6 @@ func TestPublish(t *testing.T) {
 	t.Run("multiple adverts", func(t *testing.T) {
 		publisher, err := New(priv)
 		require.NoError(t, err)
-
-		err = publisher.Start(ctx)
-		require.NoError(t, err)
-
-		defer func() {
-			err := publisher.Shutdown()
-			require.NoError(t, err)
-		}()
 
 		var adLinks []ipld.Link
 		var contextIDs []string

@@ -1,4 +1,4 @@
-package publisher
+package notifier
 
 import (
 	"context"
@@ -106,6 +106,7 @@ func (m *mockHead) Get(context.Context) ipld.Link {
 	return m.head
 }
 
-func (m *mockHead) Set(_ context.Context, head ipld.Link) {
+func (m *mockHead) Set(_ context.Context, head ipld.Link) error {
 	m.head = head
+	return nil
 }

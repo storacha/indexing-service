@@ -1,4 +1,4 @@
-package publisher
+package notifier
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/storacha/go-ucanto/core/ipld"
 )
+
+var remoteHeadPrefix = datastore.NewKey("head/remote/")
 
 type HeadState struct {
 	ds     datastore.Batching
@@ -40,10 +42,11 @@ func (h *HeadState) Get(ctx context.Context) ipld.Link {
 	return h.cached
 }
 
-func (h *HeadState) Set(ctx context.Context, head ipld.Link) {
+func (h *HeadState) Set(ctx context.Context, head ipld.Link) error {
 	err := h.ds.Put(ctx, h.hdkey, []byte(head.Binary()))
 	if err != nil {
-		log.Errorf("saving remote IPNI sync'd head: %w", err)
+		return fmt.Errorf("saving remote IPNI sync'd head: %w", err)
 	}
 	h.cached = head
+	return nil
 }
