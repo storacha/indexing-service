@@ -14,7 +14,6 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/internal/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker"
@@ -25,17 +24,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
 )
-
-// Match narrows parameters for locating providers/claims for a set of multihashes
-type Match struct {
-	Subject []did.DID
-}
-
-// Query is a query for several multihashes
-type Query struct {
-	Hashes []multihash.Multihash
-	Match  Match
-}
 
 // ProviderIndex is a read/write interface to a local cache of providers that falls back to IPNI
 type ProviderIndex interface {
@@ -116,7 +104,7 @@ type queryResult struct {
 }
 
 type queryState struct {
-	q      *Query
+	q      *types.Query
 	qr     *queryResult
 	visits map[jobKey]struct{}
 }
@@ -253,7 +241,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 // 5. Query IPNIIndex for any location claims for any shards that contain the multihash based on the ShardedDagIndex
 // 6. Read the requisite claims from the ClaimLookup
 // 7. Return all discovered claims and sharded dag indexes
-func (is *IndexingService) Query(ctx context.Context, q Query) (queryresult.QueryResult, error) {
+func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.QueryResult, error) {
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
 		initialJobs = append(initialJobs, job{mh, nil, nil, standardJobType})
