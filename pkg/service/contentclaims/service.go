@@ -1,6 +1,8 @@
 package contentclaims
 
 import (
+	"context"
+
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt"
@@ -17,22 +19,22 @@ func NewService(indexer types.Service) map[ucan.Ability]server.ServiceMethod[ass
 		assert.Equals.Can(): server.Provide(
 			assert.Equals,
 			func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx server.InvocationContext) (assert.Unit, receipt.Effects, error) {
-				log.Errorf("TODO: implement me")
-				return assert.Unit{}, nil, nil
+				err := indexer.PublishClaim(context.TODO(), inv)
+				return assert.Unit{}, nil, err
 			},
 		),
 		assert.Index.Can(): server.Provide(
 			assert.Index,
 			func(cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ctx server.InvocationContext) (assert.Unit, receipt.Effects, error) {
-				log.Errorf("TODO: implement me")
-				return assert.Unit{}, nil, nil
+				err := indexer.PublishClaim(context.TODO(), inv)
+				return assert.Unit{}, nil, err
 			},
 		),
 		assert.Location.Can(): server.Provide(
 			assert.Location,
 			func(cap ucan.Capability[assert.LocationCaveats], inv invocation.Invocation, ctx server.InvocationContext) (assert.Unit, receipt.Effects, error) {
-				log.Errorf("TODO: implement me")
-				return assert.Unit{}, nil, nil
+				err := indexer.PublishClaim(context.TODO(), inv)
+				return assert.Unit{}, nil, err
 			},
 		),
 	}
