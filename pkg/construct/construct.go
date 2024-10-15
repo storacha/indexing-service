@@ -29,7 +29,7 @@ import (
 
 var log = logging.Logger("service")
 var providerIndexNamespace = datastore.NewKey("providerindex/")
-var providerIndexPublisherNamespace = providerIndexNamespace.ChildString("publisher/")
+var providerIndexPublisherNamespace = providerIndexNamespace.Child(datastore.NewKey("publisher/"))
 
 // ServiceConfig sets specific config values for the service
 type ServiceConfig struct {
@@ -56,6 +56,8 @@ type config struct {
 	opts             []service.Option
 	ds               datastore.Batching
 	skipNotification bool
+	startIPNIServer  bool
+	publisherStore   store.PublisherStore
 }
 
 // Option configures how the node is construct
@@ -81,6 +83,24 @@ func WithCachingQueue(cachingQueue blobindexlookup.CachingQueue) Option {
 func SkipNotification() Option {
 	return func(cfg *config) error {
 		cfg.skipNotification = true
+		return nil
+	}
+}
+
+// WithStartIPNIServer determines when IPNI adds will be served directly over HTTP
+// Defaults true
+func WithStartIPNIServer(startIPNIServer bool) Option {
+	return func(cfg *config) error {
+		cfg.startIPNIServer = startIPNIServer
+		return nil
+	}
+}
+
+// WithPublisherStore overrides the store used for IPNI advertisements
+// If not used with startIPNIServer = false, store.AdvertStore must implement store.FullStore
+func WithPublisherStore(publisherStore store.PublisherStore) Option {
+	return func(cfg *config) error {
+		cfg.publisherStore = publisherStore
 		return nil
 	}
 }
@@ -183,44 +203,52 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		return nil, err
 	}
 
-	ds := cfg.ds
-	if ds == nil {
-		log.Warnf("datastore not configured, using in-memory store")
-		ds = dssync.MutexWrap(datastore.NewMapDatastore())
+	var ds datastore.Batching
+	publisherStore := cfg.publisherStore
+	if publisherStore == nil {
+		ds = initializeDatastore(&cfg)
+		// setup the datastore for publishing to IPNI
+		publisherStore = store.FromDatastore(namespace.Wrap(ds, providerIndexPublisherNamespace))
 	}
-
-	// setup the datastore for publishing to IPNI
-	store := store.FromDatastore(namespace.Wrap(ds, providerIndexPublisherNamespace))
 
 	// setup remote sync notification
 	if !cfg.skipNotification {
-		notifier, err := notifier.NewNotifierWithStorage(sc.IndexerURL, sc.PrivateKey, namespace.Wrap(ds, providerIndexNamespace))
+		// initialize datastore if not already initialized
+		if ds == nil {
+			ds = initializeDatastore(&cfg)
+		}
+		notifier, err := notifier.NewNotifierWithStorage(sc.IndexerURL, sc.PrivateKey, store.SimpleStoreFromDatastore(namespace.Wrap(ds, providerIndexNamespace)))
 		if err != nil {
 			return nil, fmt.Errorf("creating IPNI remote sync notifier: %w", err)
 		}
 		s.startupFuncs = append(s.startupFuncs, func(ctx context.Context) error { notifier.Start(ctx); return nil })
 		s.shutdownFuncs = append(s.shutdownFuncs, func(context.Context) error { notifier.Stop(); return nil })
 		// Setup handling ipni remote sync notifications
-		notifier.Notify(providerindex.NewRemoteSyncer(providersCache, store).HandleRemoteSync)
+		notifier.Notify(providerindex.NewRemoteSyncer(providersCache, publisherStore).HandleRemoteSync)
 	}
 
 	publisher, err := publisher.New(
 		sc.PrivateKey,
-		store,
-		publisher.WithDirectAnnounce("https://cid.contact"),
+		publisherStore,
+		publisher.WithDirectAnnounce(sc.IndexerURL),
 		publisher.WithAnnounceAddrs(sc.PublisherAnnounceAddrs...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating IPNI publisher: %w", err)
 	}
 
-	srv, err := server.NewServer(store, server.WithHTTPListenAddrs(sc.PublisherListenAddr))
-	if err != nil {
-		return nil, fmt.Errorf("creating server for IPNI ads: %w", err)
+	if cfg.startIPNIServer {
+		encodableStore, ok := publisherStore.(store.EncodeableStore)
+		if !ok {
+			return nil, fmt.Errorf("publisher store is incompatible with serving over HTTP (must implement store.EncodableStore)")
+		}
+		srv, err := server.NewServer(encodableStore, server.WithHTTPListenAddrs(sc.PublisherListenAddr))
+		if err != nil {
+			return nil, fmt.Errorf("creating server for IPNI ads: %w", err)
+		}
+		s.startupFuncs = append(s.startupFuncs, srv.Start)
+		s.shutdownFuncs = append(s.shutdownFuncs, srv.Shutdown)
 	}
-
-	s.startupFuncs = append(s.startupFuncs, srv.Start)
-	s.shutdownFuncs = append(s.shutdownFuncs, srv.Shutdown)
 
 	// build read through fetchers
 	// TODO: add sender / publisher / linksystem / legacy systems
@@ -238,4 +266,13 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	s.IndexingService = service.NewIndexingService(blobIndexLookup, claimLookup, providerIndex, serviceOpts...)
 
 	return s, nil
+}
+
+func initializeDatastore(cfg *config) datastore.Batching {
+	ds := cfg.ds
+	if ds == nil {
+		log.Warnf("datastore not configured, using in-memory store")
+		ds = dssync.MutexWrap(datastore.NewMapDatastore())
+	}
+	return ds
 }

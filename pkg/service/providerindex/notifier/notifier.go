@@ -6,13 +6,13 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 )
 
 var log = logging.Logger("publisher")
@@ -57,24 +57,38 @@ func (n *Notifier) Start(ctx context.Context) {
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				head, err := GetLastAdvertisement(ctx, n.client, n.provider)
+				synced, ts, err := n.Update(ctx)
 				if err != nil {
-					log.Errorf("fetching last advert CID: %w", err)
+					log.Errorf(err.Error())
 					continue
 				}
-				prev := n.head.Get(ctx)
-				if !DidSync(head, prev) {
-					log.Warnf("remote IPNI subscriber did not sync for %s", time.Since(n.ts))
+				if !synced {
+					log.Warnf("remote IPNI subscriber did not sync for %s", time.Since(ts))
 					continue
 				}
-				for _, f := range n.notify {
-					f(ctx, head, prev)
-				}
-				n.head.Set(ctx, head)
-				n.ts = time.Now()
 			}
 		}
 	}()
+}
+
+func (n *Notifier) Update(ctx context.Context) (bool, time.Time, error) {
+	head, err := GetLastAdvertisement(ctx, n.client, n.provider)
+	if err != nil {
+		return false, n.ts, fmt.Errorf("fetching last advert CID: %w", err)
+	}
+	prev := n.head.Get(ctx)
+	if !DidSync(head, prev) {
+		return false, n.ts, nil
+	}
+	err = n.head.Set(ctx, head)
+	if err != nil {
+		return false, n.ts, fmt.Errorf("updating head state: %w", err)
+	}
+	for _, f := range n.notify {
+		f(ctx, head, prev)
+	}
+	n.ts = time.Now()
+	return true, n.ts, nil
 }
 
 func (n *Notifier) Notify(f NotifyRemoteSyncFunc) {
@@ -114,13 +128,13 @@ func NewRemoteSyncNotifier(addr string, id crypto.PrivKey, head NotifierHead) (*
 	return &Notifier{client: c, head: head, ts: time.Now(), provider: provider}, nil
 }
 
-func NewNotifierWithStorage(addr string, id crypto.PrivKey, ds datastore.Batching) (*Notifier, error) {
+func NewNotifierWithStorage(addr string, id crypto.PrivKey, store store.Store) (*Notifier, error) {
 
 	addrURL, err := url.Parse(addr)
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL for remote sync notifications: %w", err)
 	}
-	headState, err := NewHeadState(ds, addrURL.Hostname())
+	headState, err := NewHeadState(store, addrURL.Hostname())
 	if err != nil {
 		return nil, fmt.Errorf("error setting up notification tracking")
 	}
