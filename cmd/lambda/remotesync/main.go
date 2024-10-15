@@ -7,29 +7,13 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/ipfs/go-cid"
-	logging "github.com/ipfs/go-log/v2"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
-	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 )
-
-var log = logging.Logger("lambda/providercache")
-
-func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher providercacher.ProviderCacher, msg events.SQSMessage) error {
-	job, err := sqsCachingDecoder.DecodeMessage(ctx, msg.Body)
-	if err != nil {
-		return err
-	}
-	_, err = providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 func makeHandler(remoteSyncer *providerindex.RemoteSyncer) func(ctx context.Context, snsEvent events.SNSEvent) error {
 	return func(ctx context.Context, snsEvent events.SNSEvent) error {
