@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"iter"
 	"os"
@@ -28,13 +29,26 @@ import (
 )
 
 var log = logging.Logger("store")
-var ErrNotFound = errors.New("not found")
+
+type ErrNotFound struct {
+	underlying error
+}
+
+func NewErrNotFound(underlying error) ErrNotFound {
+	return ErrNotFound{underlying: underlying}
+}
+
+func (e ErrNotFound) Error() string {
+	return fmt.Sprintf("unable to find underlying: %s", e.underlying.Error())
+}
+
+func (e ErrNotFound) Unwrap() error {
+	return e.underlying
+}
 
 const (
 	keyToMetadataMapPrefix  = "map/keyMD/"
 	keyToChunkLinkMapPrefix = "map/keyChunkLink/"
-	entriesPrefix           = "entries/"
-	latestAdvKey            = "sync/adv"
 	headKey                 = "head"
 )
 
@@ -186,7 +200,7 @@ func (s *AdStore) DeleteMetadataForProviderAndContextID(ctx context.Context, p p
 	return s.metadata.Delete(ctx, p, contextID)
 }
 
-func NewAdvertStore(store Store, chunkLinks, metadata ProviderContextTable) *AdStore {
+func NewPublisherStore(store Store, chunkLinks, metadata ProviderContextTable) *AdStore {
 	return &AdStore{store, chunkLinks, metadata}
 }
 
@@ -373,7 +387,8 @@ func toChunk(mhs []multihash.Multihash, next ipld.Link) *schema.EntryChunk {
 
 func IsNotFound(err error) bool {
 	// solve for the unfortuante lack of standards on not found errors
-	return errors.Is(err, datastore.ErrNotFound) || errors.Is(err, ErrNotFound)
+	var errNotFound ErrNotFound
+	return errors.Is(err, datastore.ErrNotFound) || errors.As(err, &errNotFound)
 }
 
 func providerContextKey(provider peer.ID, contextID []byte) datastore.Key {
@@ -460,8 +475,12 @@ func asCID(link ipld.Link) cid.Cid {
 	return cid.MustParse(link.String())
 }
 
+func SimpleStoreFromDatastore(ds datastore.Batching) Store {
+	return &dsStoreAdapter{ds}
+}
+
 func FromDatastore(ds datastore.Batching) FullStore {
-	return NewAdvertStore(
+	return NewPublisherStore(
 		&dsStoreAdapter{ds},
 		&dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToChunkLinkMapPrefix))},
 		&dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToMetadataMapPrefix))},
@@ -472,5 +491,5 @@ func FromLocalStore(storagePath string, ds datastore.Batching) FullStore {
 	store := &directoryStore{storagePath}
 	chunkLinksStore := &dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToChunkLinkMapPrefix))}
 	mdStore := &dsProviderContextTable{namespace.Wrap(ds, datastore.NewKey(keyToMetadataMapPrefix))}
-	return NewAdvertStore(store, chunkLinksStore, mdStore)
+	return NewPublisherStore(store, chunkLinksStore, mdStore)
 }
