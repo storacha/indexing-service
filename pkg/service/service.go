@@ -18,13 +18,12 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/go-ucanto/core/schema"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/validator"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/capability/assert"
-	"github.com/storacha/indexing-service/pkg/capability/assert/datamodel"
 	"github.com/storacha/indexing-service/pkg/internal/bytemap"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/parallelwalk"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/singlewalk"
@@ -299,7 +298,7 @@ func fetchClaimURL(provider peer.AddrInfo, claimCid cid.Cid) (*url.URL, error) {
 }
 
 func fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) {
-	return urlForResource(provider, "{shard}", shard.String())
+	return urlForResource(provider, "{blob}", digestutil.Format(shard.Hash()))
 }
 
 // CacheClaim is used to cache a claim without publishing it to IPNI
@@ -307,7 +306,7 @@ func fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) 
 // (a delegation for a location commitment is already generated on blob/accept)
 // ideally however, IPNI would enable UCAN chains for publishing so that we could publish it directly from the storage service
 // it doesn't for now, so we let SPs publish themselves them direct cache with us
-func (is *IndexingService) CacheClaim(ctx context.Context, claim delegation.Delegation) error {
+func (is *IndexingService) CacheClaim(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
 	return errors.New("not implemented")
 }
 
@@ -356,12 +355,11 @@ func publishIndexClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLook
 		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
 	}
 
-	if caps[0].Can() != assert.Index.Can() {
+	if caps[0].Can() != assert.IndexAbility {
 		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
 	}
 
-	reader := schema.Struct[assert.IndexCaveats](datamodel.IndexCaveatsType(), nil)
-	nb, rerr := reader.Read(caps[0].Nb())
+	nb, rerr := assert.IndexCaveatsReader.Read(caps[0].Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
@@ -380,7 +378,7 @@ func publishIndexClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLook
 	var idx blobindex.ShardedDagIndex
 	var ferr error
 	for _, r := range results {
-		idx, ferr = fetchBlobIndex(ctx, blobIndex, claimLookup, r)
+		idx, ferr = fetchBlobIndex(ctx, blobIndex, claimLookup, nb.Index, r)
 		if ferr != nil {
 			continue
 		}
@@ -410,7 +408,7 @@ func publishIndexClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLook
 		}
 	}
 
-	contextID := nb.Index.String()
+	contextID := nb.Index.Binary()
 	err = provIndex.Publish(ctx, provider, contextID, digests, meta)
 	if err != nil {
 		return fmt.Errorf("publishing claim: %w", err)
@@ -419,19 +417,24 @@ func publishIndexClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLook
 	return nil
 }
 
-func fetchBlobIndex(ctx context.Context, blobIndex BlobIndexLookup, claimLookup ClaimLookup, result model.ProviderResult) (blobindex.ShardedDagIndex, error) {
-	meta := metadata.LocationCommitmentMetadata{}
+func fetchBlobIndex(ctx context.Context, blobIndex BlobIndexLookup, claimLookup ClaimLookup, blob ipld.Link, result model.ProviderResult) (blobindex.ShardedDagIndex, error) {
+	meta := metadata.MetadataContext.New()
 	err := meta.UnmarshalBinary(result.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("decoding location commitment metadata: %w", err)
 	}
 
-	// TODO: try location URL in claim instead?
-	if meta.Shard == nil {
-		return nil, errors.New("missing shard CID in metadata")
+	protocol := meta.Get(metadata.LocationCommitmentID)
+	lcmeta, ok := protocol.(*metadata.LocationCommitmentMetadata)
+	if !ok {
+		return nil, errors.New("metadata is not expected type")
 	}
 
-	blobURL, err := fetchRetrievalURL(*result.Provider, *meta.Shard)
+	if lcmeta.Shard != nil {
+		blob = cidlink.Link{Cid: *lcmeta.Shard}
+	}
+
+	blobURL, err := fetchRetrievalURL(*result.Provider, asCID(blob))
 	if err != nil {
 		return nil, fmt.Errorf("building retrieval URL: %w", err)
 	}
@@ -442,13 +445,13 @@ func fetchBlobIndex(ctx context.Context, blobIndex BlobIndexLookup, claimLookup 
 	var validateErr error
 	go func() {
 		defer wg.Done()
-		claimURL, err := fetchClaimURL(*result.Provider, meta.Claim)
+		claimURL, err := fetchClaimURL(*result.Provider, lcmeta.Claim)
 		if err != nil {
 			validateErr = fmt.Errorf("building claim URL: %w", err)
 			return
 		}
 
-		dlg, err := claimLookup.LookupClaim(ctx, meta.Claim, *claimURL)
+		dlg, err := claimLookup.LookupClaim(ctx, lcmeta.Claim, *claimURL)
 		if err != nil {
 			validateErr = err
 			return
@@ -462,7 +465,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex BlobIndexLookup, claimLookup 
 	}()
 
 	// Note: the ContextID here is of a location commitment provider
-	idx, err := blobIndex.Find(ctx, result.ContextID, result, *blobURL, meta.Range)
+	idx, err := blobIndex.Find(ctx, result.ContextID, result, *blobURL, lcmeta.Range)
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
 	}
@@ -476,7 +479,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex BlobIndexLookup, claimLookup 
 }
 
 // validateLocationCommitment ensures that the delegation is a valid UCAN (signed,
-// not expired etc.), is a location commitment.
+// not expired etc.) and is a location commitment.
 func validateLocationCommitment(claim delegation.Delegation) (validator.Authorization[assert.LocationCaveats], error) {
 	// We use the delegation issuer as the authority, since this should be a self
 	// issued UCAN to assert location.

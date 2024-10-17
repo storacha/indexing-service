@@ -21,11 +21,11 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/claimlookup"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/notifier"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/publisher"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/server"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/storacha/ipni-publisher/pkg/notifier"
+	"github.com/storacha/ipni-publisher/pkg/publisher"
+	"github.com/storacha/ipni-publisher/pkg/server"
+	"github.com/storacha/ipni-publisher/pkg/store"
 )
 
 var log = logging.Logger("service")
@@ -218,7 +218,8 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		if ds == nil {
 			ds = initializeDatastore(&cfg)
 		}
-		notifier, err := notifier.NewNotifierWithStorage(sc.IndexerURL, sc.PrivateKey, store.SimpleStoreFromDatastore(namespace.Wrap(ds, providerIndexNamespace)))
+		notifierStore := store.SimpleStoreFromDatastore(namespace.Wrap(ds, providerIndexNamespace))
+		notifier, err := notifier.NewNotifierWithStorage(sc.IndexerURL, sc.PrivateKey, notifierStore)
 		if err != nil {
 			return nil, fmt.Errorf("creating IPNI remote sync notifier: %w", err)
 		}

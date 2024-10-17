@@ -200,22 +200,19 @@ func (ic IndexCaveats) ToIPLD() (datamodel.Node, error) {
 
 const IndexAbility = "assert/index"
 
-var Index = validator.NewCapability(
-	IndexAbility,
-	schema.DIDString(),
-	schema.Mapped(schema.Struct[adm.IndexCaveatsModel](adm.IndexCaveatsType(), nil), func(model adm.IndexCaveatsModel) (IndexCaveats, failure.Failure) {
-		content, err := schema.Link().Read(model.Content)
-		if err != nil {
-			return IndexCaveats{}, err
-		}
-		index, err := schema.Link(schema.WithVersion(1)).Read(model.Index)
-		if err != nil {
-			return IndexCaveats{}, err
-		}
-		return IndexCaveats{content, index}, nil
-	}),
-	nil,
-)
+var IndexCaveatsReader = schema.Mapped(schema.Struct[adm.IndexCaveatsModel](adm.IndexCaveatsType(), nil), func(model adm.IndexCaveatsModel) (IndexCaveats, failure.Failure) {
+	content, err := schema.Link().Read(model.Content)
+	if err != nil {
+		return IndexCaveats{}, err
+	}
+	index, err := schema.Link(schema.WithVersion(1)).Read(model.Index)
+	if err != nil {
+		return IndexCaveats{}, err
+	}
+	return IndexCaveats{content, index}, nil
+})
+
+var Index = validator.NewCapability(IndexAbility, schema.DIDString(), IndexCaveatsReader, nil)
 
 /**
  * Claims that a CID's graph can be read from the blocks found in parts.
