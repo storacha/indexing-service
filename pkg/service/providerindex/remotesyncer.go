@@ -8,8 +8,8 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/storacha/ipni-publisher/pkg/store"
 )
 
 type Store interface {
