@@ -80,16 +80,16 @@ func FromEnv(ctx context.Context) Config {
 		ServiceConfig: construct.ServiceConfig{
 			PrivateKey: cryptoPrivKey,
 			ProvidersRedis: redis.Options{
-				Addr:     mustGetEnv("PROVIDER_REDIS_URL"),
-				Password: mustGetEnv("PROVIDER_REDIS_PASSWD"),
+				Addr:                       mustGetEnv("PROVIDERS_REDIS_URL"),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
 			},
 			ClaimsRedis: redis.Options{
-				Addr:     mustGetEnv("CLAIMS_REDIS_URL"),
-				Password: mustGetEnv("CLAIMS_REDIS_PASSWD"),
+				Addr:                       mustGetEnv("CLAIMS_REDIS_URL"),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("CLAIMS_REDIS_CACHE")),
 			},
 			IndexesRedis: redis.Options{
-				Addr:     mustGetEnv("INDEXES_REDIS_URL"),
-				Password: mustGetEnv("INDEXES_REDIS_PASSWD"),
+				Addr:                       mustGetEnv("INDEXES_REDIS_URL"),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("INDEXES_REDIS_CACHE")),
 			},
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
 			PublisherAnnounceAddrs: []string{mustGetEnv("IPNI_PUBLISHER_ANNOUNCE_ADDRESS")},
