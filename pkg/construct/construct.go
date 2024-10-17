@@ -21,11 +21,11 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/claimlookup"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/notifier"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/publisher"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/server"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/storacha/ipni-publisher/pkg/notifier"
+	"github.com/storacha/ipni-publisher/pkg/publisher"
+	"github.com/storacha/ipni-publisher/pkg/server"
+	"github.com/storacha/ipni-publisher/pkg/store"
 )
 
 var log = logging.Logger("service")
@@ -191,23 +191,24 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	}
 
 	// setup the datastore for publishing to IPNI
-	store := store.FromDatastore(namespace.Wrap(ds, providerIndexPublisherNamespace))
+	publisherStore := store.FromDatastore(namespace.Wrap(ds, providerIndexPublisherNamespace))
 
 	// setup remote sync notification
 	if !cfg.skipNotification {
-		notifier, err := notifier.NewNotifierWithStorage(sc.IndexerURL, sc.PrivateKey, namespace.Wrap(ds, providerIndexNamespace))
+		notifierStore := store.SimpleStoreFromDatastore(namespace.Wrap(ds, providerIndexNamespace))
+		notifier, err := notifier.NewNotifierWithStorage(sc.IndexerURL, sc.PrivateKey, notifierStore)
 		if err != nil {
 			return nil, fmt.Errorf("creating IPNI remote sync notifier: %w", err)
 		}
 		s.startupFuncs = append(s.startupFuncs, func(ctx context.Context) error { notifier.Start(ctx); return nil })
 		s.shutdownFuncs = append(s.shutdownFuncs, func(context.Context) error { notifier.Stop(); return nil })
 		// Setup handling ipni remote sync notifications
-		notifier.Notify(providerindex.NewRemoteSyncer(providersCache, store).HandleRemoteSync)
+		notifier.Notify(providerindex.NewRemoteSyncer(providersCache, publisherStore).HandleRemoteSync)
 	}
 
 	publisher, err := publisher.New(
 		sc.PrivateKey,
-		store,
+		publisherStore,
 		publisher.WithDirectAnnounce("https://cid.contact"),
 		publisher.WithAnnounceAddrs(sc.PublisherAnnounceAddrs...),
 	)
@@ -215,7 +216,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		return nil, fmt.Errorf("creating IPNI publisher: %w", err)
 	}
 
-	srv, err := server.NewServer(store, server.WithHTTPListenAddrs(sc.PublisherListenAddr))
+	srv, err := server.NewServer(publisherStore, server.WithHTTPListenAddrs(sc.PublisherListenAddr))
 	if err != nil {
 		return nil, fmt.Errorf("creating server for IPNI ads: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/libp2p/go-libp2p/core/peer"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
@@ -75,7 +76,7 @@ type QueryResult interface {
 
 // Service is the core methods of the indexing service.
 type Service interface {
-	CacheClaim(ctx context.Context, claim delegation.Delegation) error
+	CacheClaim(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error
 	PublishClaim(ctx context.Context, claim delegation.Delegation) error
 	Query(ctx context.Context, q Query) (QueryResult, error)
 }

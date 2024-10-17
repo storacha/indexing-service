@@ -16,8 +16,8 @@ import (
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/metadata"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/publisher"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/storacha/ipni-publisher/pkg/publisher"
 )
 
 var log = logging.Logger("providerindex")
