@@ -12,7 +12,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
+	"github.com/storacha/ipni-publisher/pkg/store"
 )
 
 func makeHandler(remoteSyncer *providerindex.RemoteSyncer) func(ctx context.Context, snsEvent events.SNSEvent) error {

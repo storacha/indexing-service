@@ -4,5 +4,5 @@ type CacheCaveats struct {
 }
 
 type Provider struct {
-  Addresses [Byte]
+  addresses [Bytes]
 }

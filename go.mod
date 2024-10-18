@@ -16,7 +16,8 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/multiformats/go-varint v0.0.7
 	github.com/redis/go-redis/v9 v9.6.1
-	github.com/storacha/go-ucanto v0.1.1-0.20241017162431-e9b4aa03b81c
+	github.com/storacha/go-ucanto v0.1.1-0.20241018055500-0909684492ae
+	github.com/storacha/ipni-publisher v0.0.0-20241018055706-032286a2dc3f
 	github.com/stretchr/testify v1.9.0
 )
 
@@ -42,10 +43,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/pion/ice/v2 v2.3.35 // indirect
-	github.com/quic-go/qpack v0.5.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/storacha/ipni-publisher v0.0.0-20241017141940-e2c4c6e12360 // indirect
 	github.com/ucan-wg/go-ucan v0.0.0-20240916120445-37f52863156c // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.opentelemetry.io/otel/metric v1.30.0 // indirect
