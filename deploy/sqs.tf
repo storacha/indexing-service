@@ -1,7 +1,7 @@
 
 
 resource "aws_sqs_queue" "caching" {
-  name = "${terraform.workspace}-${var.app}-caching"
+  name = "${terraform.workspace}-${var.app}-caching.fifo"
   fifo_queue = true
   content_based_deduplication = true
   redrive_policy = jsonencode({
@@ -14,7 +14,9 @@ resource "aws_sqs_queue" "caching" {
 }
 
 resource "aws_sqs_queue" "caching_deadletter" {
-  name = "${terraform.workspace}-${var.app}-caching-deadletter"
+  fifo_queue = true
+  content_based_deduplication = true
+  name = "${terraform.workspace}-${var.app}-caching-deadletter.fifo"
 }
 
 resource "aws_sqs_queue_redrive_allow_policy" "caching" {

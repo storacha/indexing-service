@@ -1,99 +1,124 @@
-resource "aws_api_gateway_rest_api" "api" {
+resource "aws_apigatewayv2_api" "api" {
   name        = "${terraform.workspace}-${var.app}-api"
   description = "${terraform.workspace} ${var.app} API Gateway"
+  protocol_type = "HTTP"
 }
 
-resource "aws_api_gateway_resource" "claims" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "claims"
+resource "aws_apigatewayv2_route" "getclaims" {
+  api_id =  aws_apigatewayv2_api.api.id
+  route_key = "GET /claims"
+  authorization_type = "NONE"
+  target = "integrations/${aws_apigatewayv2_integration.getclaims.id}"
 }
 
-resource "aws_api_gateway_method" "getroot" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_rest_api.api.root_resource_id
-  http_method   = "GET"
-  authorization = "NONE"
+resource "aws_apigatewayv2_route" "getroot" {
+  api_id =  aws_apigatewayv2_api.api.id
+  route_key = "GET /"
+  authorization_type = "NONE"
+  target = "integrations/${aws_apigatewayv2_integration.getroot.id}"
 }
 
-resource "aws_api_gateway_method" "getclaims" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.claims.id
-  http_method   = "GET"
-  authorization = "NONE"
+resource "aws_apigatewayv2_route" "postclaims" {
+  api_id =  aws_apigatewayv2_api.api.id
+  route_key = "POST /claims"
+  authorization_type = "NONE"
+  target = "integrations/${aws_apigatewayv2_integration.postclaims.id}"
 }
 
-resource "aws_api_gateway_method" "postclaims" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.claims.id
-  http_method   = "POST"
-  authorization = "NONE"
+
+resource "aws_apigatewayv2_integration" "getclaims" {
+  api_id             = aws_apigatewayv2_api.api.id
+  integration_uri =  aws_lambda_function.lambda["getclaims"].invoke_arn
+  payload_format_version = "2.0"
+  integration_type    = "AWS_PROXY"
+  connection_type = "INTERNET"
 }
 
-resource "aws_api_gateway_integration" "getroot" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_method.getroot.resource_id
-  http_method             = aws_api_gateway_method.getroot.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "tbd"
+
+resource "aws_apigatewayv2_integration" "getroot" {
+  api_id             = aws_apigatewayv2_api.api.id
+  integration_uri =  aws_lambda_function.lambda["getroot"].invoke_arn
+  payload_format_version = "2.0"
+  integration_type    = "AWS_PROXY"
+  connection_type = "INTERNET"
 }
 
-resource "aws_api_gateway_integration" "getclaims" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_method.getclaims.resource_id
-  http_method             = aws_api_gateway_method.getclaims.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "tbd" #aws_lambda_function.lambda.invoke_arn
+
+resource "aws_apigatewayv2_integration" "postclaims" {
+  api_id             = aws_apigatewayv2_api.api.id
+  integration_uri =  aws_lambda_function.lambda["postclaims"].invoke_arn
+  payload_format_version = "2.0"
+  integration_type    = "AWS_PROXY"
+  connection_type = "INTERNET"
 }
 
-resource "aws_api_gateway_integration" "postclaims" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_method.postclaims.resource_id
-  http_method             = aws_api_gateway_method.postclaims.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "tbd"
-}
+resource "aws_apigatewayv2_deployment" "deployment" {
+  depends_on = [aws_apigatewayv2_integration.getclaims, aws_apigatewayv2_integration.getroot, aws_apigatewayv2_integration.postclaims]
+  triggers = {
+    redeployment = sha1(join(",", [
+      jsonencode(aws_apigatewayv2_integration.postclaims),
+      jsonencode(aws_apigatewayv2_integration.getclaims),
+      jsonencode(aws_apigatewayv2_integration.getroot),
+      jsonencode(aws_apigatewayv2_route.getclaims),
+      jsonencode(aws_apigatewayv2_route.getroot),
+      jsonencode(aws_apigatewayv2_route.postclaims),
+    ]))
+  }
 
-resource "aws_api_gateway_deployment" "deployment" {
-  depends_on = [aws_api_gateway_integration.getroot, aws_api_gateway_integration.getclaims,aws_api_gateway_method.postclaims]
-
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  stage_name  = "prod"
+  api_id = aws_apigatewayv2_api.api.id
+  description = "${terraform.workspace} ${var.app} API Deployment"
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_acm_certificate" "cert" {
-  domain_name       = "indexer.storacha.network"
+  domain_name       = terraform.workspace == "prod" ? "${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
   validation_method = "DNS"
-
+  
   lifecycle {
     create_before_destroy = true
   }
 }
 
 resource "aws_route53_zone" "primary" {
-  name = "storacha.network"
+  name = "${var.app}.storacha.network"
 }
 
 resource "aws_route53_record" "cert_validation" {
-  name    = aws_acm_certificate.cert.domain_validation_options[0].resource_record_name
-  type    = aws_acm_certificate.cert.domain_validation_options[0].resource_record_type
+  allow_overwrite = true
+  name    = tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_name
+  type    = tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_type
   zone_id = aws_route53_zone.primary.zone_id
-  records = [aws_acm_certificate.cert.domain_validation_options[0].resource_record_value]
+  records = [tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_value]
   ttl     = 60
 }
 
-resource "aws_api_gateway_domain_name" "custom_domain" {
-  domain_name = "${terraform.workspace}.${var.app}.storacha.network"
+resource "aws_acm_certificate_validation" "cert" {
   certificate_arn = aws_acm_certificate.cert.arn
+  validation_record_fqdns = [ aws_route53_record.cert_validation.fqdn ]
+}
+resource "aws_apigatewayv2_domain_name" "custom_domain" {
+  domain_name = "${terraform.workspace}.${var.app}.storacha.network"
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate_validation.cert.certificate_arn
+    endpoint_type = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+resource "aws_apigatewayv2_stage" "stage" {
+  api_id = aws_apigatewayv2_api.api.id
+  name   = "$default"
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-resource "aws_api_gateway_base_path_mapping" "path_mapping" {
-  api_id      = aws_api_gateway_rest_api.api.id
-  stage_name  = aws_api_gateway_deployment.deployment.stage_name
-  domain_name = aws_api_gateway_domain_name.custom_domain.domain_name
+resource "aws_apigatewayv2_api_mapping" "api_mapping" {
+  api_id      = aws_apigatewayv2_api.api.id
+  stage  = aws_apigatewayv2_stage.stage.id
+  domain_name = aws_apigatewayv2_domain_name.custom_domain.id
 }
 
 resource "aws_route53_record" "api_gateway" {
@@ -102,8 +127,8 @@ resource "aws_route53_record" "api_gateway" {
   type    = "A"
 
   alias {
-    name                   = aws_api_gateway_domain_name.custom_domain.cloudfront_domain_name
-    zone_id                = aws_api_gateway_domain_name.custom_domain.cloudfront_zone_id
+    name                   = aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].target_domain_name
+    zone_id                = aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
     evaluate_target_health = false
   }
 }

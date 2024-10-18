@@ -1,5 +1,5 @@
 locals {
-  caches = ["providers","indexes","claims"]
+  caches = toset(["providers","indexes","claims"])
 }
 resource "aws_kms_key" "cache_key" {
   description         = "KMS CMK for ${terraform.workspace} ${var.app}"
@@ -9,7 +9,7 @@ resource "aws_kms_key" "cache_key" {
 resource "aws_elasticache_serverless_cache" "cache" {
   for_each = local.caches
   
-  engine = "REDIS"
+  engine = "redis"
   name = "${terraform.workspace}-${var.app}-${each.key}-cache"
   cache_usage_limits {
     data_storage {
@@ -17,10 +17,10 @@ resource "aws_elasticache_serverless_cache" "cache" {
       unit = "GB"
     }
     ecpu_per_second {
-      maximum = terraform.workspace == "prod" ? 5000 : 500
+      maximum = terraform.workspace == "prod" ? 10000 : 1000
     }
   }
-  daily_snapshot_time  = "2:00"
+  daily_snapshot_time  = "02:00"
   description          = "${terraform.workspace} ${var.app} ${each.key} serverless cluster"
   kms_key_id           = aws_kms_key.cache_key.arn
   major_engine_version = "7"
@@ -37,8 +37,8 @@ resource "aws_elasticache_user_group" "cache_user_group" {
   user_group_id = "${terraform.workspace}-${var.app}-redis"
 
   user_ids = [
-    "${terraform.workspace}-${var.app}-default-disabled", 
-    "${terraform.workspace}-${var.app}-iam-user"
+    aws_elasticache_user.cache_default_user.id, 
+    aws_elasticache_user.cache_iam_user.id
   ]
 
   lifecycle {
@@ -49,16 +49,19 @@ resource "aws_elasticache_user_group" "cache_user_group" {
 resource "aws_elasticache_user" "cache_default_user" {
   user_id       = "${terraform.workspace}-${var.app}-default-disabled"
   user_name     = "default"
-  access_string = "off +get ~keys*"
+  access_string = "off ~keys* -@all +get"
   authentication_mode {
     type = "no-password-required"
+  }
+  lifecycle {
+    ignore_changes = [authentication_mode]
   }
   engine = "REDIS"
 }
 
 resource "aws_elasticache_user" "cache_iam_user" {
   user_id       = "${terraform.workspace}-${var.app}-iam-user"
-  user_name     = "iam-user"
+  user_name     = "${terraform.workspace}-${var.app}-iam-user"
   access_string = "on ~* +@all"
   authentication_mode {
     type = "iam"
@@ -70,16 +73,12 @@ resource "aws_security_group" "cache_security_group" {
 
   name        = "${terraform.workspace}-${var.app}-cache-security-group"
   description = "Security group for VPC access to redis"
-  vpc_id      = module.vpc.vpc_id
-}
-
-resource "aws_security_group_rule" "cache_security_group_rule" {
-  security_group_id = aws_security_group.cache_security_group.id
-  type = "ingress"
-
-  cidr_blocks = [aws_vpc.vpc.cidr_block]
-  description = "Redis"
-  from_port = 6379
-  to_port = 6379
-  protocol = "tcp"
+  vpc_id      = aws_vpc.vpc.id
+  ingress {
+    cidr_blocks = [aws_vpc.vpc.cidr_block]
+    description = "Redis"
+    from_port = 6379
+    to_port = 6379
+    protocol = "tcp"
+  }
 }

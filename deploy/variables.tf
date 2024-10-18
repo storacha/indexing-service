@@ -10,8 +10,12 @@ variable "region" {
   default = "us-west-2"
 }
 
-
-variable "peerID" {
-  description = "peerID for ipni"
+variable "allowed_account_ids" {
+  description = "account ids used for AWS"
+  type = list(string)
+  default = ["505595374361"]
+}
+variable private_key {
+  description = "private_key for the peer for this deployment"
   type = string
 }

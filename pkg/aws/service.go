@@ -8,8 +8,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/redis/go-redis/v9"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
@@ -50,17 +51,18 @@ func FromEnv(ctx context.Context) Config {
 	if err != nil {
 		panic(fmt.Errorf("loading aws default config: %w", err))
 	}
-	secretsClient := secretsmanager.NewFromConfig(awsConfig)
-	response, err := secretsClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(mustGetEnv("PRIVATE_KEY")),
+	ssmClient := ssm.NewFromConfig(awsConfig)
+	response, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String(mustGetEnv("PRIVATE_KEY")),
+		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
 		panic(fmt.Errorf("retrieving private key: %w", err))
 	}
-	if response.SecretString == nil {
+	if response.Parameter == nil || response.Parameter.Value == nil {
 		panic(ErrNoPrivateKey)
 	}
-	id, err := ed25519.Parse(*response.SecretString)
+	id, err := ed25519.Parse(*response.Parameter.Value)
 	if err != nil {
 		panic(fmt.Errorf("parsing private key: %s", err))
 	}
@@ -74,6 +76,12 @@ func FromEnv(ctx context.Context) Config {
 		ipniStoreKeyPrefix = "/ipni/v1/ad/"
 	}
 
+	peer, err := peer.IDFromPrivateKey(cryptoPrivKey)
+	if err != nil {
+		panic(fmt.Errorf("parsing private key to peer: %w", err))
+	}
+
+	ipniPublisherAnnounceAddress := fmt.Sprintf("/dns4/%s/tcp/443/https/p2p/%s", mustGetEnv("IPNI_STORE_BUCKET_REGIONAL_DOMAIN"), peer.String())
 	return Config{
 		Config: awsConfig,
 		Signer: id,
@@ -92,7 +100,7 @@ func FromEnv(ctx context.Context) Config {
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("INDEXES_REDIS_CACHE")),
 			},
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
-			PublisherAnnounceAddrs: []string{mustGetEnv("IPNI_PUBLISHER_ANNOUNCE_ADDRESS")},
+			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
 		},
 		SQSCachingQueueURL:  mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
 		CachingBucket:       mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
