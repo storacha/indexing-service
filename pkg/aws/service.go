@@ -15,8 +15,8 @@ import (
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/indexing-service/pkg/construct"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/storacha/ipni-publisher/pkg/store"
 )
 
 // ErrNoPrivateKey means that the value returned from Secrets was empty

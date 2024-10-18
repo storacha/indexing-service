@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/storacha/indexing-service/pkg/service/providerindex/store"
+	"github.com/storacha/ipni-publisher/pkg/store"
 )
 
 // S3Store implements the store.Store interface on S3

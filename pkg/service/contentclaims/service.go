@@ -6,9 +6,10 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt"
-	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/server"
 	"github.com/storacha/go-ucanto/ucan"
@@ -43,21 +44,26 @@ func NewService(indexer types.Service) map[ucan.Ability]server.ServiceMethod[ass
 			func(cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ctx server.InvocationContext) (assert.Unit, receipt.Effects, error) {
 				peerid, err := toPeerID(inv.Issuer())
 				if err != nil {
-					return assert.Unit{}, nil, failure.FromError(err)
+					return assert.Unit{}, nil, err
 				}
 
-				provider := peer.AddrInfo{
-					ID:    peerid,
-					Addrs: cap.Nb().Provider.Addrs,
-				}
+				provider := peer.AddrInfo{ID: peerid, Addrs: cap.Nb().Provider.Addresses}
 
-				// TODO: extract claim from invocation
-
-				err = indexer.CacheClaim(context.TODO(), provider, claim)
+				bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(inv.Blocks()))
 				if err != nil {
-					return assert.Unit{}, nil, failure.FromError(err)
+					return assert.Unit{}, nil, err
 				}
 
+				rootbl, ok, err := bs.Get(cap.Nb().Claim)
+				if err != nil {
+					return assert.Unit{}, nil, err
+				}
+				if !ok {
+					return assert.Unit{}, nil, NewMissingClaimError()
+				}
+
+				claim := delegation.NewDelegation(rootbl, bs)
+				err = indexer.CacheClaim(context.TODO(), provider, claim)
 				return assert.Unit{}, nil, err
 			},
 		),
