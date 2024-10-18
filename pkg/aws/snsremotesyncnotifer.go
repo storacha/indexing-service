@@ -22,7 +22,7 @@ type SNSRemoteSyncNotifier struct {
 	snsClient *sns.Client
 }
 
-func NewSQSRemoteSyncNotifier(config aws.Config, topicArn string) *SNSRemoteSyncNotifier {
+func NewSNSRemoteSyncNotifier(config aws.Config, topicArn string) *SNSRemoteSyncNotifier {
 	return &SNSRemoteSyncNotifier{
 		snsClient: sns.NewFromConfig(config),
 		topicArn:  topicArn,
