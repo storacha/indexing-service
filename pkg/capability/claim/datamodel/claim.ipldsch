@@ -1,0 +1,8 @@
+type CacheCaveats struct {
+	claim Link
+  provider Provider
+}
+
+type Provider struct {
+  addresses [Bytes]
+}
