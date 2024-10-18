@@ -87,7 +87,7 @@ func SkipNotification() Option {
 	}
 }
 
-// WithStartIPNIServer determines when IPNI adds will be served directly over HTTP
+// WithStartIPNIServer determines when IPNI ads will be served directly over HTTP
 // Defaults true
 func WithStartIPNIServer(startIPNIServer bool) Option {
 	return func(cfg *config) error {
