@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	sqsRemoteSyncNotifier := aws.NewSQSRemoteSyncNotifier(config.Config, config.NotifierTopicArn)
+	sqsRemoteSyncNotifier := aws.NewSNSRemoteSyncNotifier(config.Config, config.NotifierTopicArn)
 	notifier.Notify(sqsRemoteSyncNotifier.NotifyRemoteSync)
 
 	lambda.Start(makeHandler(notifier))
