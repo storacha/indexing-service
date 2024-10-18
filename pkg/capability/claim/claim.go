@@ -20,10 +20,16 @@ type Provider struct {
 }
 
 func (cc CacheCaveats) ToIPLD() (datamodel.Node, error) {
-	md := &cdm.CacheCaveatsModel{
-		Claim: cc.Claim,
+	var addrs [][]byte
+	for _, addr := range cc.Provider.Addresses {
+		addrs = append(addrs, addr.Bytes())
 	}
-	return ipld.WrapWithRecovery(md, cdm.CacheCaveatsType())
+
+	model := cdm.CacheCaveatsModel{
+		Claim:    cc.Claim,
+		Provider: cdm.ProviderModel{Addresses: addrs},
+	}
+	return ipld.WrapWithRecovery(&model, cdm.CacheCaveatsType())
 }
 
 const CacheAbility = "claim/cache"
