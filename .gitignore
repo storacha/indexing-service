@@ -3,3 +3,8 @@
 /cmd/indexing-service
 /indexing-service
 *.car
+/build
+deploy/.terraform
+.env
+.tfworkspace
+/ucangen

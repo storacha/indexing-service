@@ -1,6 +1,6 @@
 type QueryResult union {
   | QueryResult0_1 "index/query/result@0.1"
-}
+} representation keyed
 
 type QueryResult0_1 struct {
   claims optional [Link]
