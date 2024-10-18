@@ -6,6 +6,15 @@ resource "aws_s3_bucket" "ipni_store_bucket" {
   bucket = "${terraform.workspace}-${var.app}-ipni-store-bucket"
 }
 
+resource "aws_s3_bucket_public_access_block" "ipni_store_bucket" {
+  bucket = aws_s3_bucket.ipni_store_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = false
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_s3_bucket_cors_configuration" "ipni_store_cors" {
   bucket = aws_s3_bucket.ipni_store_bucket.bucket
 
@@ -19,6 +28,7 @@ resource "aws_s3_bucket_cors_configuration" "ipni_store_cors" {
 }
 
 resource "aws_s3_bucket_policy" "ipni_store_policy" {
+  depends_on = [ aws_s3_bucket_public_access_block.ipni_store_bucket ]
   bucket = aws_s3_bucket.ipni_store_bucket.id
 
   policy = jsonencode({

@@ -1,6 +1,6 @@
 locals {
   vpc_cidr = "10.0.0.0/16"
-  azs      = slice(data.aws_availability_zones.available.names, 0, 4)
+  azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 }
 
 data "aws_availability_zones" "available" {}
@@ -15,9 +15,8 @@ resource "aws_vpc" "vpc" {
   }
 }
 
-
 resource "aws_internet_gateway" "vpc_internet_gateway" {
-  vpc_id = aws_vpc.base_app.id
+  vpc_id = aws_vpc.vpc.id
   tags = {
     Name = "${terraform.workspace}-${var.app}-vpc-internet-gateway"
   }
