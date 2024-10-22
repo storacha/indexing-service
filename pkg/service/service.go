@@ -453,7 +453,7 @@ func publishIndexClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLook
 
 	var digests []multihash.Multihash
 	for _, slices := range idx.Shards().Iterator() {
-		for d, _ := range slices.Iterator() {
+		for d := range slices.Iterator() {
 			digests = append(digests, d)
 		}
 	}
