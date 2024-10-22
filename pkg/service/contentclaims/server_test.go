@@ -1,17 +1,20 @@
 package contentclaims
 
 import (
+	"context"
 	"fmt"
-	"net/url"
 	"testing"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/storacha/go-ucanto/client"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/indexing-service/pkg/capability/assert"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +28,7 @@ var rcptsch = []byte(`
 `)
 
 func TestServer(t *testing.T) {
-	server, err := NewServer(testutil.Service, nil)
+	server, err := NewServer(testutil.Service, &mockIndexer{})
 	require.NoError(t, err)
 
 	conn, err := client.NewConnection(testutil.Service, server)
@@ -48,15 +51,6 @@ func TestServer(t *testing.T) {
 			assert.IndexCaveats{
 				Content: testutil.RandomCID(),
 				Index:   testutil.RandomCID(),
-			},
-		))(t),
-		testutil.Must(assert.Location.Invoke(
-			testutil.Service,
-			testutil.Service,
-			testutil.Service.DID().String(),
-			assert.LocationCaveats{
-				Content:  assert.FromHash(testutil.RandomMultihash()),
-				Location: []url.URL{},
 			},
 		))(t),
 	}
@@ -83,3 +77,23 @@ func TestServer(t *testing.T) {
 		})
 	}
 }
+
+type mockIndexer struct {
+}
+
+// CacheClaim implements types.Service.
+func (m *mockIndexer) CacheClaim(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
+	return nil
+}
+
+// PublishClaim implements types.Service.
+func (m *mockIndexer) PublishClaim(ctx context.Context, claim delegation.Delegation) error {
+	return nil
+}
+
+// Query implements types.Service.
+func (m *mockIndexer) Query(ctx context.Context, q types.Query) (types.QueryResult, error) {
+	return nil, nil
+}
+
+var _ types.Service = (*mockIndexer)(nil)
