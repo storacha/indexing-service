@@ -108,7 +108,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polydawn/refmt v0.89.1-0.20231129105047-37766d95467a // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/storacha/go-capabilities v0.0.0-20241021135227-bd41efd524a8
+	github.com/storacha/go-capabilities v0.0.0-20241022031210-04ae6a36f715
 	github.com/storacha/go-metadata v0.0.0-20241021141939-f94d93dcda78
 	github.com/urfave/cli/v2 v2.27.4
 	github.com/whyrusleeping/cbor-gen v0.1.2 // indirect
