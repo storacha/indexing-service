@@ -8,10 +8,10 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha/go-capabilities/pkg/assert"
+	adm "github.com/storacha/go-capabilities/pkg/assert/datamodel"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/ucan"
-	"github.com/storacha/indexing-service/pkg/capability/assert"
-	adm "github.com/storacha/indexing-service/pkg/capability/assert/datamodel"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/stretchr/testify/require"

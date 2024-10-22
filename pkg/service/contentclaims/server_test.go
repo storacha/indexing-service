@@ -7,12 +7,13 @@ import (
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
-	"github.com/storacha/indexing-service/pkg/capability/assert"
+	unit "github.com/storacha/go-ucanto/core/result/ok"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -63,13 +64,13 @@ func TestServer(t *testing.T) {
 			rcptlnk, ok := resp.Get(inv.Link())
 			require.True(t, ok, "missing receipt for invocation: %s", inv.Link())
 
-			reader, err := receipt.NewReceiptReader[assert.Unit, datamodel.Node](rcptsch)
+			reader, err := receipt.NewReceiptReader[unit.Unit, datamodel.Node](rcptsch)
 			require.NoError(t, err)
 
 			rcpt, err := reader.Read(rcptlnk, resp.Blocks())
 			require.NoError(t, err)
 
-			result.MatchResultR0(rcpt.Out(), func(ok assert.Unit) {
+			result.MatchResultR0(rcpt.Out(), func(ok unit.Unit) {
 				fmt.Printf("%+v\n", ok)
 			}, func(x datamodel.Node) {
 				require.Fail(t, "unexpected failure")
