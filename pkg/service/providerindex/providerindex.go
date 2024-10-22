@@ -137,10 +137,16 @@ func (pi *ProviderIndex) filterBySpace(results []model.ProviderResult, mh mh.Mul
 	return results, nil
 }
 
-// Publish should do the following:
-// 1. Write the entries to the cache with no expiration until publishing is complete
-// 2. Generate an advertisement for the advertised hashes and publish/announce it
-func (pi *ProviderIndex) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+func (pi *ProviderIndex) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+	// Cache the entries _with_ expiry - we cannot rely on the IPNI notifier to
+	// tell us when they are published since we are not publishing to IPNI.
+	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, true)
+}
+
+func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata, expire bool) error {
+	log := log.With("contextID", []byte(contextID))
+	log.Infof("caching %d provider results for provider: %s", len(digests), provider.ID)
+
 	mdb, err := meta.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("marshaling metadata: %w", err)
@@ -152,14 +158,13 @@ func (pi *ProviderIndex) Publish(ctx context.Context, provider peer.AddrInfo, co
 		Provider:  &provider,
 	}
 
+	var joberr error
 	q := jobqueue.NewJobQueue(
 		func(ctx context.Context, digest mh.Multihash) error {
-			return appendProviderResult(ctx, pi.providerStore, digest, pr)
+			return appendProviderResult(ctx, providerStore, digest, pr, expire)
 		},
 		jobqueue.WithConcurrency(5),
-		jobqueue.WithErrorHandler(func(err error) {
-			log.Errorf("appending provider result: %w", err)
-		}),
+		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
 	)
 	q.Startup()
 	for _, d := range digests {
@@ -168,7 +173,29 @@ func (pi *ProviderIndex) Publish(ctx context.Context, provider peer.AddrInfo, co
 			return err
 		}
 	}
-	q.Shutdown(ctx)
+	err = q.Shutdown(ctx)
+	if err != nil {
+		return fmt.Errorf("shutting down job queue: %w", err)
+	}
+	if joberr != nil {
+		return fmt.Errorf("appending provider result: %w", joberr)
+	}
+
+	log.Infof("cached %d provider results", len(digests))
+	return nil
+}
+
+// Publish should do the following:
+// 1. Write the entries to the cache with no expiration until publishing is complete
+// 2. Generate an advertisement for the advertised hashes and publish/announce it
+func (pi *ProviderIndex) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+	log := log.With("contextID", []byte(contextID))
+
+	// cache but do not expire (entries will be expired via the notifier)
+	err := Cache(ctx, pi.providerStore, provider, contextID, digests, meta, false)
+	if err != nil {
+		return fmt.Errorf("caching provider results: %w", err)
+	}
 
 	id, err := pi.publisher.Publish(ctx, provider, contextID, digests, meta)
 	if err != nil {
@@ -179,7 +206,7 @@ func (pi *ProviderIndex) Publish(ctx context.Context, provider peer.AddrInfo, co
 }
 
 // TODO: atomic append...
-func appendProviderResult(ctx context.Context, providerStore types.ProviderStore, digest mh.Multihash, meta model.ProviderResult) error {
+func appendProviderResult(ctx context.Context, providerStore types.ProviderStore, digest mh.Multihash, meta model.ProviderResult, expire bool) error {
 	metas, err := providerStore.Get(ctx, digest)
 	if err != nil {
 		if err != types.ErrKeyNotFound {
@@ -187,7 +214,7 @@ func appendProviderResult(ctx context.Context, providerStore types.ProviderStore
 		}
 	}
 	metas = append(metas, meta)
-	err = providerStore.Set(ctx, digest, metas, false)
+	err = providerStore.Set(ctx, digest, metas, expire)
 	if err != nil {
 		return fmt.Errorf("setting provider results for digest: %s: %w", digest.B58String(), err)
 	}

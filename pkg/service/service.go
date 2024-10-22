@@ -45,6 +45,9 @@ type ProviderIndex interface {
 	//  2. With returned provider results, filter additionally for claim type. If space dids are set, calculate an encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
 	//     Future TODO: kick off a conversion task to update the recrds
 	Find(context.Context, providerindex.QueryKey) ([]model.ProviderResult, error)
+	// Cache writes entries to the cache but does not publish/announce an
+	// advertisement for them. Entries expire after a pre-determined time.
+	Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests []multihash.Multihash, meta meta.Metadata) error
 	// Publish should do the following:
 	// 1. Write the entries to the cache with no expiration until publishing is complete
 	// 2. Generate an advertisement for the advertised hashes and publish/announce it
@@ -309,7 +312,7 @@ func fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) 
 // ideally however, IPNI would enable UCAN chains for publishing so that we could publish it directly from the storage service
 // it doesn't for now, so we let SPs publish themselves them direct cache with us
 func (is *IndexingService) CacheClaim(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
-	return errors.New("not implemented")
+	return CacheClaim(ctx, is.blobIndexLookup, is.claimLookup, is.providerIndex, is.provider, claim)
 }
 
 // PublishClaim caches and publishes a content claim
@@ -345,6 +348,63 @@ func NewIndexingService(blobIndexLookup BlobIndexLookup, claimLookup ClaimLookup
 		option(is)
 	}
 	return is
+}
+
+func CacheClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLookup ClaimLookup, provIndex ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+	caps := claim.Capabilities()
+	switch caps[0].Can() {
+	case assert.LocationAbility:
+		return cacheLocationCommitment(ctx, provIndex, provider, claim)
+	default:
+		return ErrUnrecognizedClaim
+	}
+}
+
+func cacheLocationCommitment(ctx context.Context, provIndex ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+	caps := claim.Capabilities()
+	if len(caps) == 0 {
+		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	}
+
+	if caps[0].Can() != assert.LocationAbility {
+		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
+	}
+
+	nb, rerr := assert.LocationCaveatsReader.Read(caps[0].Nb())
+	if rerr != nil {
+		return fmt.Errorf("reading index claim data: %w", rerr)
+	}
+
+	digests := []multihash.Multihash{nb.Content.Hash()}
+	contextID, err := types.ContextID{Space: &nb.Space, Hash: nb.Content.Hash()}.ToEncoded()
+	if err != nil {
+		return fmt.Errorf("encoding advertisement context ID: %w", err)
+	}
+
+	var exp int
+	if claim.Expiration() != nil {
+		exp = *claim.Expiration()
+	}
+
+	var rng *metadata.Range
+	if nb.Range != nil {
+		rng = &metadata.Range{Offset: nb.Range.Offset, Length: nb.Range.Length}
+	}
+
+	meta := metadata.MetadataContext.New(
+		&metadata.LocationCommitmentMetadata{
+			Expiration: int64(exp),
+			Claim:      asCID(claim.Link()),
+			Range:      rng,
+		},
+	)
+
+	err = provIndex.Cache(ctx, provider, string(contextID), digests, meta)
+	if err != nil {
+		return fmt.Errorf("caching claim: %w", err)
+	}
+
+	return nil
 }
 
 func PublishClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLookup ClaimLookup, provIndex ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {

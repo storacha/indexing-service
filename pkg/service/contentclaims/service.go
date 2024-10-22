@@ -27,6 +27,9 @@ func NewService(indexer types.Service) map[ucan.Ability]server.ServiceMethod[ok.
 			assert.Equals,
 			func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, receipt.Effects, error) {
 				err := indexer.PublishClaim(context.TODO(), inv)
+				if err != nil {
+					log.Errorf("publishing equals claim: %w", err)
+				}
 				return ok.Unit{}, nil, err
 			},
 		),
@@ -65,6 +68,9 @@ func NewService(indexer types.Service) map[ucan.Ability]server.ServiceMethod[ok.
 
 				claim := delegation.NewDelegation(rootbl, bs)
 				err = indexer.CacheClaim(context.TODO(), provider, claim)
+				if err != nil {
+					log.Errorf("caching claim: %w", err)
+				}
 				return ok.Unit{}, nil, err
 			},
 		),
