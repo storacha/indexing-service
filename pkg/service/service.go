@@ -33,6 +33,8 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
+var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
+
 // ProviderIndex is a read/write interface to a local cache of providers that falls back to IPNI
 type ProviderIndex interface {
 	// Find should do the following
@@ -346,7 +348,55 @@ func NewIndexingService(blobIndexLookup BlobIndexLookup, claimLookup ClaimLookup
 }
 
 func PublishClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLookup ClaimLookup, provIndex ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
-	return publishIndexClaim(ctx, blobIndex, claimLookup, provIndex, provider, claim)
+	caps := claim.Capabilities()
+	switch caps[0].Can() {
+	case assert.EqualsAbility:
+		return publishEqualsClaim(ctx, provIndex, provider, claim)
+	case assert.IndexAbility:
+		return publishIndexClaim(ctx, blobIndex, claimLookup, provIndex, provider, claim)
+	default:
+		return ErrUnrecognizedClaim
+	}
+}
+
+func publishEqualsClaim(ctx context.Context, provIndex ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+	caps := claim.Capabilities()
+	if len(caps) == 0 {
+		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	}
+
+	if caps[0].Can() != assert.EqualsAbility {
+		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
+	}
+
+	nb, rerr := assert.EqualsCaveatsReader.Read(caps[0].Nb())
+	if rerr != nil {
+		return fmt.Errorf("reading index claim data: %w", rerr)
+	}
+
+	var exp int
+	if claim.Expiration() != nil {
+		exp = *claim.Expiration()
+	}
+
+	meta := metadata.MetadataContext.New(
+		&metadata.EqualsClaimMetadata{
+			Equals:     asCID(nb.Equals),
+			Expiration: int64(exp),
+			Claim:      asCID(claim.Link()),
+		},
+	)
+
+	var digests []multihash.Multihash
+	digests = append(digests, nb.Content.Hash())
+	digests = append(digests, nb.Equals.(cidlink.Link).Cid.Hash())
+	contextID := nb.Equals.Binary()
+	err := provIndex.Publish(ctx, provider, contextID, digests, meta)
+	if err != nil {
+		return fmt.Errorf("publishing claim: %w", err)
+	}
+
+	return nil
 }
 
 func publishIndexClaim(ctx context.Context, blobIndex BlobIndexLookup, claimLookup ClaimLookup, provIndex ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
