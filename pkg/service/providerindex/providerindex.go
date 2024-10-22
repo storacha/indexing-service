@@ -13,9 +13,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
-	"github.com/storacha/indexing-service/pkg/metadata"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/publisher"
 )

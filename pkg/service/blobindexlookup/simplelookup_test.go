@@ -12,9 +12,9 @@ import (
 	"time"
 
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/metadata"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
 	"github.com/stretchr/testify/require"
 )

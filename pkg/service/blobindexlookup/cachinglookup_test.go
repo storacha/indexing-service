@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/metadata"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
