@@ -16,8 +16,10 @@ type simpleLookup struct {
 	httpClient *http.Client
 }
 
-// NewClaimLookup creates a new ClaimLookup with the provided claimstore and HTTP client
-func NewClaimLookup(httpClient *http.Client) ClaimLookup {
+var _ ClaimLookup = (*simpleLookup)(nil)
+
+// NewSimpleClaimLookup creates a new ClaimLookup with the provided claimstore and HTTP client
+func NewSimpleClaimLookup(httpClient *http.Client) ClaimLookup {
 	return &simpleLookup{
 		httpClient: httpClient,
 	}

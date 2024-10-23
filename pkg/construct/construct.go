@@ -254,8 +254,8 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 	// build read through fetchers
 	// TODO: add sender / publisher / linksystem / legacy systems
-	providerIndex := providerindex.NewProviderIndex(providersCache, findClient, publisher, nil)
-	claimLookup := claimlookup.WithCache(claimlookup.NewClaimLookup(http.DefaultClient), claimsCache)
+	providerIndex := providerindex.New(providersCache, findClient, publisher, nil)
+	claimLookup := claimlookup.WithCache(claimlookup.NewSimpleClaimLookup(http.DefaultClient), claimsCache)
 	blobIndexLookup := blobindexlookup.WithCache(
 		blobindexlookup.NewBlobIndexLookup(http.DefaultClient),
 		shardDagIndexesCache,

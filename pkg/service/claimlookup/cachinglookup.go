@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -15,6 +16,9 @@ type cachingLookup struct {
 	claimLookup ClaimLookup
 	claimStore  types.ContentClaimsStore
 }
+
+var _ ClaimLookup = (*cachingLookup)(nil)
+var _ ClaimCacher = (*cachingLookup)(nil)
 
 // WithCache augments a ClaimLookup with cached claims from a claim store
 func WithCache(claimLookup ClaimLookup, claimStore types.ContentClaimsStore) ClaimLookup {
@@ -44,8 +48,28 @@ func (cl *cachingLookup) LookupClaim(ctx context.Context, claimCid cid.Cid, fetc
 	}
 
 	// cache the claim for the future
-	if err := cl.claimStore.Set(ctx, claimCid, claim, true); err != nil {
-		return nil, fmt.Errorf("caching fetched claim: %w", err)
+	err = cacheClaim(ctx, cl.claimStore, claim)
+	if err != nil {
+		return nil, fmt.Errorf("caching claim: %w", err)
 	}
 	return claim, nil
+}
+
+func (cl *cachingLookup) CacheClaim(ctx context.Context, claim delegation.Delegation) error {
+	err := cacheClaim(ctx, cl.claimStore, claim)
+	if err != nil {
+		return fmt.Errorf("caching claim: %w", err)
+	}
+	if cacher, ok := cl.claimLookup.(ClaimCacher); ok {
+		// cache with underlying claim lookup
+		err = cacher.CacheClaim(ctx, claim)
+		if err != nil {
+			return fmt.Errorf("caching claim in underlying cacher: %w", err)
+		}
+	}
+	return nil
+}
+
+func cacheClaim(ctx context.Context, claimStore types.ContentClaimsStore, claim delegation.Delegation) error {
+	return claimStore.Set(ctx, link.ToCID(claim.Link()), claim, true)
 }

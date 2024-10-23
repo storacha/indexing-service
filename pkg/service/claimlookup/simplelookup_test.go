@@ -46,7 +46,7 @@ func TestClaimLookup__LookupClaim(t *testing.T) {
 			testServer := httptest.NewServer(tc.handler)
 			defer func() { testServer.Close() }()
 			// Create ClaimLookup instance
-			cl := claimlookup.NewClaimLookup(testServer.Client())
+			cl := claimlookup.NewSimpleClaimLookup(testServer.Client())
 			claim, err := cl.LookupClaim(context.Background(), cid, *testutil.Must(url.Parse(testServer.URL))(t))
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
