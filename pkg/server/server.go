@@ -83,7 +83,7 @@ func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 }
 
 // GetRootHandler displays version info when a GET request is sent to "/".
-func GetRootHandler(id principal.Signer) func(http.ResponseWriter, *http.Request) {
+func GetRootHandler(id principal.Signer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("🔥 indexing-service v0.0.0\n"))
 		w.Write([]byte("- https://github.com/storacha/indexing-service\n"))
@@ -96,7 +96,7 @@ func GetRootHandler(id principal.Signer) func(http.ResponseWriter, *http.Request
 }
 
 // GetClaimHandler retrieves a single content claim by it's root CID.
-func GetClaimHandler(service types.Getter) func(http.ResponseWriter, *http.Request) {
+func GetClaimHandler(service types.Getter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(r.URL.Path, "/")
 		c, err := cid.Parse(parts[len(parts)-1])
@@ -125,7 +125,7 @@ func GetClaimHandler(service types.Getter) func(http.ResponseWriter, *http.Reque
 
 // PostClaimsHandler invokes the ucanto service when a POST request is sent to
 // "/claims".
-func PostClaimsHandler(id principal.Signer, service types.Publisher) func(http.ResponseWriter, *http.Request) {
+func PostClaimsHandler(id principal.Signer, service types.Publisher) http.HandlerFunc {
 	server, err := contentclaims.NewUCANServer(id, service)
 	if err != nil {
 		log.Fatalf("creating ucanto server: %s", err)
@@ -153,7 +153,7 @@ func PostClaimsHandler(id principal.Signer, service types.Publisher) func(http.R
 
 // GetClaimsHandler retrieves content claims when a GET request is sent to
 // "/claims?multihash={multihash}".
-func GetClaimsHandler(service types.Querier) func(http.ResponseWriter, *http.Request) {
+func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mhStrings := r.URL.Query()["multihash"]
 		hashes := make([]multihash.Multihash, 0, len(mhStrings))
