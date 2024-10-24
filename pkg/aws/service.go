@@ -91,7 +91,7 @@ func FromEnv(ctx context.Context) Config {
 		Signer: id,
 		ServiceConfig: construct.ServiceConfig{
 			PrivateKey: cryptoPrivKey,
-			PublicURL:  strings.Split(mustGetEnv("PUBLIC_ADDRESS"), ","),
+			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
 			ProvidersRedis: redis.Options{
 				Addr:                       mustGetEnv("PROVIDERS_REDIS_URL"),
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
