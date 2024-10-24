@@ -1,4 +1,4 @@
-package claimlookup_test
+package contentclaims_test
 
 import (
 	"context"
@@ -8,33 +8,33 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/service/claimlookup"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
-func TestWithCache__LookupClaim(t *testing.T) {
-
-	// Create a test CID
-	cachedCid := testutil.RandomCID().(cidlink.Link).Cid
-	notCachedCid := testutil.RandomCID().(cidlink.Link).Cid
+func TestWithCache__Find(t *testing.T) {
 	// Create a cached claim
 	cachedClaim := testutil.RandomLocationDelegation()
 	notCachedClaim := testutil.RandomIndexDelegation()
+
+	// Create a test CID
+	cachedCid := cachedClaim.Link()
+	notCachedCid := notCachedClaim.Link()
 
 	// sample error
 	anError := errors.New("something went wrong")
 	// Define test cases
 	testCases := []struct {
 		name          string
-		claimCid      cid.Cid
+		claimCid      ipld.Link
 		setErr        error
 		getErr        error
 		expectedErr   error
-		baseLookup    *mockClaimLookup
+		baseFinder    *mockFinder
 		expectedClaim delegation.Delegation
 		finalState    map[string]delegation.Delegation
 	}{
@@ -56,7 +56,7 @@ func TestWithCache__LookupClaim(t *testing.T) {
 			},
 		},
 		{
-			name:          "Lookup error",
+			name:          "Find error",
 			claimCid:      cachedCid,
 			expectedClaim: nil,
 			getErr:        anError,
@@ -70,17 +70,17 @@ func TestWithCache__LookupClaim(t *testing.T) {
 			claimCid:      notCachedCid,
 			expectedClaim: nil,
 			setErr:        anError,
-			expectedErr:   fmt.Errorf("caching fetched claim: %w", anError),
+			expectedErr:   fmt.Errorf("caching claim: %w", anError),
 			finalState: map[string]delegation.Delegation{
 				cachedCid.String(): cachedClaim,
 			},
 		},
 		{
-			name:          "underlying lookup error",
+			name:          "underlying find error",
 			claimCid:      notCachedCid,
 			expectedClaim: nil,
-			baseLookup:    &mockClaimLookup{nil, anError},
-			expectedErr:   fmt.Errorf("fetching underlying claim: %w", anError),
+			baseFinder:    &mockFinder{nil, anError},
+			expectedErr:   anError,
 			finalState: map[string]delegation.Delegation{
 				cachedCid.String(): cachedClaim,
 			},
@@ -90,7 +90,7 @@ func TestWithCache__LookupClaim(t *testing.T) {
 	// Run test cases
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockStore := &MockContentClaimsStore{
+			mockCache := &MockContentClaimsCache{
 				setErr: tc.setErr,
 				getErr: tc.getErr,
 				claims: map[string]delegation.Delegation{
@@ -98,14 +98,14 @@ func TestWithCache__LookupClaim(t *testing.T) {
 				},
 			}
 			// generate a test server for requests
-			lookup := tc.baseLookup
-			if lookup == nil {
-				lookup = &mockClaimLookup{notCachedClaim, nil}
+			finder := tc.baseFinder
+			if finder == nil {
+				finder = &mockFinder{notCachedClaim, nil}
 			}
 			// Create ClaimLookup instance
-			cl := claimlookup.WithCache(lookup, mockStore)
+			cl := contentclaims.WithCache(finder, mockCache)
 
-			claim, err := cl.LookupClaim(context.Background(), tc.claimCid, *testutil.TestURL)
+			claim, err := cl.Find(context.Background(), tc.claimCid, *testutil.TestURL)
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {
@@ -116,8 +116,8 @@ func TestWithCache__LookupClaim(t *testing.T) {
 			if finalState == nil {
 				finalState = make(map[string]delegation.Delegation)
 			}
-			require.Equal(t, len(finalState), len(mockStore.claims))
-			for c, claim := range mockStore.claims {
+			require.Equal(t, len(finalState), len(mockCache.claims))
+			for c, claim := range mockCache.claims {
 				expectedClaim := finalState[c]
 				testutil.RequireEqualDelegation(t, expectedClaim, claim)
 			}
@@ -125,20 +125,20 @@ func TestWithCache__LookupClaim(t *testing.T) {
 	}
 }
 
-// MockContentClaimsStore is a mock implementation of the ContentClaimsStore interface
-type MockContentClaimsStore struct {
+// MockContentClaimsCache is a mock implementation of the ContentClaimsCache interface
+type MockContentClaimsCache struct {
 	setErr, getErr error
 	claims         map[string]delegation.Delegation
 }
 
-var _ types.ContentClaimsStore = &MockContentClaimsStore{}
+var _ types.ContentClaimsCache = &MockContentClaimsCache{}
 
 // SetExpirable implements types.ContentClaimsStore.
-func (m *MockContentClaimsStore) SetExpirable(ctx context.Context, key cid.Cid, expires bool) error {
+func (m *MockContentClaimsCache) SetExpirable(ctx context.Context, key cid.Cid, expires bool) error {
 	return nil
 }
 
-func (m *MockContentClaimsStore) Get(ctx context.Context, claimCid cid.Cid) (delegation.Delegation, error) {
+func (m *MockContentClaimsCache) Get(ctx context.Context, claimCid cid.Cid) (delegation.Delegation, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
@@ -149,7 +149,7 @@ func (m *MockContentClaimsStore) Get(ctx context.Context, claimCid cid.Cid) (del
 	return claim, nil
 }
 
-func (m *MockContentClaimsStore) Set(ctx context.Context, claimCid cid.Cid, claim delegation.Delegation, overwrite bool) error {
+func (m *MockContentClaimsCache) Set(ctx context.Context, claimCid cid.Cid, claim delegation.Delegation, expires bool) error {
 	if m.setErr != nil {
 		return m.setErr
 	}
@@ -157,11 +157,17 @@ func (m *MockContentClaimsStore) Set(ctx context.Context, claimCid cid.Cid, clai
 	return nil
 }
 
-type mockClaimLookup struct {
+type mockFinder struct {
 	claim delegation.Delegation
 	err   error
 }
 
-func (m *mockClaimLookup) LookupClaim(ctx context.Context, claimCid cid.Cid, fetchURL url.URL) (delegation.Delegation, error) {
-	return m.claim, m.err
+func (m *mockFinder) Find(ctx context.Context, link ipld.Link, url url.URL) (delegation.Delegation, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.claim == nil || m.claim.Link().String() != link.String() {
+		return nil, types.ErrKeyNotFound
+	}
+	return m.claim, nil
 }

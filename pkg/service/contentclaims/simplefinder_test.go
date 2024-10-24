@@ -1,24 +1,25 @@
-package claimlookup_test
+package contentclaims_test
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/service/claimlookup"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/stretchr/testify/require"
 )
 
-func TestClaimLookup__LookupClaim(t *testing.T) {
-	cid := testutil.RandomCID().(cidlink.Link).Cid
+func TestSimpleFinder__Find(t *testing.T) {
 	claim := testutil.RandomIndexDelegation()
+	otherClaim := testutil.RandomIndexDelegation()
+
 	// sample error
 	testCases := []struct {
 		name          string
@@ -35,6 +36,14 @@ func TestClaimLookup__LookupClaim(t *testing.T) {
 			expectedClaim: claim,
 		},
 		{
+			name: "CID match failure",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				claimBytes := testutil.Must(io.ReadAll(otherClaim.Archive()))(t)
+				testutil.Must(w.Write(claimBytes))(t)
+			},
+			expectedErr: fmt.Errorf("received delegation: %s, does not match expected delegation: %s", otherClaim.Link(), claim.Link()),
+		},
+		{
 			name:        "failure",
 			handler:     http.NotFound,
 			expectedErr: errors.New("failure response fetching claim. status: 404 Not Found, message: 404 page not found\n"),
@@ -46,8 +55,8 @@ func TestClaimLookup__LookupClaim(t *testing.T) {
 			testServer := httptest.NewServer(tc.handler)
 			defer func() { testServer.Close() }()
 			// Create ClaimLookup instance
-			cl := claimlookup.NewClaimLookup(testServer.Client())
-			claim, err := cl.LookupClaim(context.Background(), cid, *testutil.Must(url.Parse(testServer.URL))(t))
+			cl := contentclaims.NewSimpleFinder(testServer.Client())
+			claim, err := cl.Find(context.Background(), claim.Link(), *testutil.Must(url.Parse(testServer.URL))(t))
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {

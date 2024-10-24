@@ -24,6 +24,8 @@ type cachingLookup struct {
 	cachingQueue       CachingQueue
 }
 
+var _ BlobIndexLookup = (*cachingLookup)(nil)
+
 // WithCache returns a blobIndexLookup that attempts to read blobs from the cache, and also caches providers asociated with index cids
 func WithCache(blobIndexLookup BlobIndexLookup, shardedDagIndexCache types.ShardedDagIndexStore, cachingQueue CachingQueue) BlobIndexLookup {
 	return &cachingLookup{

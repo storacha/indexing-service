@@ -3,9 +3,7 @@ package providerindex
 import (
 	"context"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -61,10 +59,10 @@ func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Li
 				return
 			}
 		}
-		if ad.PreviousCid() == cid.Undef || ad.PreviousCid().String() == prev.String() {
+		if ad.PreviousID == nil || (prev != nil && ad.PreviousID.String() == prev.String()) {
 			break
 		}
-		cur = cidlink.Link{Cid: ad.PreviousCid()}
+		cur = ad.PreviousID
 	}
 
 	err := q.Shutdown(ctx)

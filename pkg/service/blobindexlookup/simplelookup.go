@@ -18,6 +18,8 @@ type simpleLookup struct {
 	httpClient *http.Client
 }
 
+var _ BlobIndexLookup = (*simpleLookup)(nil)
+
 func NewBlobIndexLookup(httpClient *http.Client) BlobIndexLookup {
 	return &simpleLookup{httpClient}
 }

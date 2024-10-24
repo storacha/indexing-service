@@ -28,18 +28,20 @@ type QueryKey struct {
 	TargetClaims []multicodec.Code
 }
 
-// ProviderIndex is a read/write interface to a local cache of providers that falls back to IPNI
-type ProviderIndex struct {
+// ProviderIndexService is a read/write interface to a local cache of providers that falls back to IPNI
+type ProviderIndexService struct {
 	providerStore types.ProviderStore
 	findClient    ipnifind.Finder
 	publisher     publisher.Publisher
 }
 
+var _ ProviderIndex = (*ProviderIndexService)(nil)
+
 // TBD access to legacy systems
 type LegacySystems interface{}
 
-func NewProviderIndex(providerStore types.ProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacySystems LegacySystems) *ProviderIndex {
-	return &ProviderIndex{
+func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacySystems LegacySystems) *ProviderIndexService {
+	return &ProviderIndexService{
 		providerStore: providerStore,
 		findClient:    findClient,
 		publisher:     publisher,
@@ -53,7 +55,7 @@ func NewProviderIndex(providerStore types.ProviderStore, findClient ipnifind.Fin
 //     b. the are no records in the cache or IPNI, it can attempt to read from legacy systems -- Dynamo tables & content claims storage, synthetically constructing provider results
 //  2. With returned provider results, filter additionally for claim type. If space dids are set, calculate an encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
 //     Future TODO: kick off a conversion task to update the recrds
-func (pi *ProviderIndex) Find(ctx context.Context, qk QueryKey) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.ProviderResult, error) {
 	results, err := pi.getProviderResults(ctx, qk.Hash)
 	if err != nil {
 		return nil, err
@@ -65,7 +67,7 @@ func (pi *ProviderIndex) Find(ctx context.Context, qk QueryKey) ([]model.Provide
 	return pi.filterBySpace(results, qk.Hash, qk.Spaces)
 }
 
-func (pi *ProviderIndex) getProviderResults(ctx context.Context, mh mh.Multihash) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Multihash) ([]model.ProviderResult, error) {
 	res, err := pi.providerStore.Get(ctx, mh)
 	if err == nil {
 		return res, nil
@@ -89,7 +91,7 @@ func (pi *ProviderIndex) getProviderResults(ctx context.Context, mh mh.Multihash
 	return results, nil
 }
 
-func (pi *ProviderIndex) filteredCodecs(results []model.ProviderResult, codecs []multicodec.Code) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) filteredCodecs(results []model.ProviderResult, codecs []multicodec.Code) ([]model.ProviderResult, error) {
 	if len(codecs) == 0 {
 		return results, nil
 	}
@@ -107,7 +109,7 @@ func (pi *ProviderIndex) filteredCodecs(results []model.ProviderResult, codecs [
 	})
 }
 
-func (pi *ProviderIndex) filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did.DID) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did.DID) ([]model.ProviderResult, error) {
 	if len(spaces) == 0 {
 		return results, nil
 	}
@@ -137,7 +139,7 @@ func (pi *ProviderIndex) filterBySpace(results []model.ProviderResult, mh mh.Mul
 	return results, nil
 }
 
-func (pi *ProviderIndex) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
 	// Cache the entries _with_ expiry - we cannot rely on the IPNI notifier to
 	// tell us when they are published since we are not publishing to IPNI.
 	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, true)
@@ -188,7 +190,7 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 // Publish should do the following:
 // 1. Write the entries to the cache with no expiration until publishing is complete
 // 2. Generate an advertisement for the advertised hashes and publish/announce it
-func (pi *ProviderIndex) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
 	log := log.With("contextID", []byte(contextID))
 
 	// cache but do not expire (entries will be expired via the notifier)
