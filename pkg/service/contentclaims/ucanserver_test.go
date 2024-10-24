@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/storacha/go-capabilities/pkg/assert"
@@ -29,7 +30,7 @@ var rcptsch = []byte(`
 `)
 
 func TestServer(t *testing.T) {
-	server, err := NewServer(testutil.Service, &mockIndexer{})
+	server, err := NewUCANServer(testutil.Service, &mockIndexer{})
 	require.NoError(t, err)
 
 	conn, err := client.NewConnection(testutil.Service, server)
@@ -82,13 +83,17 @@ func TestServer(t *testing.T) {
 type mockIndexer struct {
 }
 
-// CacheClaim implements types.Service.
-func (m *mockIndexer) CacheClaim(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
+func (m *mockIndexer) Get(ctx context.Context, claim ipld.Link) (delegation.Delegation, error) {
+	return nil, nil
+}
+
+// Cache implements types.Service.
+func (m *mockIndexer) Cache(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
 	return nil
 }
 
-// PublishClaim implements types.Service.
-func (m *mockIndexer) PublishClaim(ctx context.Context, claim delegation.Delegation) error {
+// Publish implements types.Service.
+func (m *mockIndexer) Publish(ctx context.Context, claim delegation.Delegation) error {
 	return nil
 }
 

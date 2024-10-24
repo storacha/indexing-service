@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -11,6 +12,7 @@ import (
 	flatfs "github.com/ipfs/go-ds-flatfs"
 	logging "github.com/ipfs/go-log/v2"
 	ipnifind "github.com/ipni/go-libipni/find/client"
+	"github.com/ipni/go-libipni/maurl"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	goredis "github.com/redis/go-redis/v9"
@@ -18,7 +20,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
-	"github.com/storacha/indexing-service/pkg/service/claimlookup"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -31,12 +33,19 @@ import (
 var log = logging.Logger("service")
 var providerIndexNamespace = datastore.NewKey("providerindex/")
 var providerIndexPublisherNamespace = providerIndexNamespace.Child(datastore.NewKey("publisher/"))
+var contentClaimsNamespace = datastore.NewKey("claims/")
 
 // ServiceConfig sets specific config values for the service
 type ServiceConfig struct {
 
 	// PrivateKey configures the private key for the service.
 	PrivateKey crypto.PrivKey
+
+	// PublicURL is the public HTTP URL(s) the indexing service is available at.
+	// These are used when publishing claims, to indicate that they can be
+	// retrieved from here, replacing the pattern "{claim}" with the CID of the
+	// claim that is available.
+	PublicURL []string
 
 	ProvidersRedis goredis.Options
 	ClaimsRedis    goredis.Options
@@ -59,6 +68,7 @@ type config struct {
 	skipNotification bool
 	startIPNIServer  bool
 	publisherStore   store.PublisherStore
+	claimsStore      types.ContentClaimsStore
 }
 
 // Option configures how the node is construct
@@ -106,7 +116,16 @@ func WithPublisherStore(publisherStore store.PublisherStore) Option {
 	}
 }
 
-// WithDataPath constructs a flat FS datastore at the specified path to use for ads
+// WithClaimsStore configures the store used for content claims.
+func WithClaimsStore(store types.ContentClaimsStore) Option {
+	return func(cfg *config) error {
+		cfg.claimsStore = store
+		return nil
+	}
+}
+
+// WithDataPath constructs a flat FS datastore at the specified path to use for
+// IPNI advertisements and content claims.
 func WithDataPath(dataPath string) Option {
 	return func(cfg *config) error {
 		fds, err := flatfs.CreateOrOpen(dataPath, flatfs.IPFS_DEF_SHARD, true)
@@ -118,7 +137,8 @@ func WithDataPath(dataPath string) Option {
 	}
 }
 
-// WithDatastore uses the given datastore for storing IPNI adds
+// WithDatastore uses the given datastore for storing IPNI advertisements and
+// content claims.
 func WithDatastore(ds datastore.Batching) Option {
 	return func(cfg *config) error {
 		cfg.ds = ds
@@ -255,7 +275,16 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	// build read through fetchers
 	// TODO: add sender / publisher / linksystem / legacy systems
 	providerIndex := providerindex.New(providersCache, findClient, publisher, nil)
-	claimLookup := claimlookup.WithCache(claimlookup.NewSimpleClaimLookup(http.DefaultClient), claimsCache)
+
+	claimsStore := cfg.claimsStore
+	if claimsStore == nil {
+		if ds == nil {
+			ds = initializeDatastore(&cfg)
+		}
+		claimsStore = contentclaims.NewStoreFromDatastore(namespace.Wrap(ds, contentClaimsNamespace))
+	}
+
+	claims := contentclaims.New(claimsStore, claimsCache, http.DefaultClient)
 	blobIndexLookup := blobindexlookup.WithCache(
 		blobindexlookup.NewBlobIndexLookup(http.DefaultClient),
 		shardDagIndexesCache,
@@ -266,12 +295,24 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating peer ID: %w", err)
 	}
-	provider := peer.AddrInfo{ID: peerID}
+
+	publicAddrInfo := peer.AddrInfo{ID: peerID}
+	for _, str := range sc.PublicURL {
+		u, err := url.Parse(str)
+		if err != nil {
+			return nil, fmt.Errorf("parsing public URL: %w", err)
+		}
+		addr, err := maurl.FromURL(u)
+		if err != nil {
+			return nil, fmt.Errorf("converting URL to multiaddr: %w", err)
+		}
+		publicAddrInfo.Addrs = append(publicAddrInfo.Addrs, addr)
+	}
 
 	// with concurrency will still get overridden if a different walker setting is used
 	serviceOpts := append([]service.Option{service.WithConcurrency(5)}, cfg.opts...)
 
-	s.IndexingService = service.NewIndexingService(blobIndexLookup, claimLookup, provider, providerIndex, serviceOpts...)
+	s.IndexingService = service.NewIndexingService(blobIndexLookup, claims, publicAddrInfo, providerIndex, serviceOpts...)
 
 	return s, nil
 }

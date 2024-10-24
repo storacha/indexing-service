@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
+	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime/datamodel"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/car"
@@ -73,6 +76,7 @@ func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", GetRootHandler(c.id))
+	mux.HandleFunc("GET /claim/{claim}", GetClaimHandler(indexer))
 	mux.HandleFunc("POST /claims", PostClaimsHandler(c.id, indexer))
 	mux.HandleFunc("GET /claims", GetClaimsHandler(indexer))
 	return mux
@@ -91,10 +95,38 @@ func GetRootHandler(id principal.Signer) func(http.ResponseWriter, *http.Request
 	}
 }
 
+// GetClaimHandler retrieves a single content claim by it's root CID.
+func GetClaimHandler(service types.Getter) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/")
+		c, err := cid.Parse(parts[len(parts)-1])
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid CID: %s", err), http.StatusBadRequest)
+			return
+		}
+
+		dlg, err := service.Get(r.Context(), cidlink.Link{Cid: c})
+		if err != nil {
+			if errors.Is(err, types.ErrKeyNotFound) {
+				http.Error(w, fmt.Sprintf("not found: %s", c), http.StatusNotFound)
+				return
+			}
+			log.Errorf("getting claim: %w", err)
+			http.Error(w, "failed to get claim", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = io.Copy(w, dlg.Archive())
+		if err != nil {
+			log.Warnf("serving claim: %s: %w", c, err)
+		}
+	}
+}
+
 // PostClaimsHandler invokes the ucanto service when a POST request is sent to
 // "/claims".
-func PostClaimsHandler(id principal.Signer, indexer types.Service) func(http.ResponseWriter, *http.Request) {
-	server, err := contentclaims.NewServer(id, indexer)
+func PostClaimsHandler(id principal.Signer, service types.Publisher) func(http.ResponseWriter, *http.Request) {
+	server, err := contentclaims.NewUCANServer(id, service)
 	if err != nil {
 		log.Fatalf("creating ucanto server: %s", err)
 	}
@@ -121,7 +153,7 @@ func PostClaimsHandler(id principal.Signer, indexer types.Service) func(http.Res
 
 // GetClaimsHandler retrieves content claims when a GET request is sent to
 // "/claims?multihash={multihash}".
-func GetClaimsHandler(s types.Service) func(http.ResponseWriter, *http.Request) {
+func GetClaimsHandler(service types.Querier) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mhStrings := r.URL.Query()["multihash"]
 		hashes := make([]multihash.Multihash, 0, len(mhStrings))
@@ -149,7 +181,7 @@ func GetClaimsHandler(s types.Service) func(http.ResponseWriter, *http.Request) 
 			spaces = append(spaces, space)
 		}
 
-		qr, err := s.Query(r.Context(), types.Query{
+		qr, err := service.Query(r.Context(), types.Query{
 			Hashes: hashes,
 			Match: types.Match{
 				Subject: spaces,

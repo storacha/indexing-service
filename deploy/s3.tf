@@ -48,3 +48,7 @@ resource "aws_s3_bucket_policy" "ipni_store_policy" {
 resource "aws_s3_bucket" "notifier_head_bucket" {
   bucket = "${terraform.workspace}-${var.app}-notifier-head-bucket"
 }
+
+resource "aws_s3_bucket" "claim_store_bucket" {
+  bucket = "${terraform.workspace}-${var.app}-claim-store-bucket"
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/ipni/go-libipni/maurl"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
@@ -29,7 +30,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/singlewalk"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
-	"github.com/storacha/indexing-service/pkg/service/claimlookup"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -40,7 +41,7 @@ var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
 // IndexingService implements read/write logic for indexing data with IPNI, content claims, sharded dag indexes, and a cache layer
 type IndexingService struct {
 	blobIndexLookup blobindexlookup.BlobIndexLookup
-	claimLookup     claimlookup.ClaimLookup
+	claims          contentclaims.Service
 	providerIndex   providerindex.ProviderIndex
 	// provider is the peer info for this service, used when publishing claims.
 	provider  peer.AddrInfo
@@ -133,7 +134,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			if err != nil {
 				return err
 			}
-			claim, err := is.claimLookup.LookupClaim(mhCtx, claimCid, *url)
+			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, *url)
 			if err != nil {
 				return err
 			}
@@ -271,23 +272,27 @@ func fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) 
 	return urlForResource(provider, "{blob}", digestutil.Format(shard.Hash()))
 }
 
-// CacheClaim is used to cache a claim without publishing it to IPNI
+func (is *IndexingService) Get(ctx context.Context, claim ipld.Link) (delegation.Delegation, error) {
+	return is.claims.Get(ctx, claim)
+}
+
+// Cache is used to cache a claim without publishing it to IPNI
 // this is used cache a location commitment that come from a storage provider on blob/accept, without publishing, since the SP will publish themselves
 // (a delegation for a location commitment is already generated on blob/accept)
 // ideally however, IPNI would enable UCAN chains for publishing so that we could publish it directly from the storage service
 // it doesn't for now, so we let SPs publish themselves them direct cache with us
-func (is *IndexingService) CacheClaim(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
-	return CacheClaim(ctx, is.blobIndexLookup, is.claimLookup, is.providerIndex, is.provider, claim)
+func (is *IndexingService) Cache(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
+	return Cache(ctx, is.blobIndexLookup, is.claims, is.providerIndex, is.provider, claim)
 }
 
-// PublishClaim caches and publishes a content claim
+// Publish caches and publishes a content claim
 // I imagine publish claim to work as follows
 // For all claims except index, just use the publish API on ProviderIndex
 // For index claims, let's assume they fail if a location claim for the index car cid is not already published
 // The service should lookup the index cid location claim, and fetch the ShardedDagIndexView, then use the hashes inside
 // to assemble all the multihashes in the index advertisement
-func (is *IndexingService) PublishClaim(ctx context.Context, claim delegation.Delegation) error {
-	return PublishClaim(ctx, is.blobIndexLookup, is.claimLookup, is.providerIndex, is.provider, claim)
+func (is *IndexingService) Publish(ctx context.Context, claim delegation.Delegation) error {
+	return Publish(ctx, is.blobIndexLookup, is.claims, is.providerIndex, is.provider, claim)
 }
 
 // Option configures an IndexingService
@@ -301,10 +306,15 @@ func WithConcurrency(concurrency int) Option {
 }
 
 // NewIndexingService returns a new indexing service
-func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claimLookup claimlookup.ClaimLookup, provider peer.AddrInfo, providerIndex providerindex.ProviderIndex, options ...Option) *IndexingService {
+func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claims contentclaims.Service, publicAddrInfo peer.AddrInfo, providerIndex providerindex.ProviderIndex, options ...Option) *IndexingService {
+	provider := peer.AddrInfo{ID: publicAddrInfo.ID}
+	for _, addr := range publicAddrInfo.Addrs {
+		claimSuffix, _ := multiaddr.NewMultiaddr("/http-path/" + url.PathEscape("claim/{claim}"))
+		provider.Addrs = append(provider.Addrs, multiaddr.Join(addr, claimSuffix))
+	}
 	is := &IndexingService{
 		blobIndexLookup: blobIndexLookup,
-		claimLookup:     claimLookup,
+		claims:          claims,
 		provider:        provider,
 		providerIndex:   providerIndex,
 		jobWalker:       singlewalk.SingleWalker[job, queryState],
@@ -315,17 +325,17 @@ func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claimLo
 	return is
 }
 
-func CacheClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claimLookup claimlookup.ClaimLookup, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
 	switch caps[0].Can() {
 	case assert.LocationAbility:
-		return cacheLocationCommitment(ctx, claimLookup, provIndex, provider, claim)
+		return cacheLocationCommitment(ctx, claims, provIndex, provider, claim)
 	default:
 		return ErrUnrecognizedClaim
 	}
 }
 
-func cacheLocationCommitment(ctx context.Context, claimLookup claimlookup.ClaimLookup, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
 	if len(caps) == 0 {
 		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
@@ -340,11 +350,9 @@ func cacheLocationCommitment(ctx context.Context, claimLookup claimlookup.ClaimL
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
 
-	if cacher, ok := claimLookup.(claimlookup.ClaimCacher); ok {
-		err := cacher.CacheClaim(ctx, claim)
-		if err != nil {
-			return fmt.Errorf("caching claim with claim lookup: %w", err)
-		}
+	err := claims.Cache(ctx, claim)
+	if err != nil {
+		return fmt.Errorf("caching claim with claim service: %w", err)
 	}
 
 	digests := []multihash.Multihash{nb.Content.Hash()}
@@ -379,19 +387,19 @@ func cacheLocationCommitment(ctx context.Context, claimLookup claimlookup.ClaimL
 	return nil
 }
 
-func PublishClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claimLookup claimlookup.ClaimLookup, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
 	switch caps[0].Can() {
 	case assert.EqualsAbility:
-		return publishEqualsClaim(ctx, claimLookup, provIndex, provider, claim)
+		return publishEqualsClaim(ctx, claims, provIndex, provider, claim)
 	case assert.IndexAbility:
-		return publishIndexClaim(ctx, blobIndex, claimLookup, provIndex, provider, claim)
+		return publishIndexClaim(ctx, blobIndex, claims, provIndex, provider, claim)
 	default:
 		return ErrUnrecognizedClaim
 	}
 }
 
-func publishEqualsClaim(ctx context.Context, claimLookup claimlookup.ClaimLookup, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
 	if len(caps) == 0 {
 		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
@@ -406,11 +414,9 @@ func publishEqualsClaim(ctx context.Context, claimLookup claimlookup.ClaimLookup
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
 
-	if cacher, ok := claimLookup.(claimlookup.ClaimCacher); ok {
-		err := cacher.CacheClaim(ctx, claim)
-		if err != nil {
-			return fmt.Errorf("caching claim with claim lookup: %w", err)
-		}
+	err := claims.Publish(ctx, claim)
+	if err != nil {
+		return fmt.Errorf("caching claim with claim service: %w", err)
 	}
 
 	var exp int
@@ -430,7 +436,7 @@ func publishEqualsClaim(ctx context.Context, claimLookup claimlookup.ClaimLookup
 	digests = append(digests, nb.Content.Hash())
 	digests = append(digests, nb.Equals.(cidlink.Link).Cid.Hash())
 	contextID := nb.Equals.Binary()
-	err := provIndex.Publish(ctx, provider, contextID, digests, meta)
+	err = provIndex.Publish(ctx, provider, contextID, digests, meta)
 	if err != nil {
 		return fmt.Errorf("publishing claim: %w", err)
 	}
@@ -438,7 +444,7 @@ func publishEqualsClaim(ctx context.Context, claimLookup claimlookup.ClaimLookup
 	return nil
 }
 
-func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claimLookup claimlookup.ClaimLookup, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
 	if len(caps) == 0 {
 		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
@@ -453,11 +459,9 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
 
-	if cacher, ok := claimLookup.(claimlookup.ClaimCacher); ok {
-		err := cacher.CacheClaim(ctx, claim)
-		if err != nil {
-			return fmt.Errorf("caching claim with claim lookup: %w", err)
-		}
+	err := claims.Publish(ctx, claim)
+	if err != nil {
+		return fmt.Errorf("caching claim with claim lookup: %w", err)
 	}
 
 	results, err := provIndex.Find(ctx, providerindex.QueryKey{
@@ -474,7 +478,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	var idx blobindex.ShardedDagIndex
 	var ferr error
 	for _, r := range results {
-		idx, ferr = fetchBlobIndex(ctx, blobIndex, claimLookup, nb.Index, r)
+		idx, ferr = fetchBlobIndex(ctx, blobIndex, claims, nb.Index, r)
 		if ferr != nil {
 			continue
 		}
@@ -513,7 +517,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	return nil
 }
 
-func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claimLookup claimlookup.ClaimLookup, blob ipld.Link, result model.ProviderResult) (blobindex.ShardedDagIndex, error) {
+func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, blob ipld.Link, result model.ProviderResult) (blobindex.ShardedDagIndex, error) {
 	meta := metadata.MetadataContext.New()
 	err := meta.UnmarshalBinary(result.Metadata)
 	if err != nil {
@@ -547,7 +551,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 			return
 		}
 
-		dlg, err := claimLookup.LookupClaim(ctx, lcmeta.Claim, *claimURL)
+		dlg, err := claims.Find(ctx, cidlink.Link{Cid: lcmeta.Claim}, *claimURL)
 		if err != nil {
 			validateErr = err
 			return

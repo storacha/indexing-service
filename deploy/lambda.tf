@@ -3,6 +3,9 @@ locals {
     getroot = {
       name = "GETroot"
     }
+    getclaim = {
+      name = "GETclaim"
+    }
     getclaims = {
       name = "GETclaims"
     }
@@ -66,6 +69,7 @@ resource "aws_lambda_function" "lambda" {
         NOTIFIER_SNS_TOPIC_ARN = aws_sns_topic.published_advertisememt_head_change.id
         PRIVATE_KEY = aws_ssm_parameter.private_key.name
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
+        CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
     }
   }
 

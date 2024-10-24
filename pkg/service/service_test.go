@@ -22,7 +22,7 @@ func TestPublishClaim(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		err = PublishClaim(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
+		err = Publish(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
 	})
 }
@@ -37,7 +37,7 @@ func TestCacheClaim(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		err = CacheClaim(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
+		err = Cache(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
 	})
 }
