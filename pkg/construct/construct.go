@@ -69,6 +69,9 @@ type config struct {
 	startIPNIServer  bool
 	publisherStore   store.PublisherStore
 	claimsStore      types.ContentClaimsStore
+	providersClient  redis.Client
+	claimsClient     redis.Client
+	indexesClient    redis.Client
 }
 
 // Option configures how the node is construct
@@ -146,6 +149,30 @@ func WithDatastore(ds datastore.Batching) Option {
 	}
 }
 
+// WithProvidersClient configures the redis client used for caching providers.
+func WithProvidersClient(client redis.Client) Option {
+	return func(cfg *config) error {
+		cfg.providersClient = client
+		return nil
+	}
+}
+
+// WithClaimsClient configures the redis client used for caching content claims.
+func WithClaimsClient(client redis.Client) Option {
+	return func(cfg *config) error {
+		cfg.claimsClient = client
+		return nil
+	}
+}
+
+// WithIndexesClient configures the redis client used for caching blob indexes.
+func WithIndexesClient(client redis.Client) Option {
+	return func(cfg *config) error {
+		cfg.indexesClient = client
+		return nil
+	}
+}
+
 // Service is the core methods of the indexing service but with additional
 // lifecycle methods.
 type Service interface {
@@ -192,9 +219,18 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 	s := &serviceWithLifeCycle{}
 	// connect to redis
-	providersClient := goredis.NewClient(&sc.ProvidersRedis)
-	claimsClient := goredis.NewClient(&sc.ClaimsRedis)
-	indexesClient := goredis.NewClient(&sc.IndexesRedis)
+	providersClient := cfg.providersClient
+	if providersClient == nil {
+		providersClient = goredis.NewClient(&sc.ProvidersRedis)
+	}
+	claimsClient := cfg.claimsClient
+	if claimsClient == nil {
+		claimsClient = goredis.NewClient(&sc.ClaimsRedis)
+	}
+	indexesClient := cfg.indexesClient
+	if indexesClient == nil {
+		indexesClient = goredis.NewClient(&sc.IndexesRedis)
+	}
 
 	// build caches
 	providersCache := redis.NewProviderStore(providersClient)
