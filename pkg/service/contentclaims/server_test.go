@@ -3,11 +3,14 @@ package contentclaims
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"testing"
 
 	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	"github.com/storacha/go-capabilities/pkg/claim"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
@@ -35,6 +38,30 @@ func TestServer(t *testing.T) {
 	conn, err := client.NewConnection(testutil.Service, server)
 	require.NoError(t, err)
 
+	locationCommitment := testutil.Must(assert.Location.Delegate(testutil.Alice,
+		testutil.Alice,
+		testutil.Alice.DID().String(),
+		assert.LocationCaveats{
+			Content:  assert.FromHash(testutil.RandomMultihash()),
+			Location: []url.URL{*testutil.Must(url.Parse("https://www.yahoo.com"))(t)},
+			Space:    testutil.Bob.DID(),
+		}))(t)
+
+	cacheInvocation := testutil.Must(claim.Cache.Invoke(testutil.Service,
+		testutil.Service,
+		testutil.Service.DID().String(), claim.CacheCaveats{
+			Claim: locationCommitment.Link(),
+			Provider: claim.Provider{
+				Addresses: []multiaddr.Multiaddr{testutil.RandomMultiaddr()},
+			},
+		}))(t)
+	for b, err := range locationCommitment.Blocks() {
+		if err != nil {
+			t.Log(fmt.Sprintf("iterating claim blocks: %s", err))
+			t.FailNow()
+		}
+		require.NoError(t, cacheInvocation.Attach(b))
+	}
 	invs := []invocation.Invocation{
 		testutil.Must(assert.Equals.Invoke(
 			testutil.Service,
@@ -54,6 +81,7 @@ func TestServer(t *testing.T) {
 				Index:   testutil.RandomCID(),
 			},
 		))(t),
+		cacheInvocation,
 	}
 
 	for _, inv := range invs {

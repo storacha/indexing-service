@@ -2,6 +2,7 @@ package contentclaims
 
 import (
 	"context"
+	"fmt"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -66,7 +67,10 @@ func NewService(indexer types.Service) map[ucan.Ability]server.ServiceMethod[ok.
 					return ok.Unit{}, nil, NewMissingClaimError()
 				}
 
-				claim := delegation.NewDelegation(rootbl, bs)
+				claim, err := delegation.NewDelegation(rootbl, bs)
+				if err != nil {
+					return ok.Unit{}, nil, fmt.Errorf("generating delegation: %w", err)
+				}
 				err = indexer.CacheClaim(context.TODO(), provider, claim)
 				if err != nil {
 					log.Errorf("caching claim: %w", err)
