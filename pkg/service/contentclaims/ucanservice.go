@@ -66,7 +66,11 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 					return ok.Unit{}, nil, NewMissingClaimError()
 				}
 
-				claim := delegation.NewDelegation(rootbl, bs)
+				claim, err := delegation.NewDelegation(rootbl, bs)
+				if err != nil {
+					return ok.Unit{}, nil, err
+				}
+
 				err = service.Cache(context.TODO(), provider, claim)
 				if err != nil {
 					log.Errorf("caching claim: %w", err)
