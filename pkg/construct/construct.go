@@ -51,13 +51,17 @@ type ServiceConfig struct {
 	ClaimsRedis    goredis.Options
 	IndexesRedis   goredis.Options
 
+	// IndexerURL is the URL of an IPNI node to use for find queries.
 	IndexerURL string
 
+	// PublisherDirectAnnounceURLs are the URL(s) of IPNI nodes that advertisement
+	// announcements should be sent to. Defaults to IndexerURL if not set.
+	PublisherDirectAnnounceURLs []string
 	// PublisherListenAddr configures the HTTP address the publisher binds to.
 	// This allows a remote IPNI subscriber to fetch advertisements.
 	PublisherListenAddr string
-	// PublisherAnnounceAddrs configures the multiaddrs of IPNI nodes that new
-	// advertisements should be announced to.
+	// PublisherAnnounceAddrs configures the multiaddrs that are put into announce
+	// messages to tell indexers the addresses to fetch advertisements from.
 	PublisherAnnounceAddrs []string
 }
 
@@ -285,10 +289,15 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		notifier.Notify(providerindex.NewRemoteSyncer(providersCache, publisherStore).HandleRemoteSync)
 	}
 
+	directAnnounceURLs := sc.PublisherDirectAnnounceURLs
+	if len(directAnnounceURLs) == 0 {
+		directAnnounceURLs = append(directAnnounceURLs, sc.IndexerURL)
+	}
+
 	publisher, err := publisher.New(
 		sc.PrivateKey,
 		publisherStore,
-		publisher.WithDirectAnnounce(sc.IndexerURL),
+		publisher.WithDirectAnnounce(directAnnounceURLs...),
 		publisher.WithAnnounceAddrs(sc.PublisherAnnounceAddrs...),
 	)
 	if err != nil {
