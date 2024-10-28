@@ -11,7 +11,7 @@ import (
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/receipt/fx"
 	"github.com/storacha/go-ucanto/core/result/ok"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/server"
@@ -25,7 +25,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 	return map[ucan.Ability]server.ServiceMethod[ok.Unit]{
 		assert.EqualsAbility: server.Provide(
 			assert.Equals,
-			func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, receipt.Effects, error) {
+			func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, fx.Effects, error) {
 				err := service.Publish(context.TODO(), inv)
 				if err != nil {
 					log.Errorf("publishing equals claim: %w", err)
@@ -35,7 +35,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 		),
 		assert.IndexAbility: server.Provide(
 			assert.Index,
-			func(cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, receipt.Effects, error) {
+			func(cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, fx.Effects, error) {
 				err := service.Publish(context.TODO(), inv)
 				if err != nil {
 					log.Errorf("publishing index claim: %w", err)
@@ -45,7 +45,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 		),
 		claim.CacheAbility: server.Provide(
 			claim.Cache,
-			func(cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, receipt.Effects, error) {
+			func(cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, fx.Effects, error) {
 				peerid, err := toPeerID(inv.Issuer())
 				if err != nil {
 					return ok.Unit{}, nil, err
