@@ -16,7 +16,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/multiformats/go-varint v0.0.7
 	github.com/redis/go-redis/v9 v9.6.1
-	github.com/storacha/go-ucanto v0.1.1-0.20241027115844-258d6f3c5ad1
+	github.com/storacha/go-ucanto v0.1.1-0.20241028093931-42d9e1db4bfb
 	github.com/storacha/ipni-publisher v0.0.0-20241018055706-032286a2dc3f
 	github.com/stretchr/testify v1.9.0
 )
