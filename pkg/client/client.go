@@ -12,6 +12,7 @@ import (
 	"github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-capabilities/pkg/claim"
 	"github.com/storacha/go-ucanto/client"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
@@ -35,7 +36,7 @@ type ErrFailedResponse struct {
 	Body       string
 }
 
-func errFromResponse(res *http.Response) ErrFailedResponse {
+func errFromResponse(res *gohttp.Response) ErrFailedResponse {
 	err := ErrFailedResponse{StatusCode: res.StatusCode}
 
 	message, merr := io.ReadAll(res.Body)
@@ -48,29 +49,17 @@ func errFromResponse(res *http.Response) ErrFailedResponse {
 }
 
 func (e ErrFailedResponse) Error() string {
-	return fmt.Sprintf("http request failed, status: %d %s, message: %s", e.StatusCode, http.StatusText(e.StatusCode), e.Body)
+	return fmt.Sprintf("http request failed, status: %d %s, message: %s", e.StatusCode, gohttp.StatusText(e.StatusCode), e.Body)
 }
 
 type Client struct {
 	servicePrincipal ucan.Principal
-	serviceURL       string
-}
-
-func (c *Client) connect() (client.Connection, error) {
-	url, err := url.Parse(c.serviceURL)
-	if err != nil {
-		return nil, fmt.Errorf("parsing service URL: %w", err)
-	}
-	return client.NewConnection(c.servicePrincipal, http.NewHTTPChannel(url.JoinPath(claimsPath)))
+	serviceURL       url.URL
+	connection       client.Connection
 }
 
 func (c *Client) execute(inv invocation.Invocation) error {
-	connection, err := c.connect()
-	if err != nil {
-		return fmt.Errorf("establishing client connection: %w", err)
-	}
-
-	resp, err := client.Execute([]invocation.Invocation{inv}, connection)
+	resp, err := client.Execute([]invocation.Invocation{inv}, c.connection)
 	if err != nil {
 		return fmt.Errorf("sending invocation: %w", err)
 	}
@@ -81,52 +70,49 @@ func (c *Client) execute(inv invocation.Invocation) error {
 
 	reader, err := receipt.NewReceiptReaderFromTypes[unit.Unit, fdm.FailureModel](udm.UnitType(), fdm.FailureType())
 	if err != nil {
-		return fmt.Errorf("generating receipt reader: %w")
+		return fmt.Errorf("generating receipt reader: %w", err)
 	}
 
 	rcpt, err := reader.Read(rcptlnk, resp.Blocks())
 	if err != nil {
-		return fmt.Errorf("reading receipt: %w")
+		return fmt.Errorf("reading receipt: %w", err)
 	}
 
 	_, err = result.Unwrap(result.MapError(rcpt.Out(), failure.FromFailureModel))
 	return err
 }
 
-func (c *Client) PublishIndexClaim(ctx context.Context, issuer principal.Signer, caveats assert.IndexCaveats) error {
-	inv, err := assert.Index.Invoke(issuer, c.servicePrincipal, c.servicePrincipal.DID().String(), caveats)
-	if err != nil {
-		return fmt.Errorf("generating invocation")
-	}
-	return c.execute(inv)
-}
-
-func (c *Client) PublishEqualsClaim(ctx context.Context, issuer principal.Signer, caveats assert.EqualsCaveats) error {
-	inv, err := assert.Equals.Invoke(issuer, c.servicePrincipal, c.servicePrincipal.DID().String(), caveats)
-	if err != nil {
-		return fmt.Errorf("generating invocation")
-	}
-	return c.execute(inv)
-}
-
-func (c *Client) CacheClaim(ctx context.Context, issuer principal.Signer, provider claim.Provider, caveats assert.LocationCaveats) error {
-	lc, err := assert.Location.Invoke(issuer, issuer.DID(), caveats.Space.String(), caveats)
-	if err != nil {
-		return fmt.Errorf("building location commitment: %w", err)
-	}
-	inv, err := claim.Cache.Invoke(issuer, c.servicePrincipal, c.servicePrincipal.DID().String(), claim.CacheCaveats{
-		Claim:    lc.Link(),
-		Provider: provider,
-	})
+func (c *Client) PublishIndexClaim(ctx context.Context, issuer principal.Signer, caveats assert.IndexCaveats, options ...delegation.Option) error {
+	inv, err := assert.Index.Invoke(issuer, c.servicePrincipal, c.servicePrincipal.DID().String(), caveats, options...)
 	if err != nil {
 		return fmt.Errorf("generating invocation: %w", err)
 	}
-	for blk, err := range lc.Blocks() {
+	return c.execute(inv)
+}
+
+func (c *Client) PublishEqualsClaim(ctx context.Context, issuer principal.Signer, caveats assert.EqualsCaveats, options ...delegation.Option) error {
+	inv, err := assert.Equals.Invoke(issuer, c.servicePrincipal, c.servicePrincipal.DID().String(), caveats, options...)
+	if err != nil {
+		return fmt.Errorf("generating invocation: %w", err)
+	}
+	return c.execute(inv)
+}
+
+func (c *Client) CacheClaim(ctx context.Context, issuer principal.Signer, cacheClaim delegation.Delegation, provider claim.Provider, options ...delegation.Option) error {
+	inv, err := claim.Cache.Invoke(issuer, c.servicePrincipal, c.servicePrincipal.DID().String(), claim.CacheCaveats{
+		Claim:    cacheClaim.Link(),
+		Provider: provider,
+	}, options...)
+	if err != nil {
+		return fmt.Errorf("generating invocation: %w", err)
+	}
+
+	for blk, err := range cacheClaim.Blocks() {
 		if err != nil {
-			return fmt.Errorf("reading blocks from location commitment: %w", err)
+			return fmt.Errorf("reading claim blocks: %w", err)
 		}
 		if err := inv.Attach(blk); err != nil {
-			return fmt.Errorf("attaching location commitment block: %w", err)
+			return fmt.Errorf("attaching claim block: %w", err)
 		}
 	}
 
@@ -134,11 +120,7 @@ func (c *Client) CacheClaim(ctx context.Context, issuer principal.Signer, provid
 }
 
 func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.QueryResult, error) {
-	url, err := url.Parse(c.serviceURL)
-	if err != nil {
-		return nil, fmt.Errorf("parsing service URL: %w", err)
-	}
-	url = url.JoinPath(claimsPath)
+	url := c.serviceURL.JoinPath(claimsPath)
 	q := url.Query()
 	for _, mh := range query.Hashes {
 		mhString, err := multibase.Encode(multibase.Base64pad, mh)
@@ -159,4 +141,13 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		return nil, errFromResponse(res)
 	}
 	return queryresult.Extract(res.Body)
+}
+
+func New(servicePrincipal ucan.Principal, serviceURL url.URL) (*Client, error) {
+	channel := http.NewHTTPChannel(serviceURL.JoinPath(claimsPath))
+	conn, err := client.NewConnection(servicePrincipal, channel)
+	if err != nil {
+		return nil, fmt.Errorf("creating connection: %w", err)
+	}
+	return &Client{servicePrincipal, serviceURL, conn}, nil
 }
