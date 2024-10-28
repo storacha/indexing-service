@@ -105,12 +105,12 @@ type jobType string
 
 const standardJobType jobType = "standard"
 const locationJobType jobType = "location"
-const equalsOrLocationJobType jobType = "equals_or_location"
+const indexOrLocationJobType jobType = "index_or_location"
 
 var targetClaims = map[jobType][]multicodec.Code{
-	standardJobType:         {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
-	locationJobType:         {metadata.LocationCommitmentID},
-	equalsOrLocationJobType: {metadata.IndexClaimID, metadata.LocationCommitmentID},
+	standardJobType:        {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+	locationJobType:        {metadata.LocationCommitmentID},
+	indexOrLocationJobType: {metadata.IndexClaimID, metadata.LocationCommitmentID},
 }
 
 type queryResult struct {
@@ -202,7 +202,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			case *metadata.IndexClaimMetadata:
 				// for an index claim, we follow by looking for a location claim for the index, and fetching the index
 				mh := j.mh
-				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, equalsOrLocationJobType}); err != nil {
+				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, indexOrLocationJobType}); err != nil {
 					return err
 				}
 			case *metadata.LocationCommitmentMetadata:
@@ -236,7 +236,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					shards := index.Shards().Iterator()
 					for shard, index := range shards {
 						if index.Has(*j.indexForMh) {
-							if err := spawn(job{shard, nil, nil, equalsOrLocationJobType}); err != nil {
+							if err := spawn(job{shard, nil, nil, indexOrLocationJobType}); err != nil {
 								return err
 							}
 						}
