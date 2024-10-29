@@ -46,6 +46,13 @@ type Store[Key, Value any] interface {
 	Get(ctx context.Context, key Key) (Value, error)
 }
 
+// ErrWrongRootCount indicates a car file with multiple roots being unable to interpret
+// as a query result
+var ErrWrongRootCount = errors.New("query result should have exactly one root")
+
+// ErrNoRootBlock indicates a root that is specified but not found in a CAR file
+var ErrNoRootBlock = errors.New("query root block not found in car")
+
 // Cache describes a generic cache interface
 type Cache[Key, Value any] interface {
 	Set(ctx context.Context, key Key, value Value, expires bool) error

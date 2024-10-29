@@ -1,6 +1,7 @@
 package queryresult
 
 import (
+	"fmt"
 	"io"
 	"iter"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	multihash "github.com/multiformats/go-multihash/core"
+	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
@@ -49,6 +51,36 @@ func (q *queryResult) Indexes() []datamodel.Link {
 
 func (q *queryResult) Root() block.Block {
 	return q.root
+}
+
+func Extract(r io.Reader) (types.QueryResult, error) {
+	roots, blocks, err := car.Decode(r)
+	if err != nil {
+		return nil, fmt.Errorf("extracting car: %w", err)
+	}
+
+	if len(roots) != 1 {
+		return nil, types.ErrWrongRootCount
+	}
+
+	blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blocks))
+	if err != nil {
+		return nil, fmt.Errorf("reading blocks from car: %w", err)
+	}
+	root, has, err := blks.Get(roots[0])
+	if err != nil {
+		return nil, fmt.Errorf("reading root block: %w", err)
+	}
+	if !has {
+		return nil, types.ErrNoRootBlock
+	}
+
+	var queryResultModel qdm.QueryResultModel
+	err = block.Decode(root, &queryResultModel, qdm.QueryResultType(), cbor.Codec, sha256.Hasher)
+	if err != nil {
+		return nil, fmt.Errorf("decoding query result: %w", err)
+	}
+	return &queryResult{root, queryResultModel.Result0_1, blks}, nil
 }
 
 // Build generates a new encodable QueryResult
