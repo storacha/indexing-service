@@ -1,7 +1,6 @@
 package blobindex_test
 
 import (
-	"io"
 	"testing"
 
 	"github.com/storacha/indexing-service/pkg/blobindex"
@@ -10,9 +9,8 @@ import (
 )
 
 func TestFromToArchive(t *testing.T) {
-	roots, contentCar := testutil.RandomCAR(32)
-	contentCarBytes, _ := io.ReadAll(contentCar)
-	index, err := blobindex.FromShardArchives(roots[0], [][]byte{contentCarBytes})
+	root, _, contentCarBytes := testutil.RandomCAR(32)
+	index, err := blobindex.FromShardArchives(root, [][]byte{contentCarBytes})
 	require.NoError(t, err)
 	r, err := index.Archive()
 	require.NoError(t, err)

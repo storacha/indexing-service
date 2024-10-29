@@ -8,6 +8,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/multiformats/go-multicodec"
 	multihash "github.com/multiformats/go-multihash/core"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
@@ -117,7 +118,7 @@ func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[typ
 			}
 			indexCid, err := cid.Prefix{
 				Version:  1,
-				Codec:    cid.Raw,
+				Codec:    uint64(multicodec.Car),
 				MhType:   multihash.SHA2_256,
 				MhLength: -1,
 			}.Sum(bytes)

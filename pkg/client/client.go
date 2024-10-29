@@ -8,7 +8,6 @@ import (
 	gohttp "net/http"
 	"net/url"
 
-	"github.com/multiformats/go-multibase"
 	"github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-capabilities/pkg/claim"
 	"github.com/storacha/go-ucanto/client"
@@ -23,6 +22,7 @@ import (
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
 )
@@ -123,11 +123,7 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	url := c.serviceURL.JoinPath(claimsPath)
 	q := url.Query()
 	for _, mh := range query.Hashes {
-		mhString, err := multibase.Encode(multibase.Base64pad, mh)
-		if err != nil {
-			return nil, fmt.Errorf("encoding query multihash")
-		}
-		q.Add("multihash", mhString)
+		q.Add("multihash", digestutil.Format(mh))
 	}
 	for _, space := range query.Match.Subject {
 		q.Add("spaces", space.String())
