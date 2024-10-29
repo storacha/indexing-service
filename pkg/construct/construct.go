@@ -255,6 +255,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 		s.startupFuncs = append(s.startupFuncs, func(context.Context) error { jq.Startup(); return nil })
 		s.shutdownFuncs = append(s.shutdownFuncs, jq.Shutdown)
+		cachingQueue = jq
 	}
 
 	// setup IPNI

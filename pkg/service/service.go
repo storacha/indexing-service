@@ -282,7 +282,7 @@ func (is *IndexingService) Get(ctx context.Context, claim ipld.Link) (delegation
 // ideally however, IPNI would enable UCAN chains for publishing so that we could publish it directly from the storage service
 // it doesn't for now, so we let SPs publish themselves them direct cache with us
 func (is *IndexingService) Cache(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
-	return Cache(ctx, is.blobIndexLookup, is.claims, is.providerIndex, is.provider, claim)
+	return Cache(ctx, is.blobIndexLookup, is.claims, is.providerIndex, provider, claim)
 }
 
 // Publish caches and publishes a content claim
