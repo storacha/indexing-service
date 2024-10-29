@@ -16,6 +16,7 @@ func TestFromToArchive(t *testing.T) {
 	require.NoError(t, err)
 	newIndex, err := blobindex.Extract(r)
 	require.NoError(t, err)
+	require.Equal(t, root.String(), newIndex.Content().String())
 	require.NotZero(t, newIndex.Shards().Size())
 	require.Equal(t, index.Shards().Size(), newIndex.Shards().Size())
 	for key, shard := range newIndex.Shards().Iterator() {

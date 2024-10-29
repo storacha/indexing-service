@@ -38,7 +38,7 @@ func (m *MapStore) Get(ctx context.Context, key string) *goredis.StringCmd {
 	if !ok {
 		cmd.SetErr(goredis.Nil)
 	} else {
-		if val.expires.Before(time.Now()) {
+		if !val.expires.IsZero() && val.expires.Before(time.Now()) {
 			cmd.SetErr(goredis.Nil)
 		} else {
 			cmd.SetVal(val.data)
@@ -50,7 +50,7 @@ func (m *MapStore) Get(ctx context.Context, key string) *goredis.StringCmd {
 func (m *MapStore) Persist(ctx context.Context, key string) *goredis.BoolCmd {
 	cmd := goredis.NewBoolCmd(ctx, nil)
 	val, ok := m.data[key]
-	if ok && val.expires.IsZero() {
+	if ok && !val.expires.IsZero() {
 		val.expires = time.Time{}
 		cmd.SetVal(true)
 	}

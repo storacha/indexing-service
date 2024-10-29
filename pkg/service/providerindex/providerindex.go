@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"iter"
 	"slices"
 
 	logging "github.com/ipfs/go-log/v2"
@@ -139,15 +140,15 @@ func (pi *ProviderIndexService) filterBySpace(results []model.ProviderResult, mh
 	return results, nil
 }
 
-func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
 	// Cache the entries _with_ expiry - we cannot rely on the IPNI notifier to
 	// tell us when they are published since we are not publishing to IPNI.
 	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, true)
 }
 
-func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata, expire bool) error {
+func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata, expire bool) error {
 	log := log.With("contextID", []byte(contextID))
-	log.Infof("caching %d provider results for provider: %s", len(digests), provider.ID)
+	log.Infof("caching provider results for provider: %s", provider.ID)
 
 	mdb, err := meta.MarshalBinary()
 	if err != nil {
@@ -169,11 +170,13 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
 	)
 	q.Startup()
-	for _, d := range digests {
+	i := 0
+	for d := range digests {
 		err := q.Queue(ctx, d)
 		if err != nil {
 			return err
 		}
+		i++
 	}
 	err = q.Shutdown(ctx)
 	if err != nil {
@@ -183,14 +186,14 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 		return fmt.Errorf("appending provider result: %w", joberr)
 	}
 
-	log.Infof("cached %d provider results", len(digests))
+	log.Infof("cached %d provider results", i)
 	return nil
 }
 
 // Publish should do the following:
 // 1. Write the entries to the cache with no expiration until publishing is complete
 // 2. Generate an advertisement for the advertised hashes and publish/announce it
-func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests []mh.Multihash, meta meta.Metadata) error {
+func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
 	log := log.With("contextID", []byte(contextID))
 
 	// cache but do not expire (entries will be expired via the notifier)

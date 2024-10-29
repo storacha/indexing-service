@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 
@@ -379,7 +380,7 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 		},
 	)
 
-	err = provIndex.Cache(ctx, provider, string(contextID), digests, meta)
+	err = provIndex.Cache(ctx, provider, string(contextID), slices.Values(digests), meta)
 	if err != nil {
 		return fmt.Errorf("caching claim with provider index: %w", err)
 	}
@@ -436,7 +437,7 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	digests = append(digests, nb.Content.Hash())
 	digests = append(digests, nb.Equals.(cidlink.Link).Cid.Hash())
 	contextID := nb.Equals.Binary()
-	err = provIndex.Publish(ctx, provider, contextID, digests, meta)
+	err = provIndex.Publish(ctx, provider, contextID, slices.Values(digests), meta)
 	if err != nil {
 		return fmt.Errorf("publishing claim: %w", err)
 	}
@@ -501,15 +502,15 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 		},
 	)
 
-	var digests []multihash.Multihash
+	digests := bytemap.NewByteMap[multihash.Multihash, struct{}](-1)
 	for _, slices := range idx.Shards().Iterator() {
 		for d := range slices.Iterator() {
-			digests = append(digests, d)
+			digests.Set(d, struct{}{})
 		}
 	}
 
 	contextID := nb.Index.Binary()
-	err = provIndex.Publish(ctx, provider, contextID, digests, meta)
+	err = provIndex.Publish(ctx, provider, contextID, digests.Keys(), meta)
 	if err != nil {
 		return fmt.Errorf("publishing claim: %w", err)
 	}

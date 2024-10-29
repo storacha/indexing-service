@@ -595,6 +595,8 @@ github.com/storacha/ipni-publisher v0.0.0-20241029115945-6983733aea10 h1:ld8aOha
 github.com/storacha/ipni-publisher v0.0.0-20241029115945-6983733aea10/go.mod h1:fEuGSF5WMaOSAyDQCYAvow6Y+YKzpXczEk3A+H+s1fQ=
 github.com/storacha/ipni-publisher v0.0.0-20241029143546-c483420edec2 h1:0CfAnk0YPoXtlBSMqZ9YUBUoaIEZKNXGCrpA16SJZg8=
 github.com/storacha/ipni-publisher v0.0.0-20241029143546-c483420edec2/go.mod h1:fEuGSF5WMaOSAyDQCYAvow6Y+YKzpXczEk3A+H+s1fQ=
+github.com/storacha/ipni-publisher v0.0.0-20241029163008-3137e5b088fd h1:wFo5ltLnzojCwti9Mla6FWQMnIyqiukdgNI7QYif0AU=
+github.com/storacha/ipni-publisher v0.0.0-20241029163008-3137e5b088fd/go.mod h1:fEuGSF5WMaOSAyDQCYAvow6Y+YKzpXczEk3A+H+s1fQ=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
