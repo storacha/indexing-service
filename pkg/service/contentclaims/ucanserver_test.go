@@ -58,7 +58,7 @@ func TestServer(t *testing.T) {
 		}))(t)
 	for b, err := range locationCommitment.Blocks() {
 		if err != nil {
-			t.Log(fmt.Sprintf("iterating claim blocks: %s", err))
+			t.Logf("iterating claim blocks: %s", err)
 			t.FailNow()
 		}
 		require.NoError(t, cacheInvocation.Attach(b))
