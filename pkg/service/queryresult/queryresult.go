@@ -41,10 +41,12 @@ func (q *queryResult) Claims() []datamodel.Link {
 
 func (q *queryResult) Indexes() []datamodel.Link {
 	var indexes []ipld.Link
-	for _, k := range q.data.Indexes.Keys {
-		l, ok := q.data.Indexes.Values[k]
-		if ok {
-			indexes = append(indexes, l)
+	if q.data.Indexes != nil {
+		for _, k := range q.data.Indexes.Keys {
+			l, ok := q.data.Indexes.Values[k]
+			if ok {
+				indexes = append(indexes, l)
+			}
 		}
 	}
 	return indexes
