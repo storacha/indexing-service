@@ -15,7 +15,7 @@ require (
 	github.com/multiformats/go-varint v0.0.7
 	github.com/redis/go-redis/v9 v9.6.1
 	github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb
-	github.com/storacha/ipni-publisher v0.0.0-20241029163008-3137e5b088fd
+	github.com/storacha/ipni-publisher v0.0.0-20241029210117-3286a26a47a8
 	github.com/stretchr/testify v1.9.0
 )
 
