@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -276,7 +277,7 @@ func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryRes
 }
 
 func randomLocalURL(t *testing.T) url.URL {
-	port := testutil.GetFreePort(t)
+	port := 3000 + rand.IntN(1000)
 	pubURL, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", port))
 	require.NoError(t, err)
 	return *pubURL
