@@ -13,16 +13,16 @@ import (
 func TestShardedDagIndexStore(t *testing.T) {
 	mockRedis := NewMockRedis()
 	shardedDagIndexStore := redis.NewShardedDagIndexStore(mockRedis)
-	root1, index1 := testutil.RandomShardedDagIndexView(32)
-	root2, index2 := testutil.RandomShardedDagIndexView(32)
+	hash1, index1 := testutil.RandomShardedDagIndexView(32)
+	hash2, index2 := testutil.RandomShardedDagIndexView(32)
 
 	aliceDid := testutil.Alice.DID()
 	encodedID1 := testutil.Must(types.ContextID{
 		Space: &aliceDid,
-		Hash:  root1.Hash(),
+		Hash:  hash1,
 	}.ToEncoded())(t)
 	encodedID2 := testutil.Must(types.ContextID{
-		Hash: root2.Hash(),
+		Hash: hash2,
 	}.ToEncoded())(t)
 
 	ctx := context.Background()

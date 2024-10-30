@@ -2,6 +2,7 @@ package providerindex
 
 import (
 	"context"
+	"iter"
 
 	"github.com/ipni/go-libipni/find/model"
 	meta "github.com/ipni/go-libipni/metadata"
@@ -21,9 +22,9 @@ type ProviderIndex interface {
 	Find(context.Context, QueryKey) ([]model.ProviderResult, error)
 	// Cache writes entries to the cache but does not publish/announce an
 	// advertisement for them. Entries expire after a pre-determined time.
-	Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests []multihash.Multihash, meta meta.Metadata) error
+	Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[multihash.Multihash], meta meta.Metadata) error
 	// Publish should do the following:
 	// 1. Write the entries to the cache with no expiration until publishing is complete
 	// 2. Generate an advertisement for the advertised hashes and publish/announce it
-	Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests []multihash.Multihash, meta meta.Metadata) error
+	Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[multihash.Multihash], meta meta.Metadata) error
 }

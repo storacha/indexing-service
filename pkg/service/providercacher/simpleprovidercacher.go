@@ -3,7 +3,6 @@ package providercacher
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
 
 	"github.com/ipni/go-libipni/find/model"
@@ -30,7 +29,6 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 			}
 
 			inList := slices.ContainsFunc(existing, func(matchProvider model.ProviderResult) bool {
-				fmt.Println(provider, matchProvider)
 				return providerresults.Equals(provider, matchProvider)
 			})
 			if !inList {

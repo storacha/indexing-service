@@ -1,23 +1,21 @@
 module github.com/storacha/indexing-service
 
-go 1.23
-
-toolchain go1.23.0
+go 1.23.2
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.32.2
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-ds-flatfs v0.5.1
 	github.com/ipld/go-ipld-prime v0.21.1-0.20240917223228-6148356a4c2e
-	github.com/ipni/go-libipni v0.6.13
-	github.com/libp2p/go-libp2p v0.36.5
+	github.com/ipni/go-libipni v0.6.14
+	github.com/libp2p/go-libp2p v0.37.0
 	github.com/multiformats/go-multiaddr v0.13.0
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/multiformats/go-varint v0.0.7
 	github.com/redis/go-redis/v9 v9.6.1
-	github.com/storacha/go-ucanto v0.1.1-0.20241028122439-0d529756b469
-	github.com/storacha/ipni-publisher v0.0.0-20241018055706-032286a2dc3f
+	github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb
+	github.com/storacha/ipni-publisher v0.0.0-20241029210117-3286a26a47a8
 	github.com/stretchr/testify v1.9.0
 )
 
@@ -43,6 +41,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/onsi/gomega v1.34.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ucan-wg/go-ucan v0.0.0-20240916120445-37f52863156c // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
@@ -51,10 +50,10 @@ require (
 
 require (
 	github.com/aws/aws-lambda-go v1.47.0
-	github.com/aws/aws-sdk-go-v2/config v1.27.43
+	github.com/aws/aws-sdk-go-v2/config v1.28.0
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.15.12
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.36.2
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.65.3
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.66.1
 	github.com/aws/aws-sdk-go-v2/service/sns v1.33.2
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.36.2
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.55.2
@@ -117,11 +116,11 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
-	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
+	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
+	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.3.0 // indirect
 )

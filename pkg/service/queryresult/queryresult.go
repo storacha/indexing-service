@@ -1,13 +1,16 @@
 package queryresult
 
 import (
+	"fmt"
 	"io"
 	"iter"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/multiformats/go-multicodec"
 	multihash "github.com/multiformats/go-multihash/core"
+	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
@@ -38,10 +41,12 @@ func (q *queryResult) Claims() []datamodel.Link {
 
 func (q *queryResult) Indexes() []datamodel.Link {
 	var indexes []ipld.Link
-	for _, k := range q.data.Indexes.Keys {
-		l, ok := q.data.Indexes.Values[k]
-		if ok {
-			indexes = append(indexes, l)
+	if q.data.Indexes != nil {
+		for _, k := range q.data.Indexes.Keys {
+			l, ok := q.data.Indexes.Values[k]
+			if ok {
+				indexes = append(indexes, l)
+			}
 		}
 	}
 	return indexes
@@ -49,6 +54,36 @@ func (q *queryResult) Indexes() []datamodel.Link {
 
 func (q *queryResult) Root() block.Block {
 	return q.root
+}
+
+func Extract(r io.Reader) (types.QueryResult, error) {
+	roots, blocks, err := car.Decode(r)
+	if err != nil {
+		return nil, fmt.Errorf("extracting car: %w", err)
+	}
+
+	if len(roots) != 1 {
+		return nil, types.ErrWrongRootCount
+	}
+
+	blks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(blocks))
+	if err != nil {
+		return nil, fmt.Errorf("reading blocks from car: %w", err)
+	}
+	root, has, err := blks.Get(roots[0])
+	if err != nil {
+		return nil, fmt.Errorf("reading root block: %w", err)
+	}
+	if !has {
+		return nil, types.ErrNoRootBlock
+	}
+
+	var queryResultModel qdm.QueryResultModel
+	err = block.Decode(root, &queryResultModel, qdm.QueryResultType(), cbor.Codec, sha256.Hasher)
+	if err != nil {
+		return nil, fmt.Errorf("decoding query result: %w", err)
+	}
+	return &queryResult{root, queryResultModel.Result0_1, blks}, nil
 }
 
 // Build generates a new encodable QueryResult
@@ -85,7 +120,7 @@ func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[typ
 			}
 			indexCid, err := cid.Prefix{
 				Version:  1,
-				Codec:    cid.Raw,
+				Codec:    uint64(multicodec.Car),
 				MhType:   multihash.SHA2_256,
 				MhLength: -1,
 			}.Sum(bytes)
