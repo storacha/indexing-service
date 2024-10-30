@@ -57,20 +57,19 @@ var (
 	_ ipnimd.Protocol = (*IndexClaimMetadata)(nil)
 
 	//go:embed metadata.ipldsch
-	schemaBytes                []byte
-	indexClaimMetadata         schema.TypedPrototype
-	equalsClaimMetadata        schema.TypedPrototype
-	locationCommitmentMetadata schema.TypedPrototype
+	schemaBytes []byte
 )
+
+var nodePrototypes = map[multicodec.Code]schema.TypedPrototype{}
 
 func init() {
 	typeSystem, err := ipld.LoadSchemaBytes(schemaBytes)
 	if err != nil {
 		panic(fmt.Errorf("failed to load schema: %w", err))
 	}
-	indexClaimMetadata = bindnode.Prototype((*IndexClaimMetadata)(nil), typeSystem.TypeByName("IndexClaimMetadata"))
-	equalsClaimMetadata = bindnode.Prototype((*EqualsClaimMetadata)(nil), typeSystem.TypeByName("EqualsClaimMetadata"))
-	locationCommitmentMetadata = bindnode.Prototype((*LocationCommitmentMetadata)(nil), typeSystem.TypeByName("LocationCommitmentMetadata"))
+	nodePrototypes[IndexClaimID] = bindnode.Prototype((*IndexClaimMetadata)(nil), typeSystem.TypeByName("IndexClaimMetadata"))
+	nodePrototypes[EqualsClaimID] = bindnode.Prototype((*EqualsClaimMetadata)(nil), typeSystem.TypeByName("EqualsClaimMetadata"))
+	nodePrototypes[LocationCommitmentID] = bindnode.Prototype((*LocationCommitmentMetadata)(nil), typeSystem.TypeByName("LocationCommitmentMetadata"))
 }
 
 // metadata identifiers
@@ -85,12 +84,6 @@ const EqualsClaimID = 0x3E0001
 // LocationCommitmentID is the multicodec for location commitments
 const LocationCommitmentID = 0x3E0002
 
-var nodePrototypes = map[multicodec.Code]schema.TypedPrototype{
-	IndexClaimID:         indexClaimMetadata,
-	EqualsClaimID:        equalsClaimMetadata,
-	LocationCommitmentID: locationCommitmentMetadata,
-}
-
 var MetadataContext ipnimd.MetadataContext
 
 func init() {
@@ -99,6 +92,9 @@ func init() {
 	mdctx = mdctx.WithProtocol(EqualsClaimID, func() ipnimd.Protocol { return &EqualsClaimMetadata{} })
 	mdctx = mdctx.WithProtocol(LocationCommitmentID, func() ipnimd.Protocol { return &LocationCommitmentMetadata{} })
 	MetadataContext = mdctx
+	// WithProtocol creates a _new_ context. Assign it to Default so claim
+	// metadata can be decoded elsewhere by refrencing libipni metadata.Default
+	// i.e. ipni-publisher
 	ipnimd.Default = mdctx
 }
 
@@ -211,6 +207,7 @@ func readFrom[PT hasID[T], T any](val PT, r io.Reader) (int64, error) {
 		return cr.readCount, fmt.Errorf("transport id does not match %s: %s", val.ID(), id)
 	}
 
+	fmt.Println(val.ID(), nodePrototypes[val.ID()])
 	nb := nodePrototypes[val.ID()].NewBuilder()
 	err = dagcbor.Decode(nb, cr)
 	if err != nil {
