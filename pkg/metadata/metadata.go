@@ -99,6 +99,7 @@ func init() {
 	mdctx = mdctx.WithProtocol(EqualsClaimID, func() ipnimd.Protocol { return &EqualsClaimMetadata{} })
 	mdctx = mdctx.WithProtocol(LocationCommitmentID, func() ipnimd.Protocol { return &LocationCommitmentMetadata{} })
 	MetadataContext = mdctx
+	ipnimd.Default = mdctx
 }
 
 type HasClaim interface {
@@ -166,7 +167,7 @@ type LocationCommitmentMetadata struct {
 }
 
 func (l *LocationCommitmentMetadata) ID() multicodec.Code {
-	return EqualsClaimID
+	return LocationCommitmentID
 }
 func (l *LocationCommitmentMetadata) MarshalBinary() ([]byte, error) { return marshalBinary(l) }
 func (l *LocationCommitmentMetadata) UnmarshalBinary(data []byte) error {
