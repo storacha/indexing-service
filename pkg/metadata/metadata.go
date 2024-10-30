@@ -207,7 +207,6 @@ func readFrom[PT hasID[T], T any](val PT, r io.Reader) (int64, error) {
 		return cr.readCount, fmt.Errorf("transport id does not match %s: %s", val.ID(), id)
 	}
 
-	fmt.Println(val.ID(), nodePrototypes[val.ID()])
 	nb := nodePrototypes[val.ID()].NewBuilder()
 	err = dagcbor.Decode(nb, cr)
 	if err != nil {
