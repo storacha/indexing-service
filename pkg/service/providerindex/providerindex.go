@@ -127,6 +127,9 @@ func (pi *ProviderIndexService) filterBySpace(results []model.ProviderResult, mh
 	}
 
 	filtered, err := filter(results, func(result model.ProviderResult) (bool, error) {
+		if !filterableByContextID(result) {
+			return true, nil
+		}
 		return slices.ContainsFunc(encryptedIds, func(encyptedID types.EncodedContextID) bool {
 			return bytes.Equal(result.ContextID, encyptedID)
 		}), nil
@@ -134,10 +137,7 @@ func (pi *ProviderIndexService) filterBySpace(results []model.ProviderResult, mh
 	if err != nil {
 		return nil, err
 	}
-	if len(filtered) > 0 {
-		return filtered, nil
-	}
-	return results, nil
+	return filtered, nil
 }
 
 func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
@@ -239,4 +239,18 @@ func filter(results []model.ProviderResult, filterFunc func(model.ProviderResult
 		}
 	}
 	return filtered, nil
+}
+
+// filterableByContextID determines if the metadata can be filtered using a
+// [types.ContextID].
+func filterableByContextID(result model.ProviderResult) bool {
+	md := metadata.MetadataContext.New()
+	err := md.UnmarshalBinary(result.Metadata)
+	if err != nil {
+		log.Warnf("decoding metadata: %w", err)
+		return false
+	}
+	// we're only able to filter results with location commitment metadata atm
+	lcommMeta := md.Get(metadata.LocationCommitmentID)
+	return lcommMeta != nil
 }
