@@ -587,10 +587,14 @@ github.com/storacha/go-capabilities v0.0.0-20241030160329-4cf19ffc732d h1:zcRQSf
 github.com/storacha/go-capabilities v0.0.0-20241030160329-4cf19ffc732d/go.mod h1:vHqUkLGC11Fhio/2qBJkK8MmA4q1t7DaRVdTIo0UHhE=
 github.com/storacha/go-metadata v0.0.0-20241021141939-f94d93dcda78 h1:NAti9hMLMo8F0Iyz5ldS41CY6MyukRH0OrTPV4u2340=
 github.com/storacha/go-metadata v0.0.0-20241021141939-f94d93dcda78/go.mod h1:DcwwQnyFuTk531cKD9sUkQg/gzpwKaIqH9I7oZYyeRc=
+github.com/storacha/go-metadata v0.0.0-20241031171938-8f3343b7ce5a h1:c1eCKRLOoNw1oCk7fOUgNArvJlQZYai1QgZOHHAubL4=
+github.com/storacha/go-metadata v0.0.0-20241031171938-8f3343b7ce5a/go.mod h1:HKKrwNQRGo731eC1ourP1ISRBR/Q9CYvbtpSz9yAu6o=
 github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb h1:lFwFtMjgt162ot9pnu230haLjRQ1rqwJOIAyywOqAX8=
 github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb/go.mod h1:7ba9jAgqmwlF/JfyFUQcGV07uiYNlmJNu8qH4hHtrJk=
 github.com/storacha/ipni-publisher v0.0.0-20241030213210-27f9084f36d3 h1:+et7pAB21A4HwYgjpkWpuanzj4WyN06pa/a0lBZrbfA=
 github.com/storacha/ipni-publisher v0.0.0-20241030213210-27f9084f36d3/go.mod h1:oeRwCqtWAhWodWYYVklunZbetcp/CuEn4Q+KL0zOIR0=
+github.com/storacha/ipni-publisher v0.0.0-20241031171227-f59f9fc3b0b8 h1:X+xD2xdNq2kQQdkcoTUTUMcG1zVGAYn5VXsQtb6vClU=
+github.com/storacha/ipni-publisher v0.0.0-20241031171227-f59f9fc3b0b8/go.mod h1:oeRwCqtWAhWodWYYVklunZbetcp/CuEn4Q+KL0zOIR0=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
