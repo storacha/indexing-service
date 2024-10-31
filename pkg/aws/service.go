@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/redis/go-redis/v9"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/indexing-service/pkg/construct"
@@ -127,7 +128,7 @@ func Construct(cfg Config) (types.Service, error) {
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
-	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable)
+	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
 	return construct.Construct(
 		cfg.ServiceConfig,
 		construct.SkipNotification(),

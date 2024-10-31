@@ -12,10 +12,9 @@ require (
 	github.com/multiformats/go-multiaddr v0.13.0
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/multiformats/go-varint v0.0.7
 	github.com/redis/go-redis/v9 v9.6.1
 	github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb
-	github.com/storacha/ipni-publisher v0.0.0-20241029210117-3286a26a47a8
+	github.com/storacha/ipni-publisher v0.0.0-20241030213210-27f9084f36d3
 	github.com/stretchr/testify v1.9.0
 )
 
@@ -41,6 +40,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onsi/gomega v1.34.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ucan-wg/go-ucan v0.0.0-20240916120445-37f52863156c // indirect

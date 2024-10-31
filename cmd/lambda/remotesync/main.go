@@ -9,6 +9,7 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
@@ -47,7 +48,7 @@ func main() {
 	ipniStore := aws.NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
-	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable)
+	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
 	remoteSyncer := providerindex.NewRemoteSyncer(providerStore, publisherStore)
 	lambda.Start(makeHandler(remoteSyncer))
 }

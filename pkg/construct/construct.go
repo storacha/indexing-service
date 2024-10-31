@@ -16,6 +16,7 @@ import (
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service"
@@ -270,7 +271,10 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	if publisherStore == nil {
 		ds = initializeDatastore(&cfg)
 		// setup the datastore for publishing to IPNI
-		publisherStore = store.FromDatastore(namespace.Wrap(ds, providerIndexPublisherNamespace))
+		publisherStore = store.FromDatastore(
+			namespace.Wrap(ds, providerIndexPublisherNamespace),
+			store.WithMetadataContext(metadata.MetadataContext),
+		)
 	}
 
 	// setup remote sync notification
