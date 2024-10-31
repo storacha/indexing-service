@@ -2,89 +2,60 @@ package contentclaims
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/url"
 
-	logging "github.com/ipfs/go-log/v2"
-	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/storacha/go-capabilities/pkg/assert"
-	"github.com/storacha/go-capabilities/pkg/claim"
-	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/ipld/go-ipld-prime"
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/go-ucanto/core/invocation"
-	"github.com/storacha/go-ucanto/core/receipt"
-	"github.com/storacha/go-ucanto/core/result/ok"
-	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
-	"github.com/storacha/go-ucanto/server"
-	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-var log = logging.Logger("contentclaims")
-
-func NewService(indexer types.Service) map[ucan.Ability]server.ServiceMethod[ok.Unit] {
-	return map[ucan.Ability]server.ServiceMethod[ok.Unit]{
-		assert.EqualsAbility: server.Provide(
-			assert.Equals,
-			func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, receipt.Effects, error) {
-				err := indexer.PublishClaim(context.TODO(), inv)
-				if err != nil {
-					log.Errorf("publishing equals claim: %w", err)
-				}
-				return ok.Unit{}, nil, err
-			},
-		),
-		assert.IndexAbility: server.Provide(
-			assert.Index,
-			func(cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, receipt.Effects, error) {
-				err := indexer.PublishClaim(context.TODO(), inv)
-				if err != nil {
-					log.Errorf("publishing index claim: %w", err)
-				}
-				return ok.Unit{}, nil, err
-			},
-		),
-		claim.CacheAbility: server.Provide(
-			claim.Cache,
-			func(cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, receipt.Effects, error) {
-				peerid, err := toPeerID(inv.Issuer())
-				if err != nil {
-					return ok.Unit{}, nil, err
-				}
-
-				provider := peer.AddrInfo{ID: peerid, Addrs: cap.Nb().Provider.Addresses}
-
-				bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(inv.Blocks()))
-				if err != nil {
-					return ok.Unit{}, nil, err
-				}
-
-				rootbl, present, err := bs.Get(cap.Nb().Claim)
-				if err != nil {
-					return ok.Unit{}, nil, err
-				}
-				if !present {
-					return ok.Unit{}, nil, NewMissingClaimError()
-				}
-
-				claim := delegation.NewDelegation(rootbl, bs)
-				err = indexer.CacheClaim(context.TODO(), provider, claim)
-				if err != nil {
-					log.Errorf("caching claim: %w", err)
-				}
-				return ok.Unit{}, nil, err
-			},
-		),
-	}
+type ClaimService struct {
+	store  types.ContentClaimsStore
+	cache  types.ContentClaimsCache
+	finder Finder
 }
 
-func toPeerID(principal ucan.Principal) (peer.ID, error) {
-	vfr, err := verifier.Decode(principal.DID().Bytes())
-	if err != nil {
-		return "", err
+var _ Service = (*ClaimService)(nil)
+
+func (cs *ClaimService) Cache(ctx context.Context, claim delegation.Delegation) error {
+	return cs.cache.Set(ctx, link.ToCID(claim.Link()), claim, true)
+}
+
+func (cs *ClaimService) Find(ctx context.Context, claim ipld.Link, url url.URL) (delegation.Delegation, error) {
+	return cs.finder.Find(ctx, claim, url)
+}
+
+func (cs *ClaimService) Get(ctx context.Context, claim ipld.Link) (delegation.Delegation, error) {
+	c, err := cs.cache.Get(ctx, link.ToCID(claim))
+	if err == nil {
+		return c, nil
 	}
-	pub, err := crypto.UnmarshalEd25519PublicKey(vfr.Raw())
-	if err != nil {
-		return "", err
+	if err != types.ErrKeyNotFound {
+		return nil, err
 	}
-	return peer.IDFromPublicKey(pub)
+	c, err = cs.store.Get(ctx, claim)
+	if err != nil {
+		return nil, fmt.Errorf("getting claim from store: %w", err)
+	}
+	err = cs.Cache(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("caching claim: %w", err)
+	}
+	return c, nil
+}
+
+func (cs *ClaimService) Publish(ctx context.Context, claim delegation.Delegation) error {
+	err := cs.store.Put(ctx, claim.Link(), claim)
+	if err != nil {
+		return fmt.Errorf("putting claim to store: %w", err)
+	}
+	return cs.Cache(ctx, claim)
+}
+
+func New(store types.ContentClaimsStore, cache types.ContentClaimsCache, httpClient *http.Client) *ClaimService {
+	f := WithCache(WithStore(NewSimpleFinder(httpClient), store), cache)
+	return &ClaimService{store, cache, f}
 }

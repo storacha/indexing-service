@@ -8,9 +8,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-var (
-	_ types.ContentClaimsStore = (*ContentClaimsStore)(nil)
-)
+var _ types.ContentClaimsCache = (*ContentClaimsStore)(nil)
 
 // ContentClaimsStore is a RedisStore for storing content claims that implements types.ContentClaimsStore
 type ContentClaimsStore = Store[cid.Cid, delegation.Delegation]

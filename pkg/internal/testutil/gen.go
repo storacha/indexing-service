@@ -22,6 +22,7 @@ import (
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld/block"
+	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/blobindex"
@@ -33,7 +34,10 @@ func RandomBytes(size int) []byte {
 	return bytes
 }
 
-func RandomCAR(size int) ([]datamodel.Link, io.Reader) {
+// RandomCAR creates a CAR with a single block of random bytes of the specified
+// size. It returns the link of the root block, the hash of the CAR itself and
+// the bytes of the CAR.
+func RandomCAR(size int) (datamodel.Link, mh.Multihash, []byte) {
 	bytes := RandomBytes(size)
 	c, _ := cid.Prefix{
 		Version:  1,
@@ -42,11 +46,19 @@ func RandomCAR(size int) ([]datamodel.Link, io.Reader) {
 		MhLength: -1,
 	}.Sum(bytes)
 
-	link := cidlink.Link{Cid: c}
-	r := car.Encode([]datamodel.Link{link}, func(yield func(block.Block, error) bool) {
-		yield(block.NewBlock(link, bytes), nil)
+	root := cidlink.Link{Cid: c}
+	r := car.Encode([]datamodel.Link{root}, func(yield func(block.Block, error) bool) {
+		yield(block.NewBlock(root, bytes), nil)
 	})
-	return []datamodel.Link{link}, r
+	carBytes, err := io.ReadAll(r)
+	if err != nil {
+		panic(err)
+	}
+	carDigest, err := mh.Sum(carBytes, mh.SHA2_256, -1)
+	if err != nil {
+		panic(err)
+	}
+	return root, carDigest, carBytes
 }
 
 var seedSeq int64
@@ -58,6 +70,18 @@ func RandomPeer() peer.ID {
 	_, publicKey, _ := crypto.GenerateEd25519Key(r)
 	peerID, _ := peer.IDFromPublicKey(publicKey)
 	return peerID
+}
+
+func RandomPrincipal() ucan.Principal {
+	return RandomSigner()
+}
+
+func RandomSigner() principal.Signer {
+	id, err := signer.Generate()
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 func RandomMultiaddr() multiaddr.Multiaddr {
@@ -148,28 +172,11 @@ func RandomProviderResult() model.ProviderResult {
 	}
 }
 
-func RandomShardedDagIndexView(size int) (cid.Cid, blobindex.ShardedDagIndexView) {
-	roots, contentCar := RandomCAR(size)
-	contentCarBytes, err := io.ReadAll(contentCar)
+func RandomShardedDagIndexView(size int) (mh.Multihash, blobindex.ShardedDagIndexView) {
+	root, digest, bytes := RandomCAR(size)
+	shard, err := blobindex.FromShardArchives(root, [][]byte{bytes})
 	if err != nil {
 		panic(err)
 	}
-
-	root, err := cid.Prefix{
-		Version:  1,
-		Codec:    cid.Raw,
-		MhType:   mh.SHA2_256,
-		MhLength: -1,
-	}.Sum(contentCarBytes)
-
-	if err != nil {
-		panic(err)
-	}
-
-	shard, err := blobindex.FromShardArchives(roots[0], [][]byte{contentCarBytes})
-	if err != nil {
-		panic(err)
-	}
-
-	return root, shard
+	return digest, shard
 }

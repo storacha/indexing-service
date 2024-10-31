@@ -3,6 +3,9 @@ locals {
     getroot = {
       name = "GETroot"
     }
+    getclaim = {
+      name = "GETclaim"
+    }
     getclaims = {
       name = "GETclaims"
     }
@@ -65,7 +68,9 @@ resource "aws_lambda_function" "lambda" {
         NOTIFIER_HEAD_BUCKET_NAME = aws_s3_bucket.notifier_head_bucket.bucket
         NOTIFIER_SNS_TOPIC_ARN = aws_sns_topic.published_advertisememt_head_change.id
         PRIVATE_KEY = aws_ssm_parameter.private_key.name
+        PUBLIC_URL = var.public_url
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
+        CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
     }
   }
 
@@ -185,7 +190,8 @@ data "aws_iam_policy_document" "lambda_s3_put_get_document" {
     resources = [
       aws_s3_bucket.caching_bucket.arn,
       aws_s3_bucket.ipni_store_bucket.arn,
-      aws_s3_bucket.notifier_head_bucket.arn
+      aws_s3_bucket.notifier_head_bucket.arn,
+      aws_s3_bucket.claim_store_bucket.arn
     ]
   }
 }

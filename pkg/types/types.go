@@ -35,7 +35,23 @@ func (c ContextID) ToEncoded() (EncodedContextID, error) {
 }
 
 // ErrKeyNotFound means the key did not exist in the cache
-var ErrKeyNotFound = errors.New("cache key not found")
+var ErrKeyNotFound = errors.New("key not found")
+
+// Store describes a generic storage interface
+type Store[Key, Value any] interface {
+	// Put adds (or replaces) an item in the store.
+	Put(ctx context.Context, key Key, value Value) error
+	// Get retrieves an existing item from the store. If the item does not exist,
+	// it should return [ErrKeyNotFound].
+	Get(ctx context.Context, key Key) (Value, error)
+}
+
+// ErrWrongRootCount indicates a car file with multiple roots being unable to interpret
+// as a query result
+var ErrWrongRootCount = errors.New("query result should have exactly one root")
+
+// ErrNoRootBlock indicates a root that is specified but not found in a CAR file
+var ErrNoRootBlock = errors.New("query root block not found in car")
 
 // Cache describes a generic cache interface
 type Cache[Key, Value any] interface {
@@ -47,8 +63,11 @@ type Cache[Key, Value any] interface {
 // ProviderStore caches queries to IPNI
 type ProviderStore Cache[mh.Multihash, []model.ProviderResult]
 
-// ContentClaimsStore caches fetched content claims
-type ContentClaimsStore Cache[cid.Cid, delegation.Delegation]
+// ContentClaimsStore stores published content claims
+type ContentClaimsStore Store[ipld.Link, delegation.Delegation]
+
+// ContentClaimsCache caches fetched content claims
+type ContentClaimsCache Cache[cid.Cid, delegation.Delegation]
 
 // ShardedDagIndexStore caches fetched sharded dag indexes
 type ShardedDagIndexStore Cache[EncodedContextID, blobindex.ShardedDagIndexView]
@@ -74,9 +93,29 @@ type QueryResult interface {
 	Indexes() []ipld.Link
 }
 
+type Getter interface {
+	// Get retrieves a claim that has been published or cached by the
+	// indexing service. No external sources are consulted.
+	Get(ctx context.Context, claim ipld.Link) (delegation.Delegation, error)
+}
+
+type Publisher interface {
+	// Cache caches a claim with the service temporarily.
+	Cache(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error
+	// Publish writes a claim to permanent storage, adds it to an IPNI
+	// advertisement, annnounces it to IPNI nodes and caches it.
+	Publish(ctx context.Context, claim delegation.Delegation) error
+}
+
+type Querier interface {
+	// Query allows claims to be queried by their subject (content CID). It
+	// returns claims as well as any relevant indexes.
+	Query(ctx context.Context, q Query) (QueryResult, error)
+}
+
 // Service is the core methods of the indexing service.
 type Service interface {
-	CacheClaim(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error
-	PublishClaim(ctx context.Context, claim delegation.Delegation) error
-	Query(ctx context.Context, q Query) (QueryResult, error)
+	Getter
+	Publisher
+	Querier
 }

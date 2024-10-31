@@ -6,10 +6,10 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-func NewServer(id principal.Signer, indexer types.Service) (server.ServerView, error) {
-	service := NewService(indexer)
+func NewUCANServer(id principal.Signer, service types.Publisher) (server.ServerView, error) {
+	ucanService := NewUCANService(service)
 	var opts []server.Option
-	for ability, method := range service {
+	for ability, method := range ucanService {
 		opts = append(opts, server.WithServiceMethod(ability, method))
 	}
 	return server.NewServer(id, opts...)

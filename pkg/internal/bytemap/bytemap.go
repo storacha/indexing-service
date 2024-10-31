@@ -19,6 +19,8 @@ type ByteMap[K ~[]byte, T any] interface {
 	Delete(K) bool
 	Size() int
 	Iterator() iter.Seq2[K, T]
+	Keys() iter.Seq[K]
+	Values() iter.Seq[T]
 }
 
 // NewByteMap returns a new map of multihash to a data type
@@ -59,4 +61,14 @@ func (bm *byteMap[K, T]) Iterator() iter.Seq2[K, T] {
 	return iterable.Map2(func(str string, t T) (K, T) {
 		return K(str), t
 	}, maps.All(bm.data))
+}
+
+func (bm *byteMap[K, T]) Keys() iter.Seq[K] {
+	return iterable.Map(func(str string) K {
+		return K(str)
+	}, maps.Keys(bm.data))
+}
+
+func (bm *byteMap[K, T]) Values() iter.Seq[T] {
+	return maps.Values(bm.data)
 }

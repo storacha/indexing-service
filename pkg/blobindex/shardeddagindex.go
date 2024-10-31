@@ -77,7 +77,7 @@ func View(root ipld.Link, blockMap map[ipld.Link]ipld.Block) (ShardedDagIndexVie
 	if shardedDagIndexData.DagO_1 == nil {
 		return nil, NewUnknownFormatError(fmt.Errorf("unknown index version"))
 	}
-	dagIndex := NewShardedDagIndexView(root, len(shardedDagIndexData.DagO_1.Shards))
+	dagIndex := NewShardedDagIndexView(shardedDagIndexData.DagO_1.Content, len(shardedDagIndexData.DagO_1.Shards))
 	for _, shardLink := range shardedDagIndexData.DagO_1.Shards {
 		shard, ok := blockMap[shardLink]
 		if !ok {

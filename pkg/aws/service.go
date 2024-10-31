@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -12,9 +13,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/redis/go-redis/v9"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/indexing-service/pkg/construct"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
 )
@@ -42,6 +45,8 @@ type Config struct {
 	IPNIStorePrefix     string
 	NotifierHeadBucket  string
 	NotifierTopicArn    string
+	ClaimStoreBucket    string
+	ClaimStorePrefix    string
 	principal.Signer
 }
 
@@ -87,6 +92,7 @@ func FromEnv(ctx context.Context) Config {
 		Signer: id,
 		ServiceConfig: construct.ServiceConfig{
 			PrivateKey: cryptoPrivKey,
+			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
 			ProvidersRedis: redis.Options{
 				Addr:                       mustGetEnv("PROVIDERS_REDIS_URL"),
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
@@ -110,6 +116,8 @@ func FromEnv(ctx context.Context) Config {
 		IPNIStorePrefix:     ipniStoreKeyPrefix,
 		NotifierHeadBucket:  mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
 		NotifierTopicArn:    mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
+		ClaimStoreBucket:    mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
+		ClaimStorePrefix:    os.Getenv("CLAIM_STORE_KEY_REFIX"),
 	}
 }
 
@@ -117,12 +125,16 @@ func FromEnv(ctx context.Context) Config {
 func Construct(cfg Config) (types.Service, error) {
 	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
+	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
-	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable)
-	return construct.Construct(cfg.ServiceConfig,
+	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
+	return construct.Construct(
+		cfg.ServiceConfig,
 		construct.SkipNotification(),
 		construct.WithCachingQueue(cachingQueue),
 		construct.WithPublisherStore(publisherStore),
-		construct.WithStartIPNIServer(false))
+		construct.WithStartIPNIServer(false),
+		construct.WithClaimsStore(claimBucketStore),
+	)
 }

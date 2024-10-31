@@ -51,6 +51,7 @@ func RequireEqualDelegation(t *testing.T, expectedDelegation delegation.Delegati
 		require.Nil(t, actualDelegation)
 		return
 	}
+	require.NotNil(t, actualDelegation)
 	require.Equal(t, expectedDelegation.Issuer(), actualDelegation.Issuer())
 	require.Equal(t, expectedDelegation.Audience(), actualDelegation.Audience())
 	require.Equal(t, expectedDelegation.Capabilities(), actualDelegation.Capabilities())
