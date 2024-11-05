@@ -18,7 +18,7 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
 	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/internal/bytemap"
+	"github.com/storacha/indexing-service/pkg/bytemap"
 	qdm "github.com/storacha/indexing-service/pkg/service/queryresult/datamodel"
 	"github.com/storacha/indexing-service/pkg/types"
 )
