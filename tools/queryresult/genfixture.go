@@ -56,7 +56,7 @@ func main() {
 	index := must(blobindex.FromShardArchives(blockLink, [][]byte{carBytes}))
 	indexBytes := must(io.ReadAll(must(index.Archive())))
 	indexDigest := must(multihash.Sum(indexBytes, multihash.SHA2_256, -1))
-	indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), blockDigest)}
+	indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), indexDigest)}
 
 	carLocationURL := blobURL(randomURL(), carDigest)
 	carLocationCommitment := must(assert.Location.Delegate(
