@@ -31,7 +31,7 @@ clean-terraform:
 
 .PHONY: clean
 
-clean: clean-lambda clean-terraform
+clean: clean-terraform clean-lambda
 
 lambdas: $(LAMBDAS)
 
