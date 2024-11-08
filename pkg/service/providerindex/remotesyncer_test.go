@@ -18,7 +18,7 @@ import (
 	"github.com/ipni/go-libipni/ingest/schema"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/indexing-service/pkg/internal/bytemap"
+	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"

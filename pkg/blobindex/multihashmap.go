@@ -2,7 +2,7 @@ package blobindex
 
 import (
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha/indexing-service/pkg/internal/bytemap"
+	"github.com/storacha/indexing-service/pkg/bytemap"
 )
 
 // NewMultihashMap returns a new map of multihash to a data type

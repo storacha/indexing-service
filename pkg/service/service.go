@@ -24,7 +24,7 @@ import (
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/validator"
 	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/internal/bytemap"
+	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/parallelwalk"
