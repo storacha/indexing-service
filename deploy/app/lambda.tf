@@ -108,7 +108,7 @@ resource "aws_cloudwatch_log_group" "lambda_log_group" {
 # Role policies and access to resources
 
 resource "aws_iam_role" "lambda_exec" {
-  name = "lambda_exec_role"
+  name = "${terraform.workspace}-lambda-exec-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
