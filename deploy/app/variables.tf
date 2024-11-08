@@ -20,8 +20,3 @@ variable "private_key" {
   description = "private_key for the peer for this deployment"
   type = string
 }
-
-variable "public_url" {
-  description = "public URL of the peer for this deployment"
-  type = string
-}

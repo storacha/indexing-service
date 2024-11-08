@@ -27,7 +27,7 @@ clean-lambda:
 .PHONY: clean-terraform
 
 clean-terraform:
-	tofu -chdir=deploy destroy
+	tofu -chdir=deploy/app destroy
 
 .PHONY: clean
 
@@ -40,28 +40,34 @@ lambdas: $(LAMBDAS)
 $(LAMBDAS): build/%/bootstrap:
 	GOOS=$(LAMBDA_GOOS) GOARCH=$(LAMBDA_GOARCH) CGO_ENABLED=$(LAMBDA_CGO_ENABLED) $(LAMBDA_GOCC) build $(LAMBDA_GOFLAGS) -o $@ cmd/lambda/$*/main.go
 
-deploy/.terraform:
-	TF_WORKSPACE= tofu -chdir=deploy init
+deploy/app/.terraform:
+	tofu -chdir=deploy/app init
 
 .tfworkspace:
-	tofu -chdir=deploy workspace new $(TF_WORKSPACE)
+	tofu -chdir=deploy/app workspace new $(TF_WORKSPACE)
 	touch .tfworkspace
 
 .PHONY: init
 
-init: deploy/.terraform .tfworkspace
+init: deploy/app/.terraform .tfworkspace
 
 .PHONY: validate
 
-validate: deploy/.terraform .tfworkspace
-	tofu -chdir=deploy validate
+validate: deploy/app/.terraform .tfworkspace
+	tofu -chdir=deploy/app validate
 
 .PHONY: plan
 
-plan: deploy/.terraform .tfworkspace $(LAMBDAS)
-	tofu -chdir=deploy plan
+plan: deploy/app/.terraform .tfworkspace $(LAMBDAS)
+	tofu -chdir=deploy/app plan
 
 .PHONY: apply
 
-apply: deploy/.terraform .tfworkspace $(LAMBDAS)
-	tofu -chdir=deploy apply
+apply: deploy/app/.terraform .tfworkspace $(LAMBDAS)
+	tofu -chdir=deploy/app apply
+
+
+deploy/app/.terraform:
+	tofu -chdir=deploy/app init
+
+shared:

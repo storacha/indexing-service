@@ -4,7 +4,7 @@
 /indexing-service
 *.car
 /build
-deploy/.terraform
+.terraform
 .env
 .tfworkspace
 /ucangen
