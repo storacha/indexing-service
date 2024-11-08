@@ -4,12 +4,12 @@ ifneq (,$(wildcard ./.env))
 else
   $(error You haven't setup your .env file. Please refer to the readme)
 endif
-GOOS=linux
-GOARCH=arm64
-GOCC?=go
-GOFLAGS=-tags=lambda.norpc
-CGO_ENABLED=0
-LAMBDAS=build/getclaims/bootstrap build/getroot/bootstrap build/notifier/bootstrap build/postclaims/bootstrap build/providercache/bootstrap build/remotesync/bootstrap
+LAMBDA_GOOS=linux
+LAMBDA_GOARCH=arm64
+LAMBDA_GOCC?=go
+LAMBDA_GOFLAGS=-tags=lambda.norpc
+LAMBDA_CGO_ENABLED=0
+LAMBDAS=build/getclaim/bootstrap build/getclaims/bootstrap build/getroot/bootstrap build/notifier/bootstrap build/postclaims/bootstrap build/providercache/bootstrap build/remotesync/bootstrap
 
 ucangen:
 	go build -o ./ucangen cmd/ucangen/main.go
@@ -31,17 +31,17 @@ clean-terraform:
 
 .PHONY: clean
 
-clean: clean-lambda clean-terraform
+clean: clean-terraform clean-lambda
 
 lambdas: $(LAMBDAS)
 
 .PHONY: $(LAMBDAS)
 
 $(LAMBDAS): build/%/bootstrap:
-	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=$(CGO_ENABLED) $(GOCC) build $(GOFLAGS) -o $@ cmd/lambda/$*/main.go
+	GOOS=$(LAMBDA_GOOS) GOARCH=$(LAMBDA_GOARCH) CGO_ENABLED=$(LAMBDA_CGO_ENABLED) $(LAMBDA_GOCC) build $(LAMBDA_GOFLAGS) -o $@ cmd/lambda/$*/main.go
 
 deploy/.terraform:
-	tofu -chdir=deploy init
+	TF_WORKSPACE= tofu -chdir=deploy init
 
 .tfworkspace:
 	tofu -chdir=deploy workspace new $(TF_WORKSPACE)
