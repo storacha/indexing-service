@@ -122,13 +122,14 @@ func TestPrincipalResolver(t *testing.T) {
 	require.NoError(t, err)
 
 	uploadIDWeb, err := signer.Wrap(uploadID, testutil.Must(did.Parse("did:web:upload.storacha.network"))(t))
+	require.NoError(t, err)
 
 	presolv, err := principalresolver.New(map[string]string{
 		uploadIDWeb.DID().String(): uploadIDWeb.Unwrap().DID().String(),
 	})
+	require.NoError(t, err)
 
 	server, err := NewUCANServer(testutil.Service, &mockIndexer{}, server.WithPrincipalResolver(presolv.ResolveDIDKey))
-	// server, err := NewUCANServer(testutil.Service, &mockIndexer{})
 	require.NoError(t, err)
 
 	proof := delegation.FromDelegation(
