@@ -19,7 +19,6 @@ import (
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/go-ucanto/server"
-	ucanserver "github.com/storacha/go-ucanto/server"
 	ucanhttp "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -134,7 +133,7 @@ func GetClaimHandler(service types.Getter) http.HandlerFunc {
 
 // PostClaimsHandler invokes the ucanto service when a POST request is sent to
 // "/claims".
-func PostClaimsHandler(id principal.Signer, service types.Publisher, options ...ucanserver.Option) http.HandlerFunc {
+func PostClaimsHandler(id principal.Signer, service types.Publisher, options ...server.Option) http.HandlerFunc {
 	server, err := contentclaims.NewUCANServer(id, service, options...)
 	if err != nil {
 		log.Fatalf("creating ucanto server: %s", err)
