@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
+	"github.com/ipld/go-ipld-prime/printer"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/storacha/go-capabilities/pkg/assert"
@@ -18,7 +19,13 @@ import (
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
 	unit "github.com/storacha/go-ucanto/core/result/ok"
+	"github.com/storacha/go-ucanto/did"
+	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/principal/signer"
+	"github.com/storacha/go-ucanto/server"
+	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/indexing-service/pkg/principalresolver"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -106,6 +113,68 @@ func TestServer(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestPrincipalResolver(t *testing.T) {
+	// simulate the upload service (a did:web) issuing an invocation to the
+	// indexing service
+	uploadID, err := ed25519.Generate()
+	require.NoError(t, err)
+
+	uploadIDWeb, err := signer.Wrap(uploadID, testutil.Must(did.Parse("did:web:upload.storacha.network"))(t))
+
+	presolv, err := principalresolver.New(map[string]string{
+		uploadIDWeb.DID().String(): uploadIDWeb.Unwrap().DID().String(),
+	})
+
+	server, err := NewUCANServer(testutil.Service, &mockIndexer{}, server.WithPrincipalResolver(presolv.ResolveDIDKey))
+	// server, err := NewUCANServer(testutil.Service, &mockIndexer{})
+	require.NoError(t, err)
+
+	proof := delegation.FromDelegation(
+		testutil.Must(
+			delegation.Delegate(
+				testutil.Service,
+				uploadIDWeb,
+				[]ucan.Capability[ucan.NoCaveats]{
+					ucan.NewCapability(assert.EqualsAbility, testutil.Service.DID().String(), ucan.NoCaveats{}),
+				},
+			),
+		)(t),
+	)
+
+	inv := testutil.Must(assert.Equals.Invoke(
+		uploadIDWeb,
+		testutil.Service,
+		testutil.Service.DID().String(),
+		assert.EqualsCaveats{
+			Content: assert.FromHash(testutil.RandomMultihash()),
+			Equals:  testutil.RandomCID(),
+		},
+		delegation.WithProof(proof),
+	))(t)
+
+	conn, err := client.NewConnection(testutil.Service, server)
+	require.NoError(t, err)
+
+	resp, err := client.Execute([]invocation.Invocation{inv}, conn)
+	require.NoError(t, err)
+
+	rcptlnk, ok := resp.Get(inv.Link())
+	require.True(t, ok, "missing receipt for invocation: %s", inv.Link())
+
+	reader, err := receipt.NewReceiptReader[unit.Unit, datamodel.Node](rcptsch)
+	require.NoError(t, err)
+
+	rcpt, err := reader.Read(rcptlnk, resp.Blocks())
+	require.NoError(t, err)
+
+	result.MatchResultR0(rcpt.Out(), func(ok unit.Unit) {
+		fmt.Printf("%+v\n", ok)
+	}, func(x datamodel.Node) {
+		fmt.Println(printer.Sprint(x))
+		require.Fail(t, "unexpected failure")
+	})
 }
 
 type mockIndexer struct {
