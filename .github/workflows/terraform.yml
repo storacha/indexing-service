@@ -8,7 +8,9 @@ on:
       - "*"
     paths:
       - ".github/workflows/terraform.yml"
+      - "cmd/**"
       - "deploy/**"
+      - "pkg/**"
   pull_request:
     branches: ["main"]
   workflow_dispatch:
