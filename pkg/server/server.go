@@ -96,9 +96,9 @@ func GetRootHandler(id principal.Signer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(fmt.Sprintf("🔥 indexing-service %s\n", build.Version)))
 		w.Write([]byte("- https://github.com/storacha/indexing-service\n"))
-		w.Write([]byte(fmt.Sprintf("- %s", id.DID())))
+		w.Write([]byte(fmt.Sprintf("- %s\n", id.DID())))
 		if s, ok := id.(signer.WrappedSigner); ok {
-			w.Write([]byte(fmt.Sprintf("- %s", s.Unwrap().DID())))
+			w.Write([]byte(fmt.Sprintf("- %s\n", s.Unwrap().DID())))
 		}
 	}
 }
