@@ -187,6 +187,7 @@ data "aws_iam_policy_document" "lambda_s3_put_get_document" {
     actions = [
       "s3:GetObject",
       "s3:PutObject",
+      "s3:DeleteObject",
     ]
     resources = [
       "${aws_s3_bucket.caching_bucket.arn}/*",
