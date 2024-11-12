@@ -196,6 +196,17 @@ data "aws_iam_policy_document" "lambda_s3_put_get_document" {
       "${aws_s3_bucket.claim_store_bucket.arn}/*"
     ]
   }
+  statement {
+    actions = [
+      "s3:ListBucket","s3:GetBucketLocation"
+    ]
+    resources = [
+      aws_s3_bucket.caching_bucket.arn,
+      aws_s3_bucket.ipni_store_bucket.arn,
+      aws_s3_bucket.notifier_head_bucket.arn,
+      aws_s3_bucket.claim_store_bucket.arn
+    ]
+  }
 }
 
 resource "aws_iam_policy" "lambda_s3_put_get" {
