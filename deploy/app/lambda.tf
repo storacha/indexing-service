@@ -189,10 +189,10 @@ data "aws_iam_policy_document" "lambda_s3_put_get_document" {
       "s3:PutObject",
     ]
     resources = [
-      aws_s3_bucket.caching_bucket.arn,
-      aws_s3_bucket.ipni_store_bucket.arn,
-      aws_s3_bucket.notifier_head_bucket.arn,
-      aws_s3_bucket.claim_store_bucket.arn
+      "${aws_s3_bucket.caching_bucket.arn}/*",
+      "${aws_s3_bucket.ipni_store_bucket.arn}/*",
+      "${aws_s3_bucket.notifier_head_bucket.arn}/*",
+      "${aws_s3_bucket.claim_store_bucket.arn}/*"
     ]
   }
 }
