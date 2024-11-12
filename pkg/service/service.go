@@ -486,7 +486,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 		break
 	}
 	if ferr != nil {
-		return fmt.Errorf("fetching blob index: %w", err)
+		return fmt.Errorf("fetching blob index: %w", ferr)
 	}
 
 	var exp int
