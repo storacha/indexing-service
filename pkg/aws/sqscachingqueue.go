@@ -1,10 +1,12 @@
 package aws
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -43,14 +45,19 @@ func NewSQSCachingQueue(cfg aws.Config, queurURL string, bucket string) *SQSCach
 // Queue implements blobindexlookup.CachingQueue.
 func (s *SQSCachingQueue) Queue(ctx context.Context, job providercacher.ProviderCachingJob) error {
 	uuid := uuid.New()
-	index, err := job.Index.Archive()
+	r, err := job.Index.Archive()
 	if err != nil {
 		return fmt.Errorf("serializing index to CAR: %w", err)
 	}
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("reading index from CAR: %w", err)
+	}
 	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(uuid.String()),
-		Body:   index,
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(uuid.String()),
+		Body:          bytes.NewReader(data),
+		ContentLength: aws.Int64(int64(len(data))),
 	})
 	if err != nil {
 		return fmt.Errorf("saving index CAR to S3: %w", err)
