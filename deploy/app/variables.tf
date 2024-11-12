@@ -20,3 +20,8 @@ variable "private_key" {
   description = "private_key for the peer for this deployment"
   type = string
 }
+
+variable "did" {
+  description = "DID for this deployment (did:web:... for example)"
+  type = string
+}

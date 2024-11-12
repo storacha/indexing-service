@@ -14,8 +14,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/redis/go-redis/v9"
 	"github.com/storacha/go-metadata"
+	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -71,6 +73,18 @@ func FromEnv(ctx context.Context) Config {
 	if err != nil {
 		panic(fmt.Errorf("parsing private key: %s", err))
 	}
+
+	if len(os.Getenv("DID")) != 0 {
+		d, err := did.Parse(os.Getenv("DID"))
+		if err != nil {
+			panic(fmt.Errorf("parsing DID: %w", err))
+		}
+		id, err = signer.Wrap(id, d)
+		if err != nil {
+			panic(fmt.Errorf("wrapping server DID: %w", err))
+		}
+	}
+
 	cryptoPrivKey, err := crypto.UnmarshalEd25519PrivateKey(id.Raw())
 	if err != nil {
 		panic(fmt.Errorf("unmarshaling private key: %w", err))

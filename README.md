@@ -46,6 +46,14 @@ Best to set this to your name. "prod" and "staging" are reserved for shared depl
 
 This is a multibase encoded ed25519 private key used to sign receipts and for the indexer's peer ID. For development, you can generate one by running `make ucankey`.
 
+#### `TF_VAR_did`
+
+This is the DID for this deployment (did:web:... for example). e.g.
+
+```sh
+TF_VAR_did='did:web:yourname.indexer.storacha.network'
+```
+
 #### `TF_VAR_public_url`
 
 This is the public URL of the peer for this deployment. e.g.
