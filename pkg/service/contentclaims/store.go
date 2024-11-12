@@ -1,6 +1,7 @@
 package contentclaims
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -35,7 +36,12 @@ func (bs *bucketStore) Get(ctx context.Context, key ipld.Link) (delegation.Deleg
 }
 
 func (bs *bucketStore) Put(ctx context.Context, key ipld.Link, value delegation.Delegation) error {
-	return bs.bucket.Put(ctx, toKey(key), value.Archive())
+	r := value.Archive()
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("reading delegation archive: %w", err)
+	}
+	return bs.bucket.Put(ctx, toKey(key), uint64(len(data)), bytes.NewReader(data))
 }
 
 var _ types.ContentClaimsStore = (*bucketStore)(nil)
