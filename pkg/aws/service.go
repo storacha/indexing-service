@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"os"
@@ -110,14 +111,23 @@ func FromEnv(ctx context.Context) Config {
 			ProvidersRedis: redis.Options{
 				Addr:                       mustGetEnv("PROVIDERS_REDIS_URL") + ":6379",
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
+				TLSConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				},
 			},
 			ClaimsRedis: redis.Options{
 				Addr:                       mustGetEnv("CLAIMS_REDIS_URL") + ":6379",
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("CLAIMS_REDIS_CACHE")),
+				TLSConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				},
 			},
 			IndexesRedis: redis.Options{
 				Addr:                       mustGetEnv("INDEXES_REDIS_URL") + ":6379",
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("INDEXES_REDIS_CACHE")),
+				TLSConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				},
 			},
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
 			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
