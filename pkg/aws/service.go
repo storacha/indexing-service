@@ -108,15 +108,15 @@ func FromEnv(ctx context.Context) Config {
 			PrivateKey: cryptoPrivKey,
 			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
 			ProvidersRedis: redis.Options{
-				Addr:                       mustGetEnv("PROVIDERS_REDIS_URL"),
+				Addr:                       mustGetEnv("PROVIDERS_REDIS_URL") + ":6379",
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
 			},
 			ClaimsRedis: redis.Options{
-				Addr:                       mustGetEnv("CLAIMS_REDIS_URL"),
+				Addr:                       mustGetEnv("CLAIMS_REDIS_URL") + ":6379",
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("CLAIMS_REDIS_CACHE")),
 			},
 			IndexesRedis: redis.Options{
-				Addr:                       mustGetEnv("INDEXES_REDIS_URL"),
+				Addr:                       mustGetEnv("INDEXES_REDIS_URL") + ":6379",
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("INDEXES_REDIS_CACHE")),
 			},
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
