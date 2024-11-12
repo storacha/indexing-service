@@ -20,6 +20,7 @@ import (
 	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/go-ucanto/server"
 	ucanhttp "github.com/storacha/go-ucanto/transport/http"
+	"github.com/storacha/indexing-service/pkg/build"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 )
@@ -93,7 +94,7 @@ func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 // GetRootHandler displays version info when a GET request is sent to "/".
 func GetRootHandler(id principal.Signer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("🔥 indexing-service v0.0.0\n"))
+		w.Write([]byte(fmt.Sprintf("🔥 indexing-service %s\n", build.Version)))
 		w.Write([]byte("- https://github.com/storacha/indexing-service\n"))
 		w.Write([]byte(fmt.Sprintf("- %s", id.DID())))
 		if s, ok := id.(signer.WrappedSigner); ok {
