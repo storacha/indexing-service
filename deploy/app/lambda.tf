@@ -44,7 +44,7 @@ resource "aws_lambda_function" "lambda" {
   runtime       = "provided.al2023"
   architectures = [ "arm64" ]
   role          = aws_iam_role.lambda_exec.arn
-  timeout          = try(each.value.timeout, 3)
+  timeout          = try(each.value.timeout, 30)
   memory_size      = try(each.value.memory_size, 128)
   reserved_concurrent_executions = try(each.value.concurrency, -1)
   source_code_hash = data.archive_file.function_archive[each.key].output_base64sha256
