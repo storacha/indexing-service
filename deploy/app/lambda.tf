@@ -68,6 +68,7 @@ resource "aws_lambda_function" "lambda" {
         NOTIFIER_HEAD_BUCKET_NAME = aws_s3_bucket.notifier_head_bucket.bucket
         NOTIFIER_SNS_TOPIC_ARN = aws_sns_topic.published_advertisememt_head_change.id
         PRIVATE_KEY = aws_ssm_parameter.private_key.name
+        DID = var.did
         PUBLIC_URL = "https://${aws_apigatewayv2_domain_name.custom_domain.domain_name}"
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
         CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
