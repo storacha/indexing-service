@@ -43,7 +43,7 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 		{
 			name:        "failure",
 			handler:     http.NotFound,
-			expectedErr: errors.New("failure response fetching index. status: 404 Not Found, message: 404 page not found, url: \n"),
+			expectedErr: errors.New("failure response fetching index. status: 404 Not Found, message: 404 page not found\n, url:"),
 		},
 		{
 			name: "partial fetch from offset",
@@ -79,7 +79,7 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 			cl := blobindexlookup.NewBlobIndexLookup(testServer.Client())
 			index, err := cl.Find(context.Background(), cid.Bytes(), provider, *testutil.Must(url.Parse(testServer.URL))(t), tc.rngHeader)
 			if tc.expectedErr != nil {
-				require.EqualError(t, err, tc.expectedErr.Error())
+				require.ErrorContains(t, err, tc.expectedErr.Error())
 			} else {
 				require.NoError(t, err)
 			}
