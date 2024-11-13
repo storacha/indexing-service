@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 
@@ -167,18 +168,25 @@ var queryCmd = &cli.Command{
 		fmt.Println("")
 		fmt.Printf("  Indexes (%d):\n", len(qr.Indexes()))
 		for _, root := range qr.Indexes() {
-			index, err := blobindex.View(root, blockmap)
+			blk, ok, err := blocks.Get(root)
+			if err != nil {
+				return fmt.Errorf("getting index block: %w", err)
+			}
+			if !ok {
+				return fmt.Errorf("missing index block: %w", err)
+			}
+			index, err := blobindex.Extract(bytes.NewReader(blk.Bytes()))
 			if err != nil {
 				return fmt.Errorf("decoding index: %w", err)
 			}
 
-			fmt.Printf("  %s\n", root)
-			fmt.Printf("    Shards (%d):\n", index.Shards().Size())
+			fmt.Printf("    %s\n", root)
+			fmt.Printf("      Shards (%d):\n", index.Shards().Size())
 			for shard, slices := range index.Shards().Iterator() {
-				fmt.Printf("      %s\n", formatDigest(shard))
-				fmt.Printf("        Slices (%d):\n", slices.Size())
+				fmt.Printf("        %s\n", formatDigest(shard))
+				fmt.Printf("          Slices (%d):\n", slices.Size())
 				for digest, position := range slices.Iterator() {
-					fmt.Printf("          %s @ %d-%d\n", formatDigest(digest), position.Offset, position.Offset+position.Length)
+					fmt.Printf("            %s @ %d-%d\n", formatDigest(digest), position.Offset, position.Offset+position.Length)
 				}
 			}
 		}
