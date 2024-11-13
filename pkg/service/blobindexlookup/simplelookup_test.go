@@ -43,7 +43,7 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 		{
 			name:        "failure",
 			handler:     http.NotFound,
-			expectedErr: errors.New("failure response fetching index. status: 404 Not Found, message: 404 page not found\n"),
+			expectedErr: errors.New("failure response fetching index. status: 404 Not Found, message: 404 page not found, url: \n"),
 		},
 		{
 			name: "partial fetch from offset",
