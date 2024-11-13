@@ -163,6 +163,7 @@ func main() {
 					},
 				},
 			},
+			queryCmd,
 		},
 	}
 
