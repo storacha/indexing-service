@@ -45,7 +45,7 @@ func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, _ mod
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		body, _ := io.ReadAll(resp.Body)
 
-		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), req.RequestURI)
+		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), fetchURL.String())
 	}
 	return blobindex.Extract(resp.Body)
 }
