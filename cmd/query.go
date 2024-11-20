@@ -181,6 +181,8 @@ var queryCmd = &cli.Command{
 			}
 
 			fmt.Printf("    %s\n", root)
+			fmt.Println("      Content:")
+			fmt.Printf("        %s\n", index.Content())
 			fmt.Printf("      Shards (%d):\n", index.Shards().Size())
 			for shard, slices := range index.Shards().Iterator() {
 				fmt.Printf("        %s\n", formatDigest(shard))
