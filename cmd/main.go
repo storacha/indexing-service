@@ -77,7 +77,7 @@ func main() {
 							},
 							&cli.IntFlag{
 								Name:    "indexes-redis-db",
-								Aliases: []string{"c"},
+								Aliases: []string{"i"},
 								Usage:   "database number for indexes cache",
 								Value:   2,
 							},
