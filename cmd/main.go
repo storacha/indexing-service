@@ -94,7 +94,14 @@ func main() {
 							var id principal.Signer
 							var err error
 							var opts []server.Option
-							if cCtx.String("private-key") != "" {
+
+							if !cCtx.IsSet("private-key") {
+								// generate a new private key if one is not provided
+								id, err = ed25519.Generate()
+								if err != nil {
+									return fmt.Errorf("generating server private key: %w", err)
+								}
+							} else {
 								id, err = ed25519.Parse(cCtx.String("private-key"))
 								if err != nil {
 									return fmt.Errorf("parsing server private key: %w", err)
@@ -109,8 +116,9 @@ func main() {
 										return fmt.Errorf("wrapping server DID: %w", err)
 									}
 								}
-								opts = append(opts, server.WithIdentity(id))
 							}
+
+							opts = append(opts, server.WithIdentity(id))
 
 							presolv, err := principalresolver.New(config.PrincipalMapping)
 							if err != nil {
