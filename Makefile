@@ -11,6 +11,14 @@ LAMBDA_GOFLAGS=-tags=lambda.norpc
 LAMBDA_CGO_ENABLED=0
 LAMBDAS=build/getclaim/bootstrap build/getclaims/bootstrap build/getroot/bootstrap build/notifier/bootstrap build/postclaims/bootstrap build/providercache/bootstrap build/remotesync/bootstrap
 
+indexer:
+	go build -o ./indexer ./cmd
+
+.PHONY: clean-indexer
+
+clean-indexer:
+	rm -f ./indexer
+
 ucangen:
 	go build -o ./ucangen cmd/ucangen/main.go
 
@@ -31,7 +39,7 @@ clean-terraform:
 
 .PHONY: clean
 
-clean: clean-terraform clean-lambda
+clean: clean-terraform clean-lambda clean-indexer
 
 lambdas: $(LAMBDAS)
 
@@ -65,9 +73,3 @@ plan: deploy/app/.terraform .tfworkspace $(LAMBDAS)
 
 apply: deploy/app/.terraform .tfworkspace $(LAMBDAS)
 	tofu -chdir=deploy/app apply
-
-
-deploy/app/.terraform:
-	tofu -chdir=deploy/app init
-
-shared:
