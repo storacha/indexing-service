@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/redis/go-redis/v9"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/did"
@@ -96,12 +95,7 @@ func FromEnv(ctx context.Context) Config {
 		ipniStoreKeyPrefix = "ipni/v1/ad/"
 	}
 
-	peer, err := peer.IDFromPrivateKey(cryptoPrivKey)
-	if err != nil {
-		panic(fmt.Errorf("parsing private key to peer: %w", err))
-	}
-
-	ipniPublisherAnnounceAddress := fmt.Sprintf("/dns4/%s/tcp/443/https/p2p/%s", mustGetEnv("IPNI_STORE_BUCKET_REGIONAL_DOMAIN"), peer.String())
+	ipniPublisherAnnounceAddress := fmt.Sprintf("/dns/%s/https", mustGetEnv("IPNI_STORE_BUCKET_REGIONAL_DOMAIN"))
 	return Config{
 		Config: awsConfig,
 		Signer: id,
