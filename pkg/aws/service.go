@@ -96,7 +96,6 @@ func FromEnv(ctx context.Context) Config {
 	}
 
 	ipniPublisherAnnounceAddress := fmt.Sprintf("/dns/%s/https", mustGetEnv("IPNI_STORE_BUCKET_REGIONAL_DOMAIN"))
-	fmt.Println("IPNI publisher announce address:", ipniPublisherAnnounceAddress)
 
 	return Config{
 		Config: awsConfig,
