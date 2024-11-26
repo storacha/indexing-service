@@ -130,6 +130,10 @@ var queryCmd = &cli.Command{
 				}
 				fmt.Println("      Content:")
 				fmt.Printf("        %s\n", formatDigest(nb.Content.Hash()))
+				if nb.Space != did.Undef {
+					fmt.Println("      Space:")
+					fmt.Printf("        %s\n", nb.Space.String())
+				}
 				fmt.Println("      Locations:")
 				for _, location := range nb.Location {
 					fmt.Printf("        %s\n", location.String())
