@@ -72,6 +72,7 @@ resource "aws_lambda_function" "lambda" {
         PUBLIC_URL = "https://${aws_apigatewayv2_domain_name.custom_domain.domain_name}"
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
         CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
+        GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
     }
   }
 
