@@ -34,28 +34,29 @@ type ProviderIndexService struct {
 	providerStore types.ProviderStore
 	findClient    ipnifind.Finder
 	publisher     publisher.Publisher
+	legacyClaims  LegacyClaimsFinder
 }
 
 var _ ProviderIndex = (*ProviderIndexService)(nil)
 
-// TBD access to legacy systems
-type LegacySystems interface{}
-
-func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacySystems LegacySystems) *ProviderIndexService {
+func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder) *ProviderIndexService {
 	return &ProviderIndexService{
 		providerStore: providerStore,
 		findClient:    findClient,
 		publisher:     publisher,
+		legacyClaims:  legacyClaims,
 	}
 }
 
 // Find should do the following
 //  1. Read from the IPNI Storage cache to get a list of providers
-//     a. If there is no record in cache, query IPNI, filter out any non-content claims metadata, and store
+//     a. if there are no records in the cache, attempt to ready claims from legacy systems -- Dynamo tables & content
+//     claims storage, synthetically constructing provider results
+//     b. if no records are found in legacy systems, query IPNI, filter out any non-content claims metadata, and store
 //     the resulting records in the cache
-//     b. the are no records in the cache or IPNI, it can attempt to read from legacy systems -- Dynamo tables & content claims storage, synthetically constructing provider results
-//  2. With returned provider results, filter additionally for claim type. If space dids are set, calculate an encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
-//     Future TODO: kick off a conversion task to update the recrds
+//  2. With returned provider results, filter additionally for claim type. If space dids are set, calculate an
+//     encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
+//     Future TODO: kick off a conversion task to update the records
 func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.ProviderResult, error) {
 	results, err := pi.getProviderResults(ctx, qk.Hash)
 	if err != nil {
@@ -77,14 +78,22 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 		return nil, err
 	}
 
-	findRes, err := pi.findClient.Find(ctx, mh)
-	if err != nil {
-		return nil, err
-	}
 	var results []model.ProviderResult
-	for _, mhres := range findRes.MultihashResults {
-		results = append(results, mhres.ProviderResults...)
+
+	legacyRes, err := pi.legacyClaims.Find(ctx, mh)
+	if err == nil && len(legacyRes) > 0 {
+		results = legacyRes
+	} else {
+		findRes, err := pi.findClient.Find(ctx, mh)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, mhres := range findRes.MultihashResults {
+			results = append(results, mhres.ProviderResults...)
+		}
 	}
+
 	err = pi.providerStore.Set(ctx, mh, results, true)
 	if err != nil {
 		return nil, err

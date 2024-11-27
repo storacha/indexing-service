@@ -55,3 +55,16 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 func claimsToProviderResults(_ delegation.Delegation) ([]model.ProviderResult, error) {
 	return []model.ProviderResult{}, nil
 }
+
+// NotFoundLegacyClaimsFinder is a LegacyClaimsFinder that always returns ErrKeyNotFound. It can be used when accessing
+// claims in a legacy system is not required
+type NotFoundLegacyClaimsFinder struct{}
+
+func NewNotFoundLegacyClaimsFinder() NotFoundLegacyClaimsFinder {
+	return NotFoundLegacyClaimsFinder{}
+}
+
+// Find always returns ErrKeyNotFound
+func (f NotFoundLegacyClaimsFinder) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
+	return nil, types.ErrKeyNotFound
+}
