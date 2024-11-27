@@ -72,6 +72,8 @@ resource "aws_lambda_function" "lambda" {
         PUBLIC_URL = "https://${aws_apigatewayv2_domain_name.custom_domain.domain_name}"
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
         CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
+        LEGACY_CLAIMS_TABLE_NAME = "prod-content-claims-claims-v1"
+        LEGACY_CLAIMS_BUCKET_NAME = "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
     }
   }
