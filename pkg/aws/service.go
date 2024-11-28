@@ -153,7 +153,7 @@ func Construct(cfg Config) (types.Service, error) {
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
-	legacyClaimsMapper := NewDynamoContentToClaimMapper(cfg.Config, cfg.LegacyClaimsTableName)
+	legacyClaimsMapper := NewDynamoContentToClaimsMapper(cfg.Config, cfg.LegacyClaimsTableName)
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
 	legacyClaims := providerindex.NewLegacyClaimsStore(legacyClaimsMapper, legacyClaimsBucket)
 	return construct.Construct(

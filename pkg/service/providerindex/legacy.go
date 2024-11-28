@@ -18,26 +18,26 @@ type LegacyClaimsFinder interface {
 
 // LegacyClaimsStore allows finding claims on a legacy store
 type LegacyClaimsStore struct {
-	contentToClaim ContentToClaimMapper
-	claimsStore    types.ContentClaimsStore
+	contentToClaims ContentToClaimsMapper
+	claimsStore     types.ContentClaimsStore
 }
 
-// ContentToClaimMapper maps content hashes to claim cids
-type ContentToClaimMapper interface {
+// ContentToClaimsMapper maps content hashes to claim cids
+type ContentToClaimsMapper interface {
 	GetClaim(ctx context.Context, contentHash multihash.Multihash) (claimCid cid.Cid, err error)
 }
 
-func NewLegacyClaimsStore(contentToClaimMapper ContentToClaimMapper, claimStore types.ContentClaimsStore) LegacyClaimsStore {
+func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore) LegacyClaimsStore {
 	return LegacyClaimsStore{
-		contentToClaim: contentToClaimMapper,
-		claimsStore:    claimStore,
+		contentToClaims: contentToClaimsMapper,
+		claimsStore:     claimStore,
 	}
 }
 
 // Find looks for the corresponding claims for a given content hash in the mapper and then fetches the claims from the
 // claims store
 func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
-	claimCid, err := ls.contentToClaim.GetClaim(ctx, contentHash)
+	claimCid, err := ls.contentToClaims.GetClaim(ctx, contentHash)
 	if err != nil {
 		return nil, err
 	}
@@ -47,12 +47,22 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 		return nil, err
 	}
 
-	return claimsToProviderResults(claim)
+	pr, err := synthetizeProviderResult(claim)
+	if err != nil {
+		return nil, err
+	}
+
+	return []ClaimProviderResult{
+		{
+			ProviderResult: pr,
+			Claim:          claim,
+		},
+	}, nil
 }
 
-// claimsToProviderResults synthetizes provider results from a set of claims
+// synthetizeProviderResult synthetizes a provider result, including metadata, from a given claim
 // TODO: implement
-func claimsToProviderResults(_ delegation.Delegation) ([]model.ProviderResult, error) {
+func synthetizeProviderResult(_ delegation.Delegation) ([]model.ProviderResult, error) {
 	return []model.ProviderResult{}, nil
 }
 

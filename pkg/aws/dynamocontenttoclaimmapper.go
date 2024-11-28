@@ -20,7 +20,7 @@ type DynamoContentToClaimMapper struct {
 	tableName string
 }
 
-func NewDynamoContentToClaimMapper(awsCfg aws.Config, tableName string) DynamoContentToClaimMapper {
+func NewDynamoContentToClaimsMapper(awsCfg aws.Config, tableName string) DynamoContentToClaimMapper {
 	return DynamoContentToClaimMapper{
 		c:         dynamodb.NewFromConfig(awsCfg),
 		tableName: tableName,

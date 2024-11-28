@@ -332,7 +332,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	}
 
 	// build read through fetchers
-	// TODO: add sender / publisher / linksystem / legacy systems
+	// TODO: add sender / publisher / linksystem
 	legacyClaims := cfg.legacyClaims
 	if legacyClaims == nil {
 		legacyClaims = providerindex.NewNotFoundLegacyClaimsFinder()
