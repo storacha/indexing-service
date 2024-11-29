@@ -24,7 +24,7 @@ type LegacyClaimsStore struct {
 
 // ContentToClaimsMapper maps content hashes to claim cids
 type ContentToClaimsMapper interface {
-	GetClaim(ctx context.Context, contentHash multihash.Multihash) (claimCid cid.Cid, err error)
+	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
 func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore) LegacyClaimsStore {
@@ -37,33 +37,34 @@ func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStor
 // Find looks for the corresponding claims for a given content hash in the mapper and then fetches the claims from the
 // claims store
 func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
-	claimCid, err := ls.contentToClaims.GetClaim(ctx, contentHash)
+	claimsCids, err := ls.contentToClaims.GetClaims(ctx, contentHash)
 	if err != nil {
 		return nil, err
 	}
 
-	claim, err := ls.claimsStore.Get(ctx, cidlink.Link{Cid: claimCid})
-	if err != nil {
-		return nil, err
+	results := []model.ProviderResult{}
+
+	for _, claimCid := range claimsCids {
+		claim, err := ls.claimsStore.Get(ctx, cidlink.Link{Cid: claimCid})
+		if err != nil {
+			return nil, err
+		}
+
+		pr, err := synthetizeProviderResult(claim)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, pr)
 	}
 
-	pr, err := synthetizeProviderResult(claim)
-	if err != nil {
-		return nil, err
-	}
-
-	return []ClaimProviderResult{
-		{
-			ProviderResult: pr,
-			Claim:          claim,
-		},
-	}, nil
+	return results, nil
 }
 
 // synthetizeProviderResult synthetizes a provider result, including metadata, from a given claim
-// TODO: implement
-func synthetizeProviderResult(_ delegation.Delegation) ([]model.ProviderResult, error) {
-	return []model.ProviderResult{}, nil
+func synthetizeProviderResult(_ delegation.Delegation) (model.ProviderResult, error) {
+	// TODO: implement
+	return model.ProviderResult{}, nil
 }
 
 // NotFoundLegacyClaimsFinder is a LegacyClaimsFinder that always returns ErrKeyNotFound. It can be used when accessing
