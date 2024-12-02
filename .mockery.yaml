@@ -12,3 +12,6 @@ packages:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
       Store:
+  github.com/aws/aws-sdk-go-v2/service/dynamodb:
+    interfaces:
+      QueryAPIClient:

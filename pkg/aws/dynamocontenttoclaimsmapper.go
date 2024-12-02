@@ -11,17 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
-// DynamoContentToClaimMapper uses a DynamoDB table to map content hashes to the corresponding claims
-type DynamoContentToClaimMapper struct {
-	c         *dynamodb.Client
+// DynamoContentToClaimsMapper uses a DynamoDB table to map content hashes to the corresponding claims
+type DynamoContentToClaimsMapper struct {
+	c         dynamodb.QueryAPIClient
 	tableName string
 }
 
-func NewDynamoContentToClaimsMapper(awsCfg aws.Config, tableName string) DynamoContentToClaimMapper {
-	return DynamoContentToClaimMapper{
-		c:         dynamodb.NewFromConfig(awsCfg),
+func NewDynamoContentToClaimsMapper(queryClient dynamodb.QueryAPIClient, tableName string) DynamoContentToClaimsMapper {
+	return DynamoContentToClaimsMapper{
+		c:         queryClient,
 		tableName: tableName,
 	}
 }
@@ -33,7 +34,7 @@ type contentClaimItem struct {
 }
 
 // GetClaim returns claim CIDs for a given content hash. Implements ContentToClaimMapper
-func (dm DynamoContentToClaimMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
+func (dm DynamoContentToClaimsMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
 	hash, err := attributevalue.Marshal(contentHash)
 	if err != nil {
 		return nil, err
@@ -55,6 +56,7 @@ func (dm DynamoContentToClaimMapper) GetClaims(ctx context.Context, contentHash 
 		KeyConditionExpression:    expr.KeyCondition(),
 		ProjectionExpression:      expr.Projection(),
 	})
+
 	for queryPaginator.HasMorePages() {
 		response, err := queryPaginator.NextPage(ctx)
 		if err != nil {
@@ -75,6 +77,10 @@ func (dm DynamoContentToClaimMapper) GetClaims(ctx context.Context, contentHash 
 
 			claimsCids = append(claimsCids, claimCid)
 		}
+	}
+
+	if len(claimsCids) == 0 {
+		return nil, types.ErrKeyNotFound
 	}
 
 	return claimsCids, nil
