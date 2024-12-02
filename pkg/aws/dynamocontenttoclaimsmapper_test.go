@@ -40,7 +40,7 @@ func TestGetClaims(t *testing.T) {
 
 		ctx := context.Background()
 
-		mockDynamoDBClient.On("Query", ctx, mock.Anything, mock.Anything).Return(&dynamodb.QueryOutput{
+		mockCall := mockDynamoDBClient.On("Query", ctx, mock.Anything, mock.Anything).Return(&dynamodb.QueryOutput{
 			Count: 2,
 			Items: []map[string]dbtypes.AttributeValue{locationClaim, indexClaim},
 		}, nil)
@@ -51,12 +51,13 @@ func TestGetClaims(t *testing.T) {
 		require.Equal(t, []cid.Cid{locationClaimCID, indexClaimCID}, cids)
 
 		mockDynamoDBClient.AssertExpectations(t)
+		mockCall.Unset()
 	})
 
 	t.Run("returns ErrKeyNotFound when there are no results in the DB", func(t *testing.T) {
 		ctx := context.Background()
 
-		mockDynamoDBClient.On("Query", ctx, mock.Anything, mock.Anything).Return(&dynamodb.QueryOutput{
+		mockCall := mockDynamoDBClient.On("Query", ctx, mock.Anything, mock.Anything).Return(&dynamodb.QueryOutput{
 			Count: 0,
 		}, nil)
 
@@ -65,5 +66,6 @@ func TestGetClaims(t *testing.T) {
 		require.Equal(t, types.ErrKeyNotFound, err)
 
 		mockDynamoDBClient.AssertExpectations(t)
+		mockCall.Unset()
 	})
 }
