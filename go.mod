@@ -31,7 +31,7 @@ require (
 	github.com/storacha/go-metadata v0.0.0-20241031171938-8f3343b7ce5a
 	github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb
 	github.com/storacha/ipni-publisher v0.0.0-20241112152400-07a540928427
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.4
 )
 
@@ -105,6 +105,7 @@ require (
 	github.com/polydawn/refmt v0.89.1-0.20231129105047-37766d95467a // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/ucan-wg/go-ucan v0.0.0-20240916120445-37f52863156c // indirect
 	github.com/whyrusleeping/cbor-gen v0.1.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect

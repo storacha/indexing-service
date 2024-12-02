@@ -3,12 +3,13 @@ package providerindex
 import (
 	"context"
 
+	"github.com/storacha/indexing-service/pkg/types"
+
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/indexing-service/pkg/types"
 )
 
 // LegacyClaimsFinder is a read-only interface to find claims on a legacy system
