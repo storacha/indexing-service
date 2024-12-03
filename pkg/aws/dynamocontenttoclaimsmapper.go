@@ -35,7 +35,7 @@ type contentClaimItem struct {
 
 // GetClaim returns claim CIDs for a given content hash. Implements ContentToClaimMapper
 func (dm DynamoContentToClaimsMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
-	hash, err := attributevalue.Marshal(contentHash)
+	hash, err := attributevalue.Marshal(contentHash.B58String())
 	if err != nil {
 		return nil, err
 	}
