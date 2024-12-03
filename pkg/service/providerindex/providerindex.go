@@ -81,7 +81,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	var results []model.ProviderResult
 
 	legacyRes, err := pi.legacyClaims.Find(ctx, mh)
-	if err == nil && len(legacyRes) > 0 {
+	if err == nil {
 		results = legacyRes
 	} else {
 		findRes, err := pi.findClient.Find(ctx, mh)
