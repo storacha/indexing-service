@@ -10,7 +10,7 @@ import (
 
 type Finder interface {
 	// Find and retrieve a claim via URL.
-	Find(ctx context.Context, claim ipld.Link, fetchURL url.URL) (delegation.Delegation, error)
+	Find(ctx context.Context, claim ipld.Link, fetchURL *url.URL) (delegation.Delegation, error)
 }
 
 type Service interface {
@@ -19,7 +19,7 @@ type Service interface {
 	// Find attempts to read the claim from the cache, falling back to retrieving
 	// it from storage and finally, if still not found, fetching it from the
 	// provided URL. The result is stored in the cache.
-	Find(ctx context.Context, claim ipld.Link, fetchURL url.URL) (delegation.Delegation, error)
+	Find(ctx context.Context, claim ipld.Link, fetchURL *url.URL) (delegation.Delegation, error)
 	// Cache writes the claim to the cache with default expiry.
 	Cache(ctx context.Context, claim delegation.Delegation) error
 	// Publish writes the claim to the cache, and adds it to storage.

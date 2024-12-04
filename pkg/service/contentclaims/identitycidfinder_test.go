@@ -74,7 +74,7 @@ func TestIdentityCidFinder__Find(t *testing.T) {
 			// Create ClaimLookup instance
 			cl := contentclaims.WithIdentityCids(finder)
 
-			claim, err := cl.Find(context.Background(), tc.claimCid, *testutil.TestURL)
+			claim, err := cl.Find(context.Background(), tc.claimCid, testutil.TestURL)
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {

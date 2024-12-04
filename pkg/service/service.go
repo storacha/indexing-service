@@ -140,7 +140,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			if err != nil {
 				return err
 			}
-			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, *url)
+			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, url)
 			if err != nil {
 				return err
 			}
@@ -190,7 +190,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					if err != nil {
 						return err
 					}
-					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, *url, typedProtocol.Range)
+					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
 					if err != nil {
 						return err
 					}
@@ -556,7 +556,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 			return
 		}
 
-		dlg, err := claims.Find(ctx, cidlink.Link{Cid: lcmeta.Claim}, *claimURL)
+		dlg, err := claims.Find(ctx, cidlink.Link{Cid: lcmeta.Claim}, claimURL)
 		if err != nil {
 			validateErr = err
 			return
@@ -570,7 +570,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 	}()
 
 	// Note: the ContextID here is of a location commitment provider
-	idx, err := blobIndex.Find(ctx, result.ContextID, result, *blobURL, lcmeta.Range)
+	idx, err := blobIndex.Find(ctx, result.ContextID, result, blobURL, lcmeta.Range)
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
 	}

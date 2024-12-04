@@ -76,7 +76,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 	results := []model.ProviderResult{}
 
 	for _, claimCid := range claimsCids {
-		claim, err := ls.claimsStore.Find(ctx, cidlink.Link{Cid: claimCid}, url.URL{})
+		claim, err := ls.claimsStore.Find(ctx, cidlink.Link{Cid: claimCid}, &url.URL{})
 		if err != nil {
 			if errors.Is(err, types.ErrKeyNotFound) {
 				continue

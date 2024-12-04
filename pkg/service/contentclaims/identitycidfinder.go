@@ -22,7 +22,7 @@ func WithIdentityCids(finder Finder) Finder {
 }
 
 // Find attempts to fetch a claim from either the permenant storage or via the provided URL
-func (idf *identityCidFinder) Find(ctx context.Context, id ipld.Link, fetchURL url.URL) (delegation.Delegation, error) {
+func (idf *identityCidFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL) (delegation.Delegation, error) {
 
 	if cidLink, ok := id.(cidlink.Link); ok {
 		if cidLink.Cid.Prefix().MhType == multihash.IDENTITY {

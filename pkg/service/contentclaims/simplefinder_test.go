@@ -57,7 +57,7 @@ func TestSimpleFinder__Find(t *testing.T) {
 			defer func() { testServer.Close() }()
 			// Create ClaimLookup instance
 			cl := contentclaims.NewSimpleFinder(testServer.Client())
-			claim, err := cl.Find(context.Background(), claim.Link(), *testutil.Must(url.Parse(testServer.URL))(t))
+			claim, err := cl.Find(context.Background(), claim.Link(), testutil.Must(url.Parse(testServer.URL))(t))
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, strings.ReplaceAll(tc.expectedErr.Error(), "{url}", testServer.URL))
 			} else {

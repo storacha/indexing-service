@@ -18,5 +18,5 @@ type BlobIndexLookup interface {
 	// 3. return the index
 	// 4. asyncronously, add records to the ProviderStore from the parsed blob index so that we can avoid future queries to IPNI for
 	// other multihashes in the index
-	Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error)
+	Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL *url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error)
 }
