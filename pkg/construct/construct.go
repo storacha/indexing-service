@@ -77,6 +77,7 @@ type config struct {
 	providersClient  redis.Client
 	claimsClient     redis.Client
 	indexesClient    redis.Client
+	legacyClaims     providerindex.LegacyClaimsFinder
 }
 
 // Option configures how the node is construct
@@ -174,6 +175,14 @@ func WithClaimsClient(client redis.Client) Option {
 func WithIndexesClient(client redis.Client) Option {
 	return func(cfg *config) error {
 		cfg.indexesClient = client
+		return nil
+	}
+}
+
+// WithLegacyClaims uses the given LegacyClaimsFinder to find claims on legacy systems and storage
+func WithLegacyClaims(legacyClaims providerindex.LegacyClaimsFinder) Option {
+	return func(cfg *config) error {
+		cfg.legacyClaims = legacyClaims
 		return nil
 	}
 }
@@ -323,8 +332,12 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	}
 
 	// build read through fetchers
-	// TODO: add sender / publisher / linksystem / legacy systems
-	providerIndex := providerindex.New(providersCache, findClient, publisher, nil)
+	// TODO: add sender / publisher / linksystem
+	legacyClaims := cfg.legacyClaims
+	if legacyClaims == nil {
+		legacyClaims = providerindex.NewNotFoundLegacyClaimsFinder()
+	}
+	providerIndex := providerindex.New(providersCache, findClient, publisher, legacyClaims)
 
 	claimsStore := cfg.claimsStore
 	if claimsStore == nil {

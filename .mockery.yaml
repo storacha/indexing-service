@@ -1,0 +1,17 @@
+issue-845-fix: True
+resolve-type-alias: False
+with-expecter: True
+filename: 'mock_{{.InterfaceName}}.go'
+dir: 'pkg/internal/testutil/mocks'
+mockname: 'Mock{{.InterfaceName}}'
+outpkg: 'mocks'
+packages:
+  github.com/storacha/indexing-service/pkg/service/providerindex:
+    interfaces:
+      ContentToClaimsMapper:
+  github.com/storacha/indexing-service/pkg/types:
+    interfaces:
+      ContentClaimsStore:
+  github.com/aws/aws-sdk-go-v2/service/dynamodb:
+    interfaces:
+      QueryAPIClient:

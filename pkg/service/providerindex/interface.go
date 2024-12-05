@@ -10,7 +10,7 @@ import (
 	"github.com/multiformats/go-multihash"
 )
 
-// ProviderIndex is a read/write interface to a local cache of providers that falls back to IPNI
+// ProviderIndex is a read/write interface to a local cache of providers that falls back to legacy systems and IPNI
 type ProviderIndex interface {
 	// Find should do the following
 	//  1. Read from the IPNI Storage cache to get a list of providers

@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/redis/go-redis/v9"
@@ -20,6 +21,7 @@ import (
 	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
+	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
 )
@@ -39,16 +41,18 @@ func mustGetEnv(envVar string) string {
 type Config struct {
 	construct.ServiceConfig
 	aws.Config
-	SQSCachingQueueURL  string
-	CachingBucket       string
-	ChunkLinksTableName string
-	MetadataTableName   string
-	IPNIStoreBucket     string
-	IPNIStorePrefix     string
-	NotifierHeadBucket  string
-	NotifierTopicArn    string
-	ClaimStoreBucket    string
-	ClaimStorePrefix    string
+	SQSCachingQueueURL    string
+	CachingBucket         string
+	ChunkLinksTableName   string
+	MetadataTableName     string
+	IPNIStoreBucket       string
+	IPNIStorePrefix       string
+	NotifierHeadBucket    string
+	NotifierTopicArn      string
+	ClaimStoreBucket      string
+	ClaimStorePrefix      string
+	LegacyClaimsTableName string
+	LegacyClaimsBucket    string
 	principal.Signer
 }
 
@@ -127,16 +131,18 @@ func FromEnv(ctx context.Context) Config {
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
 			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
 		},
-		SQSCachingQueueURL:  mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
-		CachingBucket:       mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
-		ChunkLinksTableName: mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
-		MetadataTableName:   mustGetEnv("METADATA_TABLE_NAME"),
-		IPNIStoreBucket:     mustGetEnv("IPNI_STORE_BUCKET_NAME"),
-		IPNIStorePrefix:     ipniStoreKeyPrefix,
-		NotifierHeadBucket:  mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
-		NotifierTopicArn:    mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
-		ClaimStoreBucket:    mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
-		ClaimStorePrefix:    os.Getenv("CLAIM_STORE_KEY_REFIX"),
+		SQSCachingQueueURL:    mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
+		CachingBucket:         mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
+		ChunkLinksTableName:   mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
+		MetadataTableName:     mustGetEnv("METADATA_TABLE_NAME"),
+		IPNIStoreBucket:       mustGetEnv("IPNI_STORE_BUCKET_NAME"),
+		IPNIStorePrefix:       ipniStoreKeyPrefix,
+		NotifierHeadBucket:    mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
+		NotifierTopicArn:      mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
+		ClaimStoreBucket:      mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
+		ClaimStorePrefix:      os.Getenv("CLAIM_STORE_KEY_REFIX"),
+		LegacyClaimsTableName: mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
+		LegacyClaimsBucket:    mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
 	}
 }
 
@@ -148,6 +154,9 @@ func Construct(cfg Config) (types.Service, error) {
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
+	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName)
+	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
+	legacyClaims := providerindex.NewLegacyClaimsStore(legacyClaimsMapper, legacyClaimsBucket)
 	return construct.Construct(
 		cfg.ServiceConfig,
 		construct.SkipNotification(),
@@ -155,5 +164,6 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
+		construct.WithLegacyClaims(legacyClaims),
 	)
 }
