@@ -78,20 +78,13 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 		return nil, err
 	}
 
+	findRes, err := pi.findClient.Find(ctx, mh)
+	if err != nil {
+		return nil, err
+	}
 	var results []model.ProviderResult
-
-	legacyRes, err := pi.legacyClaims.Find(ctx, mh)
-	if err == nil {
-		results = legacyRes
-	} else {
-		findRes, err := pi.findClient.Find(ctx, mh)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, mhres := range findRes.MultihashResults {
-			results = append(results, mhres.ProviderResults...)
-		}
+	for _, mhres := range findRes.MultihashResults {
+		results = append(results, mhres.ProviderResults...)
 	}
 
 	err = pi.providerStore.Set(ctx, mh, results, true)
