@@ -2,12 +2,21 @@ package providerindex
 
 import (
 	"context"
+	"fmt"
+	"net/url"
+	"strings"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/storacha/go-capabilities/pkg/assert"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/types"
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/ipni/go-libipni/maurl"
+	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
 )
@@ -51,7 +60,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 			return nil, err
 		}
 
-		pr, err := synthetizeProviderResult(claim)
+		pr, err := ls.synthetizeProviderResult(claimCid, claim)
 		if err != nil {
 			return nil, err
 		}
@@ -63,9 +72,150 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 }
 
 // synthetizeProviderResult synthetizes a provider result, including metadata, from a given claim
-func synthetizeProviderResult(_ delegation.Delegation) (model.ProviderResult, error) {
-	// TODO: implement
-	return model.ProviderResult{}, nil
+func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegation.Delegation) (model.ProviderResult, error) {
+	expiration := int64(0)
+	if claim.Expiration() != nil {
+		expiration = int64(*claim.Expiration())
+	}
+
+	if len(claim.Capabilities()) != 1 {
+		return model.ProviderResult{}, fmt.Errorf("claim %s has an unexpected number of capabilities (%d)", claimCid, len(claim.Capabilities()))
+	}
+
+	cap := claim.Capabilities()[0]
+	switch cap.Can() {
+	case assert.LocationAbility:
+		return ls.synthetizeLocationProviderResult(cap.Nb().(assert.LocationCaveats), claimCid, expiration)
+	case assert.IndexAbility:
+		return ls.synthetizeIndexProviderResult(cap.Nb().(assert.IndexCaveats), claimCid, expiration)
+	case assert.EqualsAbility:
+		return ls.synthetizeEqualsProviderResult(cap.Nb().(assert.EqualsCaveats), claimCid, expiration)
+	default:
+		return model.ProviderResult{}, fmt.Errorf("unknown claim type: %T", claim.Capabilities()[0])
+	}
+}
+
+func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.LocationCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
+	spaceDid := caveats.Space
+	contextID, err := types.ContextID{
+		Hash:  caveats.Content.Hash(),
+		Space: &spaceDid,
+	}.ToEncoded()
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+
+	contentCid := cid.NewCidV1(uint64(multicodec.Car), caveats.Content.Hash())
+	var rng metadata.Range
+	if caveats.Range != nil {
+		rng = metadata.Range{
+			Offset: caveats.Range.Offset,
+			Length: caveats.Range.Length,
+		}
+	}
+	meta := metadata.LocationCommitmentMetadata{
+		Shard:      &contentCid,
+		Range:      &rng,
+		Expiration: expiration,
+		Claim:      claimCid,
+	}
+	metaBytes, err := meta.MarshalBinary()
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+
+	providerAddrs := make([]ma.Multiaddr, 0, len(caveats.Location))
+	for _, l := range caveats.Location {
+		// replace actual hashes with the placeholder so that the correct URL is reconstructed for fetching
+		l.Path = strings.ReplaceAll(l.Path, caveats.Content.Hash().B58String(), "{blob}")
+		ma, err := maurl.FromURL(&l)
+		if err != nil {
+			return model.ProviderResult{}, err
+		}
+
+		providerAddrs = append(providerAddrs, ma)
+	}
+
+	providerAddrInfo := &peer.AddrInfo{
+		ID:    "",
+		Addrs: providerAddrs,
+	}
+
+	return model.ProviderResult{
+		ContextID: contextID,
+		Metadata:  metaBytes,
+		Provider:  providerAddrInfo,
+	}, nil
+}
+
+func (ls LegacyClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
+	indexCid := caveats.Index.(cidlink.Link).Cid
+	contextID := []byte(caveats.Index.Binary())
+
+	meta := metadata.IndexClaimMetadata{
+		Index:      indexCid,
+		Expiration: int64(expiration),
+		Claim:      claimCid,
+	}
+	metaBytes, err := meta.MarshalBinary()
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+
+	// the index claim is fetchable from the legacy claims store
+	legacyClaimsUrl, err := url.Parse(fmt.Sprintf("/{claim}/{claim}"))
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+	providerAddr, err := maurl.FromURL(legacyClaimsUrl)
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+	providerAddrInfo := &peer.AddrInfo{
+		ID:    "",
+		Addrs: []ma.Multiaddr{providerAddr},
+	}
+
+	return model.ProviderResult{
+		ContextID: contextID,
+		Metadata:  metaBytes,
+		Provider:  providerAddrInfo,
+	}, nil
+}
+
+func (ls LegacyClaimsStore) synthetizeEqualsProviderResult(caveats assert.EqualsCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
+	equalsCid := caveats.Equals.(cidlink.Link).Cid
+	contextID := []byte(caveats.Equals.Binary())
+
+	meta := metadata.EqualsClaimMetadata{
+		Equals:     equalsCid,
+		Expiration: int64(expiration),
+		Claim:      claimCid,
+	}
+	metaBytes, err := meta.MarshalBinary()
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+
+	// the equals claim is fetchable from the legacy claims store
+	legacyClaimsUrl, err := url.Parse(fmt.Sprintf("/{claim}/{claim}"))
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+	providerAddr, err := maurl.FromURL(legacyClaimsUrl)
+	if err != nil {
+		return model.ProviderResult{}, err
+	}
+	providerAddrInfo := &peer.AddrInfo{
+		ID:    "",
+		Addrs: []ma.Multiaddr{providerAddr},
+	}
+
+	return model.ProviderResult{
+		ContextID: contextID,
+		Metadata:  metaBytes,
+		Provider:  providerAddrInfo,
+	}, nil
 }
 
 // NotFoundLegacyClaimsFinder is a LegacyClaimsFinder that always returns ErrKeyNotFound. It can be used when accessing
