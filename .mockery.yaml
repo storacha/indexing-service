@@ -11,7 +11,7 @@ packages:
       ContentToClaimsMapper:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
-      Store:
+      ContentClaimsStore:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
     interfaces:
       QueryAPIClient:

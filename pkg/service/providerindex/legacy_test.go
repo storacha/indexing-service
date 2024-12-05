@@ -17,7 +17,6 @@ import (
 	"github.com/storacha/go-capabilities/pkg/assert"
 	adm "github.com/storacha/go-capabilities/pkg/assert/datamodel"
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,7 +25,7 @@ import (
 func TestFind(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockStore[ipld.Link, delegation.Delegation](t)
+		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore)
 
 		contentCID := testutil.RandomCID()
@@ -58,9 +57,9 @@ func TestFind(t *testing.T) {
 
 		ctx := context.Background()
 
-		mockMapper.On("GetClaims", ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
-		mockStore.On("Get", ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
-		mockStore.On("Get", ctx, cidlink.Link{Cid: indexDelegationCid}).Return(indexDelegation, nil)
+		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
+		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: indexDelegationCid}).Return(indexDelegation, nil)
 
 		results, err := legacyClaims.Find(ctx, contentHash)
 
@@ -71,41 +70,32 @@ func TestFind(t *testing.T) {
 		expectedLocationResult := model.ProviderResult{}
 		expectedIndexResult := model.ProviderResult{}
 		require.Equal(t, []model.ProviderResult{expectedLocationResult, expectedIndexResult}, results)
-
-		mockMapper.AssertExpectations(t)
-		mockStore.AssertExpectations(t)
 	})
 
 	t.Run("returns ErrKeyNotFound when the content hash is not found in the mapper", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockStore[ipld.Link, delegation.Delegation](t)
+		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore)
 
-		mockMapper.On("GetClaims", mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
+		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 
 		_, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
 
 		require.Equal(t, types.ErrKeyNotFound, err)
-
-		mockMapper.AssertExpectations(t)
-		mockStore.AssertExpectations(t)
 	})
 
 	t.Run("returns ErrKeyNotFound when claims are not found in the store", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockStore[ipld.Link, delegation.Delegation](t)
+		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore)
 
 		testCID := testutil.RandomCID().(cidlink.Link).Cid
 
-		mockMapper.On("GetClaims", mock.Anything, mock.Anything).Return([]cid.Cid{testCID}, nil)
-		mockStore.On("Get", mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
+		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return([]cid.Cid{testCID}, nil)
+		mockStore.EXPECT().Get(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 
 		_, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
 
 		require.Equal(t, types.ErrKeyNotFound, err)
-
-		mockMapper.AssertExpectations(t)
-		mockStore.AssertExpectations(t)
 	})
 }
