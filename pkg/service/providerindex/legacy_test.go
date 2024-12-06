@@ -26,7 +26,7 @@ func TestFind(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore)
+		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore, "")
 
 		contentCID := testutil.RandomCID()
 		contentHash := contentCID.(cidlink.Link).Hash()
@@ -75,7 +75,7 @@ func TestFind(t *testing.T) {
 	t.Run("returns ErrKeyNotFound when the content hash is not found in the mapper", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore)
+		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore, "")
 
 		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 
@@ -87,7 +87,7 @@ func TestFind(t *testing.T) {
 	t.Run("returns ErrKeyNotFound when claims are not found in the store", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore)
+		legacyClaims := NewLegacyClaimsStore(mockMapper, mockStore, "")
 
 		testCID := testutil.RandomCID().(cidlink.Link).Cid
 

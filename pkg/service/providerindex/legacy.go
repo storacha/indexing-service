@@ -30,6 +30,7 @@ type LegacyClaimsFinder interface {
 type LegacyClaimsStore struct {
 	contentToClaims ContentToClaimsMapper
 	claimsStore     types.ContentClaimsStore
+	claimsUrl       string
 }
 
 // ContentToClaimsMapper maps content hashes to claim cids
@@ -37,10 +38,11 @@ type ContentToClaimsMapper interface {
 	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
-func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore) LegacyClaimsStore {
+func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore, claimsUrl string) LegacyClaimsStore {
 	return LegacyClaimsStore{
 		contentToClaims: contentToClaimsMapper,
 		claimsStore:     claimStore,
+		claimsUrl:       claimsUrl,
 	}
 }
 
@@ -126,7 +128,8 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 
 	providerAddrs := make([]ma.Multiaddr, 0, len(caveats.Location))
 	for _, l := range caveats.Location {
-		// replace actual hashes with the placeholder so that the correct URL is reconstructed for fetching
+		// generalize the location URL by replacing actual hashes with the placeholder.
+		// That will allow the correct URL to be reconstructed for fetching
 		l.Path = strings.ReplaceAll(l.Path, caveats.Content.Hash().B58String(), "{blob}")
 		ma, err := maurl.FromURL(&l)
 		if err != nil {
@@ -163,7 +166,7 @@ func (ls LegacyClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCa
 	}
 
 	// the index claim is fetchable from the legacy claims store
-	legacyClaimsUrl, err := url.Parse(fmt.Sprintf("/{claim}/{claim}"))
+	legacyClaimsUrl, err := url.Parse(ls.claimsUrl)
 	if err != nil {
 		return model.ProviderResult{}, err
 	}
@@ -198,7 +201,7 @@ func (ls LegacyClaimsStore) synthetizeEqualsProviderResult(caveats assert.Equals
 	}
 
 	// the equals claim is fetchable from the legacy claims store
-	legacyClaimsUrl, err := url.Parse(fmt.Sprintf("/{claim}/{claim}"))
+	legacyClaimsUrl, err := url.Parse(ls.claimsUrl)
 	if err != nil {
 		return model.ProviderResult{}, err
 	}
