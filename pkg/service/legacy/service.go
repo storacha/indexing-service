@@ -57,7 +57,7 @@ func (l *IndexingService) Query(ctx context.Context, q types.Query) (types.Query
 
 	// lets see if we can materialize some location claims
 	content := assert.FromHash(q.Hashes[0])
-	records, err := l.blockIndexStore.Query(content.Hash())
+	records, err := l.blockIndexStore.Query(ctx, content.Hash())
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ type BlockIndexRecord struct {
 }
 
 type BlockIndexStore interface {
-	Query(digest multihash.Multihash) ([]BlockIndexRecord, error)
+	Query(ctx context.Context, digest multihash.Multihash) ([]BlockIndexRecord, error)
 }
 
 func NewService(id principal.Signer, indexer types.Service, blockIndexStore BlockIndexStore, bucketURL url.URL) *IndexingService {
