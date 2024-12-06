@@ -16,7 +16,6 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/ipni/go-libipni/maurl"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
 )
@@ -87,11 +86,26 @@ func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim del
 	cap := claim.Capabilities()[0]
 	switch cap.Can() {
 	case assert.LocationAbility:
-		return ls.synthetizeLocationProviderResult(cap.Nb().(assert.LocationCaveats), claimCid, expiration)
+		caveats, err := assert.LocationCaveatsReader.Read(cap.Nb())
+		if err != nil {
+			return model.ProviderResult{}, err
+		}
+		return ls.synthetizeLocationProviderResult(caveats, claimCid, expiration)
+
 	case assert.IndexAbility:
-		return ls.synthetizeIndexProviderResult(cap.Nb().(assert.IndexCaveats), claimCid, expiration)
+		caveats, err := assert.IndexCaveatsReader.Read(cap.Nb())
+		if err != nil {
+			return model.ProviderResult{}, err
+		}
+		return ls.synthetizeIndexProviderResult(caveats, claimCid, expiration)
+
 	case assert.EqualsAbility:
-		return ls.synthetizeEqualsProviderResult(cap.Nb().(assert.EqualsCaveats), claimCid, expiration)
+		caveats, err := assert.EqualsCaveatsReader.Read(cap.Nb())
+		if err != nil {
+			return model.ProviderResult{}, err
+		}
+		return ls.synthetizeEqualsProviderResult(caveats, claimCid, expiration)
+
 	default:
 		return model.ProviderResult{}, fmt.Errorf("unknown claim type: %T", claim.Capabilities()[0])
 	}
@@ -107,17 +121,17 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 		return model.ProviderResult{}, err
 	}
 
-	contentCid := cid.NewCidV1(uint64(multicodec.Car), caveats.Content.Hash())
-	var rng metadata.Range
+	contentCid := cid.NewCidV1(cid.Raw, caveats.Content.Hash())
+	var rng *metadata.Range
 	if caveats.Range != nil {
-		rng = metadata.Range{
+		rng = &metadata.Range{
 			Offset: caveats.Range.Offset,
 			Length: caveats.Range.Length,
 		}
 	}
 	meta := metadata.LocationCommitmentMetadata{
 		Shard:      &contentCid,
-		Range:      &rng,
+		Range:      rng,
 		Expiration: expiration,
 		Claim:      claimCid,
 	}
