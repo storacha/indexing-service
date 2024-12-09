@@ -28,6 +28,10 @@ import (
 )
 
 func TestDynamoProviderBlockIndexTable(t *testing.T) {
+	if os.Getenv("CI") != "" && runtime.GOOS != "linux" {
+		t.SkipNow()
+	}
+
 	ctx := context.Background()
 	endpoint := createDynamo(t)
 	dynamoClient := newDynamoClient(t, endpoint)
@@ -35,16 +39,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 	tableName := "blocks-cars-position-" + uuid.NewString()
 	createTable(t, dynamoClient, tableName)
 
-	maybeSkip := func(f func(t *testing.T)) func(t *testing.T) {
-		return func(t *testing.T) {
-			if os.Getenv("CI") != "" && runtime.GOOS != "linux" {
-				t.SkipNow()
-			}
-			f(t)
-		}
-	}
-
-	t.Run("query existing item", maybeSkip(func(t *testing.T) {
+	t.Run("query existing item", func(t *testing.T) {
 		digest := testutil.RandomMultihash()
 		path := fmt.Sprintf("http://test.example.com/%s.blob", digestutil.Format(digest))
 		offset := rand.IntN(1024 * 1024 * 128)
@@ -69,9 +64,9 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 		require.Equal(t, path, results[0].CarPath)
 		require.Equal(t, uint64(offset), results[0].Offset)
 		require.Equal(t, uint64(length), results[0].Length)
-	}))
+	})
 
-	t.Run("query multiple existing items for same digest", maybeSkip(func(t *testing.T) {
+	t.Run("query multiple existing items for same digest", func(t *testing.T) {
 		root := testutil.RandomCID()
 		digest := link.ToCID(root).Hash()
 
@@ -116,15 +111,15 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 				return r.CarPath == i.path && r.Offset == uint64(i.offset) && r.Length == uint64(i.length)
 			}))
 		}
-	}))
+	})
 
-	t.Run("query not found", maybeSkip(func(t *testing.T) {
+	t.Run("query not found", func(t *testing.T) {
 		digest := testutil.RandomMultihash()
 		store := NewDynamoProviderBlockIndexTable(dynamoClient, tableName)
 		_, err := store.Query(ctx, digest)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, istypes.ErrKeyNotFound))
-	}))
+	})
 }
 
 func createDynamo(t *testing.T) url.URL {
