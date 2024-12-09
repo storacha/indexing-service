@@ -55,46 +55,42 @@ func (l *IndexingService) Query(ctx context.Context, q types.Query) (types.Query
 		return results, nil
 	}
 
-	// lets see if we can materialize some location claims
-	content := assert.FromHash(q.Hashes[0])
-	records, err := l.blockIndexStore.Query(ctx, content.Hash())
-	if err != nil {
-		return nil, err
-	}
-
 	var locs []assert.LocationCaveats
-	var derivedLocs []assert.LocationCaveats
-	for _, r := range records {
-		u, err := url.Parse(r.CarPath)
+	for _, h := range q.Hashes {
+		// lets see if we can materialize some location claims
+		content := assert.FromHash(h)
+		records, err := l.blockIndexStore.Query(ctx, content.Hash())
 		if err != nil {
-			// non-URL is legacy region/bucket/key format
-			// e.g. us-west-2/dotstorage-prod-1/raw/bafy...
-			parts := strings.Split(r.CarPath, "/")
-			key := strings.Join(parts[2:], "/")
-			shard, err := bucketKeyToShardLink(key)
-			if err != nil {
+			return nil, err
+		}
+
+		for _, r := range records {
+			u, err := url.Parse(r.CarPath)
+			if err != nil || !isAbsoluteURL(*u) {
+				// non-URL is legacy region/bucket/key format
+				// e.g. us-west-2/dotstorage-prod-1/raw/bafy...
+				parts := strings.Split(r.CarPath, "/")
+				key := strings.Join(parts[2:], "/")
+				shard, err := bucketKeyToShardLink(key)
+				if err != nil {
+					continue
+				}
+
+				u = l.bucketURL.JoinPath(fmt.Sprintf("/%s/%s.car", shard.String(), shard.String()))
+				locs = append(locs, assert.LocationCaveats{
+					Content:  content,
+					Location: []url.URL{*u},
+					Range:    &assert.Range{Offset: r.Offset, Length: &r.Length},
+				})
 				continue
 			}
 
-			u = l.bucketURL.JoinPath(fmt.Sprintf("/%s/%s.car", shard.String(), shard.String()))
-			derivedLocs = append(derivedLocs, assert.LocationCaveats{
+			locs = append(locs, assert.LocationCaveats{
 				Content:  content,
 				Location: []url.URL{*u},
 				Range:    &assert.Range{Offset: r.Offset, Length: &r.Length},
 			})
-			continue
 		}
-
-		locs = append(locs, assert.LocationCaveats{
-			Content:  content,
-			Location: []url.URL{*u},
-			Range:    &assert.Range{Offset: r.Offset, Length: &r.Length},
-		})
-	}
-
-	// prefer items with non derived location URLs
-	if len(locs) == 0 {
-		locs = derivedLocs
 	}
 
 	claims := map[cid.Cid]delegation.Delegation{}
@@ -155,4 +151,8 @@ func bucketKeyToShardLink(key string) (ipld.Link, error) {
 		return nil, errors.New("not a CAR CID")
 	}
 	return cidlink.Link{Cid: shard}, nil
+}
+
+func isAbsoluteURL(u url.URL) bool {
+	return u.Scheme != "" && u.Host != ""
 }

@@ -32,12 +32,7 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 	}
 
 	keyEx := expression.Key("multihash").Equal(expression.Value(digestAttr))
-	proj := expression.NamesList(
-		expression.Name("carpath"),
-		expression.Name("offset"),
-		expression.Name("length"),
-	)
-	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).WithProjection(proj).Build()
+	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).Build()
 	if err != nil {
 		return nil, err
 	}
