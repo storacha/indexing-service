@@ -15,7 +15,6 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/maurl"
-	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
 	adm "github.com/storacha/go-capabilities/pkg/assert/datamodel"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -93,14 +92,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 			Space:    spaceDID,
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.LocationCaveats]{locationClaim}))(t)
-		locationDelegationCid := testutil.Must(cid.Prefix{
-			Version:  1,
-			Codec:    cid.Raw,
-			MhType:   mh.SHA2_256,
-			MhLength: -1,
-		}.Sum(testutil.Must(io.ReadAll(delegation.Archive(locationDelegation)))(t)))(t)
 
-		result, err := legacyClaims.synthetizeProviderResult(locationDelegationCid, locationDelegation)
+		result, err := legacyClaims.synthetizeProviderResult(locationDelegation)
 
 		require.NoError(t, err)
 
@@ -116,7 +109,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		require.Equal(t, contentCid, *locMeta.Shard)
 		require.Nil(t, locMeta.Range)
 		require.Equal(t, int64(*locationDelegation.Expiration()), locMeta.Expiration)
-		require.Equal(t, locationDelegationCid, locMeta.Claim)
+		require.Equal(t, locationDelegation.Link().(cidlink.Link).Cid, locMeta.Claim)
 
 		blobUrl := testutil.Must(url.Parse("https://storacha.network/blobs/{blob}"))(t)
 		blobProviderAddr := testutil.Must(maurl.FromURL(blobUrl))(t)
@@ -137,14 +130,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 			Index:   indexLink,
 		})
 		indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.IndexCaveats]{indexClaim}))(t)
-		indexDelegationCid := testutil.Must(cid.Prefix{
-			Version:  1,
-			Codec:    cid.Raw,
-			MhType:   mh.SHA2_256,
-			MhLength: -1,
-		}.Sum(testutil.Must(io.ReadAll(delegation.Archive(indexDelegation)))(t)))(t)
 
-		result, err := legacyClaims.synthetizeProviderResult(indexDelegationCid, indexDelegation)
+		result, err := legacyClaims.synthetizeProviderResult(indexDelegation)
 
 		require.NoError(t, err)
 
@@ -156,7 +143,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		indexMeta := md.Get(metadata.IndexClaimID).(*metadata.IndexClaimMetadata)
 		require.Equal(t, indexCid, indexMeta.Index)
 		require.Equal(t, int64(*indexDelegation.Expiration()), indexMeta.Expiration)
-		require.Equal(t, indexDelegationCid, indexMeta.Claim)
+		require.Equal(t, indexDelegation.Link().(cidlink.Link).Cid, indexMeta.Claim)
 
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)
@@ -179,14 +166,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		})
 
 		equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.EqualsCaveats]{equalsClaim}))(t)
-		equalsDelegationCid := testutil.Must(cid.Prefix{
-			Version:  1,
-			Codec:    cid.Raw,
-			MhType:   mh.SHA2_256,
-			MhLength: -1,
-		}.Sum(testutil.Must(io.ReadAll(delegation.Archive(equalsDelegation)))(t)))(t)
 
-		result, err := legacyClaims.synthetizeProviderResult(equalsDelegationCid, equalsDelegation)
+		result, err := legacyClaims.synthetizeProviderResult(equalsDelegation)
 
 		require.NoError(t, err)
 
@@ -198,7 +179,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		equalsMeta := md.Get(metadata.EqualsClaimID).(*metadata.EqualsClaimMetadata)
 		require.Equal(t, equalsCid, equalsMeta.Equals)
 		require.Equal(t, int64(*equalsDelegation.Expiration()), equalsMeta.Expiration)
-		require.Equal(t, equalsDelegationCid, equalsMeta.Claim)
+		require.Equal(t, equalsDelegation.Link().(cidlink.Link).Cid, equalsMeta.Claim)
 
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)

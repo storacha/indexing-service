@@ -62,7 +62,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 			return nil, err
 		}
 
-		pr, err := ls.synthetizeProviderResult(claimCid, claim)
+		pr, err := ls.synthetizeProviderResult(claim)
 		if err != nil {
 			return nil, err
 		}
@@ -74,11 +74,13 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 }
 
 // synthetizeProviderResult synthetizes a provider result, including metadata, from a given claim
-func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegation.Delegation) (model.ProviderResult, error) {
+func (ls LegacyClaimsStore) synthetizeProviderResult(claim delegation.Delegation) (model.ProviderResult, error) {
 	expiration := int64(0)
 	if claim.Expiration() != nil {
 		expiration = int64(*claim.Expiration())
 	}
+
+	claimCid := claim.Link().(cidlink.Link).Cid
 
 	if len(claim.Capabilities()) != 1 {
 		return model.ProviderResult{}, fmt.Errorf("claim %s has an unexpected number of capabilities (%d)", claimCid, len(claim.Capabilities()))
