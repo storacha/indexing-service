@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
@@ -136,10 +137,20 @@ func createDynamo(t *testing.T) url.URL {
 }
 
 func newDynamoClient(t *testing.T, endpoint url.URL) *dynamodb.Client {
-	cfg, err := config.LoadDefaultConfig(context.Background(), func(o *config.LoadOptions) error {
-		o.Region = "us-east-1"
-		return nil
-	})
+	cfg, err := config.LoadDefaultConfig(
+		context.Background(),
+		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+			Value: aws.Credentials{
+				AccessKeyID:     "DUMMYIDEXAMPLE",
+				SecretAccessKey: "DUMMYEXAMPLEKEY",
+			},
+		}),
+		func(o *config.LoadOptions) error {
+			o.Region = "us-east-1"
+			return nil
+		},
+	)
+
 	require.NoError(t, err)
 	return dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
 		base := endpoint.String()
