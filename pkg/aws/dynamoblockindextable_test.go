@@ -37,7 +37,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 	dynamoClient := newDynamoClient(t, endpoint)
 
 	tableName := "blocks-cars-position-" + uuid.NewString()
-	createTable(t, dynamoClient, tableName)
+	createBlockIndexTable(t, dynamoClient, tableName)
 
 	t.Run("query existing item", func(t *testing.T) {
 		digest := testutil.RandomMultihash()
@@ -164,7 +164,7 @@ func newDynamoClient(t *testing.T, endpoint url.URL) *dynamodb.Client {
 	})
 }
 
-func createTable(t *testing.T, c *dynamodb.Client, tableName string) {
+func createBlockIndexTable(t *testing.T, c *dynamodb.Client, tableName string) {
 	_, err := c.CreateTable(context.Background(), &dynamodb.CreateTableInput{
 		TableName:   aws.String(tableName),
 		BillingMode: types.BillingModePayPerRequest,
