@@ -8,6 +8,7 @@ import (
 
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
+	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil/mocks"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -32,9 +33,9 @@ func TestFind(t *testing.T) {
 		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
 		locationDelegation := testutil.RandomLocationDelegation()
-		locationDelegationCid := testutil.RandomCID().(cidlink.Link).Cid
+		locationDelegationCid := link.ToCID(testutil.RandomCID())
 		indexDelegation := testutil.RandomIndexDelegation()
-		indexDelegationCid := testutil.RandomCID().(cidlink.Link).Cid
+		indexDelegationCid := link.ToCID(testutil.RandomCID())
 
 		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
@@ -64,7 +65,7 @@ func TestFind(t *testing.T) {
 		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
-		testCID := testutil.RandomCID().(cidlink.Link).Cid
+		testCID := link.ToCID(testutil.RandomCID())
 
 		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return([]cid.Cid{testCID}, nil)
 		mockStore.EXPECT().Get(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
@@ -82,8 +83,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		contentLink := testutil.RandomCID()
-		contentCid := contentLink.(cidlink.Link).Cid
-		contentHash := contentLink.(cidlink.Link).Hash()
+		contentCid := link.ToCID(contentLink)
+		contentHash := contentCid.Hash()
 		spaceDID := testutil.RandomPrincipal().DID()
 
 		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
@@ -109,7 +110,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		require.Equal(t, contentCid, *locMeta.Shard)
 		require.Nil(t, locMeta.Range)
 		require.Equal(t, int64(*locationDelegation.Expiration()), locMeta.Expiration)
-		require.Equal(t, locationDelegation.Link().(cidlink.Link).Cid, locMeta.Claim)
+		require.Equal(t, link.ToCID(locationDelegation.Link()), locMeta.Claim)
 
 		blobUrl := testutil.Must(url.Parse("https://storacha.network/blobs/{blob}"))(t)
 		blobProviderAddr := testutil.Must(maurl.FromURL(blobUrl))(t)
@@ -123,7 +124,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 
 		contentLink := testutil.RandomCID()
 		indexLink := testutil.RandomCID()
-		indexCid := indexLink.(cidlink.Link).Cid
+		indexCid := link.ToCID(indexLink)
 
 		indexClaim := assert.Index.New(testutil.Service.DID().String(), assert.IndexCaveats{
 			Content: contentLink,
@@ -143,7 +144,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		indexMeta := md.Get(metadata.IndexClaimID).(*metadata.IndexClaimMetadata)
 		require.Equal(t, indexCid, indexMeta.Index)
 		require.Equal(t, int64(*indexDelegation.Expiration()), indexMeta.Expiration)
-		require.Equal(t, indexDelegation.Link().(cidlink.Link).Cid, indexMeta.Claim)
+		require.Equal(t, link.ToCID(indexDelegation.Link()), indexMeta.Claim)
 
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)
@@ -155,10 +156,9 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
-		contentLink := testutil.RandomCID()
-		contentHash := contentLink.(cidlink.Link).Hash()
+		contentHash := link.ToCID(testutil.RandomCID()).Hash()
 		equalsLink := testutil.RandomCID()
-		equalsCid := equalsLink.(cidlink.Link).Cid
+		equalsCid := link.ToCID(equalsLink)
 
 		equalsClaim := assert.Equals.New(testutil.Service.DID().String(), assert.EqualsCaveats{
 			Content: testutil.Must(assert.Digest(adm.DigestModel{Digest: contentHash}))(t),
@@ -179,7 +179,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		equalsMeta := md.Get(metadata.EqualsClaimID).(*metadata.EqualsClaimMetadata)
 		require.Equal(t, equalsCid, equalsMeta.Equals)
 		require.Equal(t, int64(*equalsDelegation.Expiration()), equalsMeta.Expiration)
-		require.Equal(t, equalsDelegation.Link().(cidlink.Link).Cid, equalsMeta.Claim)
+		require.Equal(t, link.ToCID(equalsDelegation.Link()), equalsMeta.Claim)
 
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)

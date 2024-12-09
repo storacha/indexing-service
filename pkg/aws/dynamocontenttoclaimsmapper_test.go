@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ipfs/go-cid"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil/mocks"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -24,8 +24,8 @@ func TestGetClaims(t *testing.T) {
 		dynamoDBMapper := NewDynamoContentToClaimsMapper(mockDynamoDBClient, testTable)
 
 		contentHash := testutil.RandomMultihash()
-		locationClaimCID := testutil.RandomCID().(cidlink.Link).Cid
-		indexClaimCID := testutil.RandomCID().(cidlink.Link).Cid
+		locationClaimCID := link.ToCID(testutil.RandomCID())
+		indexClaimCID := link.ToCID(testutil.RandomCID())
 
 		locationClaim, err := attributevalue.MarshalMap(contentClaimItem{
 			Content: contentHash.String(),

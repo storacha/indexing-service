@@ -10,6 +10,7 @@ import (
 	"github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
+	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/types"
 
 	"github.com/ipfs/go-cid"
@@ -90,7 +91,7 @@ func (ls LegacyClaimsStore) synthetizeProviderResult(claim delegation.Delegation
 		expiration = int64(*claim.Expiration())
 	}
 
-	claimCid := claim.Link().(cidlink.Link).Cid
+	claimCid := link.ToCID(claim.Link())
 
 	if len(claim.Capabilities()) != 1 {
 		return model.ProviderResult{}, fmt.Errorf("claim %s has an unexpected number of capabilities (%d)", claimCid, len(claim.Capabilities()))
@@ -196,7 +197,7 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 }
 
 func (ls LegacyClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
-	indexCid := caveats.Index.(cidlink.Link).Cid
+	indexCid := link.ToCID(caveats.Index)
 	contextID := []byte(caveats.Index.Binary())
 
 	meta := metadata.IndexClaimMetadata{
@@ -223,7 +224,7 @@ func (ls LegacyClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCa
 }
 
 func (ls LegacyClaimsStore) synthetizeEqualsProviderResult(caveats assert.EqualsCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
-	equalsCid := caveats.Equals.(cidlink.Link).Cid
+	equalsCid := link.ToCID(caveats.Equals)
 	contextID := []byte(caveats.Equals.Binary())
 
 	meta := metadata.EqualsClaimMetadata{
