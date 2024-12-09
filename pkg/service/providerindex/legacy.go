@@ -31,7 +31,7 @@ type LegacyClaimsFinder interface {
 type LegacyClaimsStore struct {
 	contentToClaims ContentToClaimsMapper
 	claimsStore     types.ContentClaimsStore
-	claimsUrl       string
+	claimsAddr      ma.Multiaddr
 }
 
 // ContentToClaimsMapper maps content hashes to claim cids
@@ -39,12 +39,21 @@ type ContentToClaimsMapper interface {
 	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
-func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore, claimsUrl string) LegacyClaimsStore {
+func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore, claimsUrl string) (LegacyClaimsStore, error) {
+	legacyClaimsUrl, err := url.Parse(claimsUrl)
+	if err != nil {
+		return LegacyClaimsStore{}, err
+	}
+	claimsAddr, err := maurl.FromURL(legacyClaimsUrl)
+	if err != nil {
+		return LegacyClaimsStore{}, err
+	}
+
 	return LegacyClaimsStore{
 		contentToClaims: contentToClaimsMapper,
 		claimsStore:     claimStore,
-		claimsUrl:       claimsUrl,
-	}
+		claimsAddr:      claimsAddr,
+	}, nil
 }
 
 // Find looks for the corresponding claims for a given content hash in the mapper and then fetches the claims from the
@@ -158,7 +167,7 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 		return model.ProviderResult{}, err
 	}
 
-	providerAddrs := make([]ma.Multiaddr, 0, len(caveats.Location))
+	providerAddrs := make([]ma.Multiaddr, 0, len(caveats.Location)+1)
 	for _, l := range caveats.Location {
 		// generalize the location URL by replacing actual hashes with the placeholder.
 		// That will allow the correct URL to be reconstructed for fetching
@@ -170,6 +179,9 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 
 		providerAddrs = append(providerAddrs, ma)
 	}
+
+	// the URL to fetch claims from is also needed
+	providerAddrs = append(providerAddrs, ls.claimsAddr)
 
 	providerAddrInfo := &peer.AddrInfo{
 		ID:    "",
@@ -198,17 +210,9 @@ func (ls LegacyClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCa
 	}
 
 	// the index claim is fetchable from the legacy claims store
-	legacyClaimsUrl, err := url.Parse(ls.claimsUrl)
-	if err != nil {
-		return model.ProviderResult{}, err
-	}
-	providerAddr, err := maurl.FromURL(legacyClaimsUrl)
-	if err != nil {
-		return model.ProviderResult{}, err
-	}
 	providerAddrInfo := &peer.AddrInfo{
 		ID:    "",
-		Addrs: []ma.Multiaddr{providerAddr},
+		Addrs: []ma.Multiaddr{ls.claimsAddr},
 	}
 
 	return model.ProviderResult{
@@ -233,17 +237,9 @@ func (ls LegacyClaimsStore) synthetizeEqualsProviderResult(caveats assert.Equals
 	}
 
 	// the equals claim is fetchable from the legacy claims store
-	legacyClaimsUrl, err := url.Parse(ls.claimsUrl)
-	if err != nil {
-		return model.ProviderResult{}, err
-	}
-	providerAddr, err := maurl.FromURL(legacyClaimsUrl)
-	if err != nil {
-		return model.ProviderResult{}, err
-	}
 	providerAddrInfo := &peer.AddrInfo{
 		ID:    "",
-		Addrs: []ma.Multiaddr{providerAddr},
+		Addrs: []ma.Multiaddr{ls.claimsAddr},
 	}
 
 	return model.ProviderResult{
