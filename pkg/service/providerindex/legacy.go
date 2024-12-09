@@ -19,6 +19,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/did"
 )
 
 // LegacyClaimsFinder is a read-only interface to find claims on a legacy system
@@ -115,13 +116,27 @@ func (ls LegacyClaimsStore) synthetizeProviderResult(claim delegation.Delegation
 }
 
 func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.LocationCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
-	spaceDid := caveats.Space
-	contextID, err := types.ContextID{
-		Hash:  caveats.Content.Hash(),
-		Space: &spaceDid,
-	}.ToEncoded()
-	if err != nil {
-		return model.ProviderResult{}, err
+	var encodedCtxID types.EncodedContextID
+	if caveats.Space != did.Undef {
+		spaceDid := caveats.Space
+		contextID, err := types.ContextID{
+			Hash:  caveats.Content.Hash(),
+			Space: &spaceDid,
+		}.ToEncoded()
+		if err != nil {
+			return model.ProviderResult{}, err
+		}
+
+		encodedCtxID = contextID
+	} else {
+		contextID, err := types.ContextID{
+			Hash: caveats.Content.Hash(),
+		}.ToEncoded()
+		if err != nil {
+			return model.ProviderResult{}, err
+		}
+
+		encodedCtxID = contextID
 	}
 
 	contentCid := cid.NewCidV1(cid.Raw, caveats.Content.Hash())
@@ -162,7 +177,7 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 	}
 
 	return model.ProviderResult{
-		ContextID: contextID,
+		ContextID: encodedCtxID,
 		Metadata:  metaBytes,
 		Provider:  providerAddrInfo,
 	}, nil
