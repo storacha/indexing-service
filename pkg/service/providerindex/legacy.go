@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-metadata"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/types"
 
 	"github.com/ipfs/go-cid"
@@ -144,7 +145,7 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 	for _, l := range caveats.Location {
 		// generalize the location URL by replacing actual hashes with the placeholder.
 		// That will allow the correct URL to be reconstructed for fetching
-		l.Path = strings.ReplaceAll(l.Path, caveats.Content.Hash().B58String(), "{blob}")
+		l.Path = strings.ReplaceAll(l.Path, digestutil.Format(caveats.Content.Hash()), "{blob}")
 		ma, err := maurl.FromURL(&l)
 		if err != nil {
 			return model.ProviderResult{}, err

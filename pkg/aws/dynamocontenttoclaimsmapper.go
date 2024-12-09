@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -35,7 +36,7 @@ type contentClaimItem struct {
 
 // GetClaim returns claim CIDs for a given content hash. Implements ContentToClaimMapper
 func (dm DynamoContentToClaimsMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
-	hash, err := attributevalue.Marshal(contentHash.B58String())
+	hash, err := attributevalue.Marshal(digestutil.Format(contentHash))
 	if err != nil {
 		return nil, err
 	}

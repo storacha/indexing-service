@@ -3,11 +3,11 @@ package providerindex
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/url"
 	"testing"
 
 	"github.com/storacha/go-metadata"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil/mocks"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -89,7 +89,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 
 		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
 			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: contentHash}))(t),
-			Location: []url.URL{*testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", contentHash.B58String())))(t)},
+			Location: []url.URL{*testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(contentHash))))(t)},
 			Space:    spaceDID,
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.LocationCaveats]{locationClaim}))(t)
