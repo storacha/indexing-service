@@ -32,6 +32,7 @@ require (
 	github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb
 	github.com/storacha/ipni-publisher v0.0.0-20241112152400-07a540928427
 	github.com/stretchr/testify v1.10.0
+	github.com/testcontainers/testcontainers-go v0.34.0
 	github.com/urfave/cli/v2 v2.27.4
 )
 
@@ -135,7 +136,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/testcontainers/testcontainers-go v0.34.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/ucan-wg/go-ucan v0.0.0-20240916120445-37f52863156c // indirect
