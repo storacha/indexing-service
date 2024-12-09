@@ -31,7 +31,7 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 		return nil, err
 	}
 
-	keyEx := expression.Key("multihash").Equal(expression.Value(digestAttr))
+	keyEx := expression.Key("blockmultihash").Equal(expression.Value(digestAttr))
 	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).Build()
 	if err != nil {
 		return nil, err
