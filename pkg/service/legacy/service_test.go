@@ -132,7 +132,7 @@ func TestLegacyService(t *testing.T) {
 		result, err := queryresult.Build(claims, indexes)
 		require.NoError(t, err)
 
-		mockService := mockIndexingService{result}
+		mockService := mockIndexingService{result, nil}
 		service := NewService(id, &mockService, mockStore, *bucketURL)
 		query := types.Query{Hashes: []multihash.Multihash{digest}}
 
@@ -166,7 +166,7 @@ func TestLegacyService(t *testing.T) {
 		result, err := queryresult.Build(claims, indexes)
 		require.NoError(t, err)
 
-		mockService := mockIndexingService{result}
+		mockService := mockIndexingService{result, nil}
 		service := NewService(id, &mockService, mockStore, *bucketURL)
 		query := types.Query{Hashes: []multihash.Multihash{digest}}
 
@@ -176,27 +176,57 @@ func TestLegacyService(t *testing.T) {
 		require.Equal(t, 1, len(results.Indexes()))
 		require.Equal(t, indexCID.String(), results.Indexes()[0].String())
 	})
+
+	t.Run("calls through to underlying indexing service", func(t *testing.T) {
+		digest := testutil.RandomMultihash()
+		mockStore := newMockBlockIndexStore()
+		mockService := mockIndexingService{nil, errNotImplemented}
+		service := NewService(id, &mockService, mockStore, *bucketURL)
+
+		nb := assert.LocationCaveats{Content: assert.FromHash(digest)}
+		claim, err := assert.Location.Delegate(id, id, id.DID().String(), nb)
+		require.NoError(t, err)
+
+		err = service.Cache(context.Background(), peer.AddrInfo{}, claim)
+		require.True(t, errors.Is(err, errNotImplemented))
+
+		_, err = service.Get(context.Background(), testutil.RandomCID())
+		require.True(t, errors.Is(err, errNotImplemented))
+
+		err = service.Publish(context.Background(), claim)
+		require.True(t, errors.Is(err, errNotImplemented))
+
+		query := types.Query{Hashes: []multihash.Multihash{digest}}
+		_, err = service.Query(context.Background(), query)
+		require.True(t, errors.Is(err, errNotImplemented))
+	})
 }
 
+var errNotImplemented = errors.New("not implemented")
+
 type mockIndexingService struct {
-	result types.QueryResult
+	queryResult types.QueryResult
+	queryError  error
 }
 
 func (is *mockIndexingService) Cache(ctx context.Context, provider peer.AddrInfo, claim delegation.Delegation) error {
-	return errors.New("not implemented")
+	return errNotImplemented
 }
 
 func (is *mockIndexingService) Get(ctx context.Context, claim datamodel.Link) (delegation.Delegation, error) {
-	return nil, errors.New("not implemented")
+	return nil, errNotImplemented
 }
 
 func (is *mockIndexingService) Publish(ctx context.Context, claim delegation.Delegation) error {
-	return errors.New("not implemented")
+	return errNotImplemented
 }
 
 func (is *mockIndexingService) Query(ctx context.Context, q types.Query) (types.QueryResult, error) {
-	if is.result != nil {
-		return is.result, nil
+	if is.queryError != nil {
+		return nil, is.queryError
+	}
+	if is.queryResult != nil {
+		return is.queryResult, nil
 	}
 	claims := map[cid.Cid]delegation.Delegation{}
 	indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](0)
