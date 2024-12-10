@@ -25,19 +25,28 @@ import (
 )
 
 func TestFind(t *testing.T) {
-	t.Run("happy path", func(t *testing.T) {
+	t.Run("happy path, unsupported claims are filtered out", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
+
+		partitionClaim := assert.Partition.New(testutil.Service.DID().String(), assert.PartitionCaveats{
+			Content: assert.FromHash(contentHash),
+			Blocks:  nil,
+			Parts:   nil,
+		})
+		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.PartitionCaveats]{partitionClaim}))(t)
+		partitionDelegationCid := link.ToCID(testutil.RandomCID())
 		locationDelegation := testutil.RandomLocationDelegation()
 		locationDelegationCid := link.ToCID(testutil.RandomCID())
 		indexDelegation := testutil.RandomIndexDelegation()
 		indexDelegationCid := link.ToCID(testutil.RandomCID())
 
-		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
+		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{partitionDelegationCid, locationDelegationCid, indexDelegationCid}, nil)
+		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: partitionDelegationCid}).Return(partitionDelegation, nil)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: indexDelegationCid}).Return(indexDelegation, nil)
 
@@ -45,7 +54,6 @@ func TestFind(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, results, 2)
-
 	})
 
 	t.Run("returns no error, but empty results, when the content hash is not found in the mapper", func(t *testing.T) {
@@ -186,5 +194,25 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)
 		require.Equal(t, claimsProviderAddr, result.Provider.Addrs[0])
+	})
+
+	t.Run("unsupported claim", func(t *testing.T) {
+		mockMapper := mocks.NewMockContentToClaimsMapper(t)
+		mockStore := mocks.NewMockContentClaimsStore(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+
+		contentHash := link.ToCID(testutil.RandomCID()).Hash()
+
+		partitionClaim := assert.Partition.New(testutil.Service.DID().String(), assert.PartitionCaveats{
+			Content: assert.FromHash(contentHash),
+			Blocks:  nil,
+			Parts:   nil,
+		})
+
+		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.PartitionCaveats]{partitionClaim}))(t)
+
+		_, err := legacyClaims.synthetizeProviderResult(partitionDelegation)
+
+		require.ErrorAs(t, err, &errUnsupportedClaimType{})
 	})
 }
