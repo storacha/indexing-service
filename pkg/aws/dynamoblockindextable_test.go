@@ -24,7 +24,7 @@ import (
 	istypes "github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
+	tcdynamodb "github.com/testcontainers/testcontainers-go/modules/dynamodb"
 )
 
 func TestDynamoProviderBlockIndexTable(t *testing.T) {
@@ -124,19 +124,11 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 
 func createDynamo(t *testing.T) *url.URL {
 	ctx := context.Background()
-	req := testcontainers.ContainerRequest{
-		Image:        "amazon/dynamodb-local:latest",
-		ExposedPorts: []string{"8000/tcp"},
-		WaitingFor:   wait.ForExposedPort(),
-	}
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	container, err := tcdynamodb.Run(ctx, "amazon/dynamodb-local:latest")
 	testcontainers.CleanupContainer(t, container)
 	require.NoError(t, err)
 
-	endpoint, err := container.Endpoint(ctx, "")
+	endpoint, err := container.ConnectionString(ctx)
 	require.NoError(t, err)
 
 	return testutil.Must(url.Parse("http://" + endpoint))(t)

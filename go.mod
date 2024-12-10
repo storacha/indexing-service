@@ -34,6 +34,7 @@ require (
 	github.com/storacha/ipni-publisher v0.0.0-20241112152400-07a540928427
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.34.0
+	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.34.0
 	github.com/urfave/cli/v2 v2.27.4
 )
 
