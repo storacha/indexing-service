@@ -2,6 +2,7 @@ package providerindex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -62,6 +63,10 @@ func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStor
 func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
 	claimsCids, err := ls.contentToClaims.GetClaims(ctx, contentHash)
 	if err != nil {
+		if errors.Is(err, types.ErrKeyNotFound) {
+			return []model.ProviderResult{}, nil
+		}
+
 		return nil, err
 	}
 
@@ -70,6 +75,10 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 	for _, claimCid := range claimsCids {
 		claim, err := ls.claimsStore.Get(ctx, cidlink.Link{Cid: claimCid})
 		if err != nil {
+			if errors.Is(err, types.ErrKeyNotFound) {
+				continue
+			}
+
 			return nil, err
 		}
 

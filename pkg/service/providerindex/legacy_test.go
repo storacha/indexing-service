@@ -48,19 +48,20 @@ func TestFind(t *testing.T) {
 
 	})
 
-	t.Run("returns ErrKeyNotFound when the content hash is not found in the mapper", func(t *testing.T) {
+	t.Run("returns no error, but empty results, when the content hash is not found in the mapper", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 
-		_, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
+		results, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
 
-		require.Equal(t, types.ErrKeyNotFound, err)
+		require.NoError(t, err)
+		require.Empty(t, results)
 	})
 
-	t.Run("returns ErrKeyNotFound when claims are not found in the store", func(t *testing.T) {
+	t.Run("returns no error, but empty results, when claims are not found in the store", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
@@ -70,9 +71,10 @@ func TestFind(t *testing.T) {
 		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return([]cid.Cid{testCID}, nil)
 		mockStore.EXPECT().Get(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 
-		_, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
+		results, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
 
-		require.Equal(t, types.ErrKeyNotFound, err)
+		require.NoError(t, err)
+		require.Empty(t, results)
 	})
 }
 

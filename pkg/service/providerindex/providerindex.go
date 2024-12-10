@@ -50,10 +50,10 @@ func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publishe
 
 // Find should do the following
 //  1. Read from the IPNI Storage cache to get a list of providers
-//     a. if there are no records in the cache, attempt to ready claims from legacy systems -- Dynamo tables & content
+//     a. if there are no records in the cache, query IPNI, filtering out any non-content claims metadata
+//     b. if no records are found in IPNI, attempt to ready claims from legacy systems -- Dynamo tables & content
 //     claims storage, synthetically constructing provider results
-//     b. if no records are found in legacy systems, query IPNI, filter out any non-content claims metadata, and store
-//     the resulting records in the cache
+//     c. finally, store the resulting records in the cache
 //  2. With returned provider results, filter additionally for claim type. If space dids are set, calculate an
 //     encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
 //     Future TODO: kick off a conversion task to update the records
@@ -80,24 +80,32 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 
 	var results []model.ProviderResult
 
-	legacyRes, err := pi.legacyClaims.Find(ctx, mh)
-	if err == nil {
-		results = legacyRes
-	} else {
-		findRes, err := pi.findClient.Find(ctx, mh)
+	findRes, err := pi.findClient.Find(ctx, mh)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, mhres := range findRes.MultihashResults {
+		results = append(results, mhres.ProviderResults...)
+	}
+
+	// try legacy claims storage if nothing was found on IPNI
+	if len(results) == 0 {
+		legacyResults, err := pi.legacyClaims.Find(ctx, mh)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, mhres := range findRes.MultihashResults {
-			results = append(results, mhres.ProviderResults...)
+		results = legacyResults
+	}
+
+	// cache results if there are results to cache
+	if len(results) > 0 {
+		if err := pi.providerStore.Set(ctx, mh, results, true); err != nil {
+			return nil, err
 		}
 	}
 
-	err = pi.providerStore.Set(ctx, mh, results, true)
-	if err != nil {
-		return nil, err
-	}
 	return results, nil
 }
 
