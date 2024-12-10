@@ -9,9 +9,17 @@ packages:
   github.com/storacha/indexing-service/pkg/service/providerindex:
     interfaces:
       ContentToClaimsMapper:
+      LegacyClaimsFinder:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
       ContentClaimsStore:
+      ProviderStore:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
     interfaces:
       QueryAPIClient:
+  github.com/ipni/go-libipni/find/client:
+    interfaces:
+      Finder:
+  github.com/storacha/ipni-publisher/pkg/publisher:
+    interfaces:
+      Publisher:
