@@ -162,7 +162,10 @@ func Construct(cfg Config) (types.Service, error) {
 	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName)
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
 	legacyClaimsUrl := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
-	legacyClaims := providerindex.NewLegacyClaimsStore(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsUrl)
+	legacyClaims, err := providerindex.NewLegacyClaimsStore(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsUrl)
+	if err != nil {
+		return nil, err
+	}
 	service, err := construct.Construct(
 		cfg.ServiceConfig,
 		construct.SkipNotification(),
