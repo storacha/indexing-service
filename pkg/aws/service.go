@@ -21,6 +21,7 @@ import (
 	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
+	"github.com/storacha/indexing-service/pkg/service/legacy"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
@@ -41,18 +42,20 @@ func mustGetEnv(envVar string) string {
 type Config struct {
 	construct.ServiceConfig
 	aws.Config
-	SQSCachingQueueURL    string
-	CachingBucket         string
-	ChunkLinksTableName   string
-	MetadataTableName     string
-	IPNIStoreBucket       string
-	IPNIStorePrefix       string
-	NotifierHeadBucket    string
-	NotifierTopicArn      string
-	ClaimStoreBucket      string
-	ClaimStorePrefix      string
-	LegacyClaimsTableName string
-	LegacyClaimsBucket    string
+	SQSCachingQueueURL        string
+	CachingBucket             string
+	ChunkLinksTableName       string
+	MetadataTableName         string
+	IPNIStoreBucket           string
+	IPNIStorePrefix           string
+	NotifierHeadBucket        string
+	NotifierTopicArn          string
+	ClaimStoreBucket          string
+	ClaimStorePrefix          string
+	LegacyClaimsTableName     string
+	LegacyClaimsBucket        string
+	LegacyBlockIndexTableName string
+	LegacyDataBucketURL       string
 	principal.Signer
 }
 
@@ -131,18 +134,20 @@ func FromEnv(ctx context.Context) Config {
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
 			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
 		},
-		SQSCachingQueueURL:    mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
-		CachingBucket:         mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
-		ChunkLinksTableName:   mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
-		MetadataTableName:     mustGetEnv("METADATA_TABLE_NAME"),
-		IPNIStoreBucket:       mustGetEnv("IPNI_STORE_BUCKET_NAME"),
-		IPNIStorePrefix:       ipniStoreKeyPrefix,
-		NotifierHeadBucket:    mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
-		NotifierTopicArn:      mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
-		ClaimStoreBucket:      mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
-		ClaimStorePrefix:      os.Getenv("CLAIM_STORE_KEY_REFIX"),
-		LegacyClaimsTableName: mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
-		LegacyClaimsBucket:    mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
+		SQSCachingQueueURL:        mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
+		CachingBucket:             mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
+		ChunkLinksTableName:       mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
+		MetadataTableName:         mustGetEnv("METADATA_TABLE_NAME"),
+		IPNIStoreBucket:           mustGetEnv("IPNI_STORE_BUCKET_NAME"),
+		IPNIStorePrefix:           ipniStoreKeyPrefix,
+		NotifierHeadBucket:        mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
+		NotifierTopicArn:          mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
+		ClaimStoreBucket:          mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
+		ClaimStorePrefix:          os.Getenv("CLAIM_STORE_KEY_REFIX"),
+		LegacyClaimsTableName:     mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
+		LegacyClaimsBucket:        mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
+		LegacyBlockIndexTableName: mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
+		LegacyDataBucketURL:       mustGetEnv("LEGACY_DATA_BUCKET_URL"),
 	}
 }
 
@@ -158,7 +163,7 @@ func Construct(cfg Config) (types.Service, error) {
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
 	legacyClaimsUrl := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
 	legacyClaims := providerindex.NewLegacyClaimsStore(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsUrl)
-	return construct.Construct(
+	service, err := construct.Construct(
 		cfg.ServiceConfig,
 		construct.SkipNotification(),
 		construct.WithCachingQueue(cachingQueue),
@@ -167,4 +172,9 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithClaimsStore(claimBucketStore),
 		construct.WithLegacyClaims(legacyClaims),
 	)
+	if err != nil {
+		return nil, err
+	}
+	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyBlockIndexTableName)
+	return legacy.NewService(cfg.Signer, service, legacyBlockIndexStore, cfg.LegacyDataBucketURL)
 }

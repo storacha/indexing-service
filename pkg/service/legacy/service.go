@@ -124,8 +124,25 @@ type BlockIndexStore interface {
 	Query(ctx context.Context, digest multihash.Multihash) ([]BlockIndexRecord, error)
 }
 
-func NewService(id principal.Signer, indexer types.Service, blockIndexStore BlockIndexStore, bucketURL url.URL) *IndexingService {
-	return &IndexingService{id, indexer, blockIndexStore, bucketURL}
+// NewService creates a new indexing service that wraps the passed service and
+// transparently proxies to it, with the exception of the call to [Query], which
+// calls the wrapped service and then inspects the results. If they are empty
+// then it will query the blockIndexStore - a giant index of historical data,
+// mapping multihashes to bucket keys/URLs and their byte offsets.
+//
+// The data referenced by bucket keys in the blockIndexStore has been
+// consolidated into a single bucket. So this instance does the work of mapping
+// old bucket keys to URLs, where the base URL is the passed bucketURL param.
+//
+// Using the data in the blockIndexStore, the service will materialize content
+// claims using the id param as the signing key, and add them to the query
+// results before returning them back to the caller.
+func NewService(id principal.Signer, indexer types.Service, blockIndexStore BlockIndexStore, bucketURL string) (*IndexingService, error) {
+	burl, err := url.Parse(bucketURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing bucket URL: %w", err)
+	}
+	return &IndexingService{id, indexer, blockIndexStore, *burl}, nil
 }
 
 func bucketKeyToShardLink(key string) (ipld.Link, error) {

@@ -87,9 +87,10 @@ func TestLegacyService(t *testing.T) {
 			mockStore := newMockBlockIndexStore()
 			mockStore.data.Set(f.digest, []BlockIndexRecord{f.record})
 			mockService := mockIndexingService{}
-			service := NewService(id, &mockService, mockStore, *bucketURL)
-			query := types.Query{Hashes: []multihash.Multihash{f.digest}}
+			service, err := NewService(id, &mockService, mockStore, bucketURL.String())
+			require.NoError(t, err)
 
+			query := types.Query{Hashes: []multihash.Multihash{f.digest}}
 			results, err := service.Query(context.Background(), query)
 			require.NoError(t, err)
 			require.Empty(t, results.Indexes())
@@ -133,9 +134,10 @@ func TestLegacyService(t *testing.T) {
 		require.NoError(t, err)
 
 		mockService := mockIndexingService{result, nil}
-		service := NewService(id, &mockService, mockStore, *bucketURL)
-		query := types.Query{Hashes: []multihash.Multihash{digest}}
+		service, err := NewService(id, &mockService, mockStore, bucketURL.String())
+		require.NoError(t, err)
 
+		query := types.Query{Hashes: []multihash.Multihash{digest}}
 		results, err := service.Query(context.Background(), query)
 		require.NoError(t, err)
 		require.Empty(t, results.Indexes())
@@ -167,9 +169,10 @@ func TestLegacyService(t *testing.T) {
 		require.NoError(t, err)
 
 		mockService := mockIndexingService{result, nil}
-		service := NewService(id, &mockService, mockStore, *bucketURL)
-		query := types.Query{Hashes: []multihash.Multihash{digest}}
+		service, err := NewService(id, &mockService, mockStore, bucketURL.String())
+		require.NoError(t, err)
 
+		query := types.Query{Hashes: []multihash.Multihash{digest}}
 		results, err := service.Query(context.Background(), query)
 		require.NoError(t, err)
 		require.Empty(t, results.Claims())
@@ -181,7 +184,8 @@ func TestLegacyService(t *testing.T) {
 		digest := testutil.RandomMultihash()
 		mockStore := newMockBlockIndexStore()
 		mockService := mockIndexingService{nil, errNotImplemented}
-		service := NewService(id, &mockService, mockStore, *bucketURL)
+		service, err := NewService(id, &mockService, mockStore, bucketURL.String())
+		require.NoError(t, err)
 
 		nb := assert.LocationCaveats{Content: assert.FromHash(digest)}
 		claim, err := assert.Location.Delegate(id, id, id.DID().String(), nb)
