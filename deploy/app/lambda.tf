@@ -74,6 +74,8 @@ resource "aws_lambda_function" "lambda" {
         CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
         LEGACY_CLAIMS_TABLE_NAME = "prod-content-claims-claims-v1"
         LEGACY_CLAIMS_BUCKET_NAME = "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8"
+        LEGACY_BLOCK_INDEX_TABLE_NAME = "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
+        LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
     }
   }
