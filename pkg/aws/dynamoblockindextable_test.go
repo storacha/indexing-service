@@ -122,7 +122,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 	})
 }
 
-func createDynamo(t *testing.T) url.URL {
+func createDynamo(t *testing.T) *url.URL {
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
 		Image:        "amazon/dynamodb-local:latest",
@@ -139,10 +139,10 @@ func createDynamo(t *testing.T) url.URL {
 	endpoint, err := container.Endpoint(ctx, "")
 	require.NoError(t, err)
 
-	return *testutil.Must(url.Parse("http://" + endpoint))(t)
+	return testutil.Must(url.Parse("http://" + endpoint))(t)
 }
 
-func newDynamoClient(t *testing.T, endpoint url.URL) *dynamodb.Client {
+func newDynamoClient(t *testing.T, endpoint *url.URL) *dynamodb.Client {
 	cfg, err := config.LoadDefaultConfig(
 		context.Background(),
 		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{

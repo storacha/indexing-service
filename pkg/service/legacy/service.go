@@ -66,7 +66,7 @@ func (l *IndexingService) Query(ctx context.Context, q types.Query) (types.Query
 
 		for _, r := range records {
 			u, err := url.Parse(r.CarPath)
-			if err != nil || !isAbsoluteURL(*u) {
+			if err != nil || !u.IsAbs() {
 				// non-URL is legacy region/bucket/key format
 				// e.g. us-west-2/dotstorage-prod-1/raw/bafy...
 				parts := strings.Split(r.CarPath, "/")
@@ -168,8 +168,4 @@ func bucketKeyToShardLink(key string) (ipld.Link, error) {
 		return nil, errors.New("not a CAR CID")
 	}
 	return cidlink.Link{Cid: shard}, nil
-}
-
-func isAbsoluteURL(u url.URL) bool {
-	return u.Scheme != "" && u.Host != ""
 }

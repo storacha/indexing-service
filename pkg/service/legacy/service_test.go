@@ -35,7 +35,7 @@ func TestLegacyService(t *testing.T) {
 		digest multihash.Multihash
 		record BlockIndexRecord
 		// the expected location URL in the materlized claim
-		expectedURL url.URL
+		expectedURL *url.URL
 		// signals that no claim can be materialized from fixture
 		noClaim bool
 	}{
@@ -47,7 +47,7 @@ func TestLegacyService(t *testing.T) {
 				Offset:  128844,
 				Length:  200,
 			},
-			expectedURL: *bucketURL.JoinPath("/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq.car"),
+			expectedURL: bucketURL.JoinPath("/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq.car"),
 		},
 		{
 			name:   "b32 CAR CID key",
@@ -57,7 +57,7 @@ func TestLegacyService(t *testing.T) {
 				Offset:  9196818,
 				Length:  262144,
 			},
-			expectedURL: *bucketURL.JoinPath("/bagbaieras4pzdxrc6rxlqfu73a4g4zmbtn54e77gwxyq4lvwqouwkknndquq/bagbaieras4pzdxrc6rxlqfu73a4g4zmbtn54e77gwxyq4lvwqouwkknndquq.car"),
+			expectedURL: bucketURL.JoinPath("/bagbaieras4pzdxrc6rxlqfu73a4g4zmbtn54e77gwxyq4lvwqouwkknndquq/bagbaieras4pzdxrc6rxlqfu73a4g4zmbtn54e77gwxyq4lvwqouwkknndquq.car"),
 		},
 		{
 			name:   "b32 root CID key",
@@ -67,7 +67,7 @@ func TestLegacyService(t *testing.T) {
 				Offset:  8029928,
 				Length:  58,
 			},
-			expectedURL: url.URL{},
+			expectedURL: nil,
 			noClaim:     true,
 		},
 		{
@@ -78,7 +78,7 @@ func TestLegacyService(t *testing.T) {
 				Offset:  5401120,
 				Length:  36876,
 			},
-			expectedURL: *testutil.Must(url.Parse("https://carpark-prod-0.r2.w3s.link/zQmRYBmBVN28FpKprXj8FiRxE8KLSkQ96gNsBu8LtnK7sEe/zQmRYBmBVN28FpKprXj8FiRxE8KLSkQ96gNsBu8LtnK7sEe.blob"))(t),
+			expectedURL: testutil.Must(url.Parse("https://carpark-prod-0.r2.w3s.link/zQmRYBmBVN28FpKprXj8FiRxE8KLSkQ96gNsBu8LtnK7sEe/zQmRYBmBVN28FpKprXj8FiRxE8KLSkQ96gNsBu8LtnK7sEe.blob"))(t),
 		},
 	}
 
