@@ -51,7 +51,7 @@ func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publishe
 // Find should do the following
 //  1. Read from the IPNI Storage cache to get a list of providers
 //     a. if there are no records in the cache, query IPNI, filtering out any non-content claims metadata
-//     b. if no records are found in IPNI, attempt to ready claims from legacy systems -- Dynamo tables & content
+//     b. if no records are found in IPNI, attempt to read claims from legacy systems -- Dynamo tables & content
 //     claims storage, synthetically constructing provider results
 //     c. finally, store the resulting records in the cache
 //  2. With returned provider results, filter additionally for claim type. If space dids are set, calculate an
