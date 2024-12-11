@@ -213,6 +213,6 @@ func TestSynthetizeProviderResult(t *testing.T) {
 
 		_, err := legacyClaims.synthetizeProviderResult(partitionDelegation)
 
-		require.ErrorAs(t, err, &errUnsupportedClaimType{})
+		require.Error(t, err)
 	})
 }

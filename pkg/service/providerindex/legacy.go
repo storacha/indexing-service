@@ -84,28 +84,14 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 
 		pr, err := ls.synthetizeProviderResult(claim)
 		if err != nil {
-			var unsupportedClaimErr errUnsupportedClaimType
-			if errors.As(err, &unsupportedClaimErr) {
-				continue
-			}
-
-			return nil, err
+			log.Warnf("error synthetizing provider result for claim %s: %s", claimCid, err)
+			continue
 		}
 
 		results = append(results, pr)
 	}
 
 	return results, nil
-}
-
-// errUnsupportedClaimType is used to signal that we are not synthetizing records for claims other than location, index
-// and equals claims
-type errUnsupportedClaimType struct {
-	claimType string
-}
-
-func (e errUnsupportedClaimType) Error() string {
-	return fmt.Sprintf("unsupported claim type: %s", e.claimType)
 }
 
 // synthetizeProviderResult synthetizes a provider result, including metadata, from a given claim
@@ -145,7 +131,7 @@ func (ls LegacyClaimsStore) synthetizeProviderResult(claim delegation.Delegation
 		return ls.synthetizeEqualsProviderResult(caveats, claimCid, expiration)
 
 	default:
-		return model.ProviderResult{}, errUnsupportedClaimType{cap.Can()}
+		return model.ProviderResult{}, fmt.Errorf("unsupported capability: %s", cap.Can())
 	}
 }
 
