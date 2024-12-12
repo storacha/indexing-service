@@ -28,10 +28,10 @@ data "aws_dynamodb_table" "legacy_block_index_table" {
   name = "${terraform.workspace == "prod" ? "prod" : "staging"}-${var.legacy_block_index_table_name}"
 }
 
-data "aws_iam_policy_document" "lambda_legacy_dynamodb_get_document" {
+data "aws_iam_policy_document" "lambda_legacy_dynamodb_query_document" {
   statement {
     actions = [
-      "dynamodb:GetItem",
+      "dynamodb:Query",
     ]
     resources = [
       data.aws_dynamodb_table.legacy_claims_table.arn,
@@ -40,15 +40,15 @@ data "aws_iam_policy_document" "lambda_legacy_dynamodb_get_document" {
   }
 }
 
-resource "aws_iam_policy" "lambda_legacy_dynamodb_get" {
-  name        = "${terraform.workspace}-${var.app}-lambda-legacy-dynamodb-get"
-  description = "This policy will be used by the lambda to get data from legacy DynamoDB tables"
-  policy      = data.aws_iam_policy_document.lambda_legacy_dynamodb_get_document.json
+resource "aws_iam_policy" "lambda_legacy_dynamodb_query" {
+  name        = "${terraform.workspace}-${var.app}-lambda-legacy-dynamodb-query"
+  description = "This policy will be used by the lambda to query data from legacy DynamoDB tables"
+  policy      = data.aws_iam_policy_document.lambda_legacy_dynamodb_query_document.json
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_legacy_dynamodb_get" {
+resource "aws_iam_role_policy_attachment" "lambda_legacy_dynamodb_query" {
   role       = aws_iam_role.lambda_exec.name
-  policy_arn = aws_iam_policy.lambda_legacy_dynamodb_get.arn
+  policy_arn = aws_iam_policy.lambda_legacy_dynamodb_query.arn
 }
 
 data "aws_iam_policy_document" "lambda_legacy_s3_get_document" {
