@@ -34,6 +34,7 @@ type LegacyClaimsStore struct {
 	contentToClaims ContentToClaimsMapper
 	claimsStore     types.ContentClaimsStore
 	claimsAddr      ma.Multiaddr
+	claimsCache     types.ContentClaimsCache
 }
 
 // ContentToClaimsMapper maps content hashes to claim cids
@@ -41,7 +42,7 @@ type ContentToClaimsMapper interface {
 	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
-func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore, claimsUrl string) (LegacyClaimsStore, error) {
+func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore, claimsUrl string, claimsCache types.ContentClaimsCache) (LegacyClaimsStore, error) {
 	legacyClaimsUrl, err := url.Parse(claimsUrl)
 	if err != nil {
 		return LegacyClaimsStore{}, err
@@ -55,6 +56,7 @@ func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStor
 		contentToClaims: contentToClaimsMapper,
 		claimsStore:     claimStore,
 		claimsAddr:      claimsAddr,
+		claimsCache:     claimsCache,
 	}, nil
 }
 
@@ -73,13 +75,20 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 	results := []model.ProviderResult{}
 
 	for _, claimCid := range claimsCids {
-		claim, err := ls.claimsStore.Get(ctx, cidlink.Link{Cid: claimCid})
+		claim, err := ls.claimsCache.Get(ctx, claimCid)
 		if err != nil {
-			if errors.Is(err, types.ErrKeyNotFound) {
-				continue
+			if !errors.Is(err, types.ErrKeyNotFound) {
+				log.Warnf("error getting legacy claim %s from cache: %s", claimCid, err)
 			}
 
-			return nil, err
+			claim, err = ls.claimsStore.Get(ctx, cidlink.Link{Cid: claimCid})
+			if err != nil {
+				if errors.Is(err, types.ErrKeyNotFound) {
+					continue
+				}
+
+				return nil, err
+			}
 		}
 
 		pr, err := ls.synthetizeProviderResult(claim)
@@ -89,6 +98,10 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 		}
 
 		results = append(results, pr)
+
+		if err := ls.claimsCache.Set(ctx, claimCid, claim, true); err != nil {
+			log.Warnf("error caching legacy claim %s: %s", claimCid, err)
+		}
 	}
 
 	return results, nil

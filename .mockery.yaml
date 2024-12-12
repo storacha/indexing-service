@@ -12,6 +12,7 @@ packages:
       LegacyClaimsFinder:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
+      ContentClaimsCache:
       ContentClaimsStore:
       ProviderStore:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
