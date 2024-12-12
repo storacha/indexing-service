@@ -13,7 +13,11 @@ variable "legacy_claims_bucket_name" {
 variable "legacy_block_index_table_name" {
   description = "The name of the legacy block index DynamoDB table"
   type = string
-  default = "ep-v1-blocks-cars-position"
+  default = ""
+}
+
+locals {
+    inferred_legacy_block_index_table_name = var.legacy_block_index_table_name != "" ? var.legacy_block_index_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
 }
 
 data "aws_s3_bucket" "legacy_claims_bucket" {
@@ -25,7 +29,7 @@ data "aws_dynamodb_table" "legacy_claims_table" {
 }
 
 data "aws_dynamodb_table" "legacy_block_index_table" {
-  name = "${terraform.workspace == "prod" ? "prod" : "staging"}-${var.legacy_block_index_table_name}"
+  name = local.inferred_legacy_block_index_table_name
 }
 
 data "aws_iam_policy_document" "lambda_legacy_dynamodb_query_document" {
