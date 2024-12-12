@@ -72,9 +72,9 @@ resource "aws_lambda_function" "lambda" {
         PUBLIC_URL = "https://${aws_apigatewayv2_domain_name.custom_domain.domain_name}"
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
         CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
-        LEGACY_CLAIMS_TABLE_NAME = "prod-content-claims-claims-v1"
-        LEGACY_CLAIMS_BUCKET_NAME = "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8"
-        LEGACY_BLOCK_INDEX_TABLE_NAME = "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
+        LEGACY_CLAIMS_TABLE_NAME = data.aws_dynamodb_table.legacy_claims_table.id
+        LEGACY_CLAIMS_BUCKET_NAME = data.aws_s3_bucket.legacy_claims_bucket.id
+        LEGACY_BLOCK_INDEX_TABLE_NAME = data.aws_dynamodb_table.legacy_block_index_table.id
         LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
     }
