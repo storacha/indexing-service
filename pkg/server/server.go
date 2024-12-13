@@ -168,7 +168,7 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 		for _, mhString := range mhStrings {
 			_, bytes, err := multibase.Decode(mhString)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid multibase encoding: %s", err.Error()), 400)
+				http.Error(w, fmt.Sprintf("invalid multibase encoding: %s", err.Error()), http.StatusBadRequest)
 				return
 			}
 			hashes = append(hashes, bytes)
@@ -183,7 +183,7 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 		for _, spaceString := range spaceStrings {
 			space, err := did.Parse(spaceString)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid did: %s", err.Error()), 400)
+				http.Error(w, fmt.Sprintf("invalid did: %s", err.Error()), http.StatusBadRequest)
 				return
 			}
 			spaces = append(spaces, space)
@@ -196,7 +196,7 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 			},
 		})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("processing query: %s", err.Error()), 400)
+			http.Error(w, fmt.Sprintf("processing query: %s", err.Error()), http.StatusInternalServerError)
 			return
 		}
 
