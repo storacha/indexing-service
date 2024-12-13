@@ -204,6 +204,19 @@ func TestLegacyService(t *testing.T) {
 		_, err = service.Query(context.Background(), query)
 		require.True(t, errors.Is(err, errNotImplemented))
 	})
+
+	t.Run("returns empty results when block index errors with not found", func(t *testing.T) {
+		mockStore := newMockBlockIndexStore()
+		mockService := mockIndexingService{nil, nil}
+		service, err := NewService(id, &mockService, mockStore, bucketURL.String())
+		require.NoError(t, err)
+
+		query := types.Query{Hashes: []multihash.Multihash{testutil.RandomMultihash()}}
+		results, err := service.Query(context.Background(), query)
+		require.NoError(t, err)
+		require.Len(t, results.Claims(), 0)
+		require.Len(t, results.Indexes(), 0)
+	})
 }
 
 var errNotImplemented = errors.New("not implemented")
