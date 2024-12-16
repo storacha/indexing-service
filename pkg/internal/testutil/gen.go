@@ -13,12 +13,14 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
+	ipnimeta "github.com/ipni/go-libipni/metadata"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld/block"
@@ -170,6 +172,28 @@ func RandomProviderResult() model.ProviderResult {
 			},
 		},
 	}
+}
+
+func RandomBitswapProviderResult() model.ProviderResult {
+	pr := RandomProviderResult()
+	bitswapMeta, _ := ipnimeta.Bitswap{}.MarshalBinary()
+	pr.Metadata = bitswapMeta
+	return pr
+}
+
+func RandomLocationCommitmentProviderResult() model.ProviderResult {
+	shard := RandomCID().(cidlink.Link).Cid
+	locationMeta := metadata.LocationCommitmentMetadata{
+		Shard:      &shard,
+		Range:      &metadata.Range{Offset: 128},
+		Expiration: 0,
+		Claim:      RandomCID().(cidlink.Link).Cid,
+	}
+	metaBytes, _ := locationMeta.MarshalBinary()
+
+	pr := RandomProviderResult()
+	pr.Metadata = metaBytes
+	return pr
 }
 
 func RandomShardedDagIndexView(size int) (mh.Multihash, blobindex.ShardedDagIndexView) {
