@@ -29,7 +29,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/v9 v9.6.1
 	github.com/storacha/go-capabilities v0.0.0-20241030160329-4cf19ffc732d
-	github.com/storacha/go-metadata v0.0.0-20241031171938-8f3343b7ce5a
+	github.com/storacha/go-metadata v0.0.0-20241216142904-a60e20043cef
 	github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb
 	github.com/storacha/ipni-publisher v0.0.0-20241112152400-07a540928427
 	github.com/stretchr/testify v1.10.0
