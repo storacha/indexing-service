@@ -335,7 +335,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	// TODO: add sender / publisher / linksystem
 	legacyClaims := cfg.legacyClaims
 	if legacyClaims == nil {
-		legacyClaims = providerindex.NewNotFoundLegacyClaimsFinder()
+		legacyClaims = providerindex.NewNoResultsLegacyClaimsFinder()
 	}
 	providerIndex := providerindex.New(providersCache, findClient, publisher, legacyClaims)
 
