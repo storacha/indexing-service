@@ -56,3 +56,35 @@ func TestProviderResults__Equals(t *testing.T) {
 		})
 	}
 }
+
+func TestSerialization(t *testing.T) {
+	randomResult := testutil.RandomProviderResult()
+
+	testCases := []struct {
+		name       string
+		testResult model.ProviderResult
+	}{
+		{
+			name:       "random result",
+			testResult: randomResult,
+		},
+		{
+			name: "empty peer ID",
+			testResult: model.ProviderResult{
+				ContextID: randomResult.ContextID,
+				Metadata:  randomResult.Metadata,
+				Provider: &peer.AddrInfo{
+					ID:    "",
+					Addrs: randomResult.Provider.Addrs,
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			marshalled := testutil.Must(providerresults.MarshalCBOR([]model.ProviderResult{tc.testResult}))(t)
+			unmarshalled := testutil.Must(providerresults.UnmarshalCBOR(marshalled))(t)
+			require.Equal(t, tc.testResult, unmarshalled[0])
+		})
+	}
+}

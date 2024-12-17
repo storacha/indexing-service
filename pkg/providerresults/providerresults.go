@@ -33,6 +33,11 @@ func init() {
 }
 
 func bytesToPeerID(data []byte) (interface{}, error) {
+	if len(data) == 0 {
+		emptyID := peer.ID("")
+		return &emptyID, nil
+	}
+
 	id, err := peer.IDFromBytes(data)
 	return &id, err
 }
