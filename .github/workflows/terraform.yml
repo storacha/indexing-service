@@ -66,7 +66,7 @@ jobs:
         run: |
           tofu -chdir="deploy/app" init
 
-      - name: Ruild Go Apps    
+      - name: Build Go Apps
         run: |
           touch .env
           make lambdas
