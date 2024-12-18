@@ -54,14 +54,6 @@ jobs:
           echo "TF_VAR_private_key=${{ secrets.STAGING_PRIVATE_KEY }}" >> $GITHUB_ENV
           echo "TF_VAR_did=did:web:staging.indexer.storacha.network" >> $GITHUB_ENV
 
-      - name: Set Production Environment Variables
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          echo "ENV=production" >> $GITHUB_ENV
-          echo "TF_WORKSPACE=prod" >> $GITHUB_ENV
-          echo "TF_VAR_private_key=${{ secrets.PROD_PRIVATE_KEY }}" >> $GITHUB_ENV
-          echo "TF_VAR_did=did:web:indexer.storacha.network" >> $GITHUB_ENV
-          
       - name: Tofu Init
         run: |
           tofu -chdir="deploy/app" init
@@ -78,5 +70,19 @@ jobs:
 
       - name: Terraform Apply
         if: github.event_name != 'pull_request'
+        run: |
+          tofu -chdir="deploy/app" apply -input=false --auto-approve
+
+      # deploy to prod on new releases
+      - name: Set Production Environment Variables
+        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+        run: |
+          echo "ENV=production" >> $GITHUB_ENV
+          echo "TF_WORKSPACE=prod" >> $GITHUB_ENV
+          echo "TF_VAR_private_key=${{ secrets.PROD_PRIVATE_KEY }}" >> $GITHUB_ENV
+          echo "TF_VAR_did=did:web:indexer.storacha.network" >> $GITHUB_ENV
+
+      - name: Deploy to prod
+        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
         run: |
           tofu -chdir="deploy/app" apply -input=false --auto-approve
