@@ -46,8 +46,8 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
       - uses: actions/setup-go@v5
 
+      # always deploy to staging
       - name: Set Staging Environment Variables
-        if: startsWith(github.ref, 'refs/tags/') != true
         run: |
           echo "ENV=staging" >> $GITHUB_ENV
           echo "TF_WORKSPACE=staging" >> $GITHUB_ENV
