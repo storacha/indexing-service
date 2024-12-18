@@ -119,7 +119,7 @@ resource "aws_acm_certificate_validation" "cert" {
   validation_record_fqdns = [ aws_route53_record.cert_validation.fqdn ]
 }
 resource "aws_apigatewayv2_domain_name" "custom_domain" {
-  domain_name = "${terraform.workspace}.${var.app}.storacha.network"
+  domain_name = aws_acm_certificate.cert.domain_name
 
   domain_name_configuration {
     certificate_arn = aws_acm_certificate_validation.cert.certificate_arn
