@@ -11,8 +11,11 @@ on:
       - "cmd/**"
       - "deploy/**"
       - "pkg/**"
-      - "version.json"
   pull_request:
+    branches: ["main"]
+  workflow_run:
+    workflows: [Releaser]
+    types: [completed]
     branches: ["main"]
   workflow_dispatch:
 
