@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -339,6 +340,10 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	// TODO: add sender / publisher / linksystem
 	var legacyClaims providerindex.LegacyClaimsFinder
 	if cfg.legacyClaimsMapper != nil && cfg.legacyClaimsBucket != nil {
+		if !strings.Contains(cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder) {
+			return nil, fmt.Errorf("legacy claims url %s must contain the claim placeholder %s", cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder)
+		}
+
 		legacyClaims, err = providerindex.NewLegacyClaimsStore(cfg.legacyClaimsMapper, cfg.legacyClaimsBucket, cfg.legacyClaimsUrl, claimsCache)
 		if err != nil {
 			return nil, fmt.Errorf("creating legacy claims store: %w", err)
