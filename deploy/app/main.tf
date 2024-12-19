@@ -24,7 +24,7 @@ provider "aws" {
       "Environment" = terraform.workspace
       "ManagedBy"   = "OpenTofu"
       Owner         = "storacha"
-      Team          = "Storacha Engineer"
+      Team          = "Storacha Engineering"
       Organization  = "Storacha"
       Project       = "${var.app}"
     }
