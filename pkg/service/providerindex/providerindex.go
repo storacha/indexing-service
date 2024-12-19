@@ -58,18 +58,15 @@ func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publishe
 //     encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
 //     Future TODO: kick off a conversion task to update the records
 func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.ProviderResult, error) {
-	results, err := pi.getProviderResults(ctx, qk.Hash)
+	results, err := pi.getProviderResults(ctx, qk.Hash, qk.TargetClaims)
 	if err != nil {
 		return nil, err
 	}
-	results, err = pi.filteredCodecs(results, qk.TargetClaims)
-	if err != nil {
-		return nil, err
-	}
-	return pi.filterBySpace(results, qk.Hash, qk.Spaces)
+
+	return filterBySpace(results, qk.Hash, qk.Spaces)
 }
 
-func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Multihash) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	res, err := pi.providerStore.Get(ctx, mh)
 	if err == nil {
 		return res, nil
@@ -78,20 +75,14 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 		return nil, err
 	}
 
-	var results []model.ProviderResult
-
-	findRes, err := pi.findClient.Find(ctx, mh)
+	results, err := pi.fetchFromIPNI(ctx, mh, targetClaims)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, mhres := range findRes.MultihashResults {
-		results = append(results, mhres.ProviderResults...)
-	}
-
-	// try legacy claims storage if nothing was found on IPNI
+	// if nothing was found on IPNI, try legacy claims storage
 	if len(results) == 0 {
-		legacyResults, err := pi.legacyClaims.Find(ctx, mh)
+		legacyResults, err := pi.fetchFromLegacy(ctx, mh, targetClaims)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +100,40 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	return results, nil
 }
 
-func (pi *ProviderIndexService) filteredCodecs(results []model.ProviderResult, codecs []multicodec.Code) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
+	var results []model.ProviderResult
+	findRes, err := pi.findClient.Find(ctx, mh)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, mhres := range findRes.MultihashResults {
+		results = append(results, mhres.ProviderResults...)
+	}
+
+	results, err = filterCodecs(results, targetClaims)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func (pi *ProviderIndexService) fetchFromLegacy(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
+	results, err := pi.legacyClaims.Find(ctx, mh)
+	if err != nil {
+		return nil, err
+	}
+
+	results, err = filterCodecs(results, targetClaims)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+func filterCodecs(results []model.ProviderResult, codecs []multicodec.Code) ([]model.ProviderResult, error) {
 	if len(codecs) == 0 {
 		return results, nil
 	}
@@ -127,7 +151,7 @@ func (pi *ProviderIndexService) filteredCodecs(results []model.ProviderResult, c
 	})
 }
 
-func (pi *ProviderIndexService) filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did.DID) ([]model.ProviderResult, error) {
+func filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did.DID) ([]model.ProviderResult, error) {
 	if len(spaces) == 0 {
 		return results, nil
 	}

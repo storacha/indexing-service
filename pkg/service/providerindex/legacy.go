@@ -26,6 +26,8 @@ import (
 
 // LegacyClaimsFinder is a read-only interface to find claims on a legacy system
 type LegacyClaimsFinder interface {
+	// Find returns a list of claims for a given content hash.
+	// Implementations should return an empty slice and no error if no results are found.
 	Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error)
 }
 
@@ -279,15 +281,15 @@ func (ls LegacyClaimsStore) synthetizeEqualsProviderResult(caveats assert.Equals
 	}, nil
 }
 
-// NotFoundLegacyClaimsFinder is a LegacyClaimsFinder that always returns ErrKeyNotFound. It can be used when accessing
-// claims in a legacy system is not required
-type NotFoundLegacyClaimsFinder struct{}
+// NoResultsLegacyClaimsFinder is a LegacyClaimsFinder that returns no results. It can be used when accessing claims
+// in a legacy system is not required
+type NoResultsLegacyClaimsFinder struct{}
 
-func NewNotFoundLegacyClaimsFinder() NotFoundLegacyClaimsFinder {
-	return NotFoundLegacyClaimsFinder{}
+func NewNoResultsLegacyClaimsFinder() NoResultsLegacyClaimsFinder {
+	return NoResultsLegacyClaimsFinder{}
 }
 
-// Find always returns ErrKeyNotFound
-func (f NotFoundLegacyClaimsFinder) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
-	return nil, types.ErrKeyNotFound
+// Find always returns no results
+func (f NoResultsLegacyClaimsFinder) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
+	return []model.ProviderResult{}, nil
 }

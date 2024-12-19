@@ -1,3 +1,7 @@
+locals {
+    domain_name = terraform.workspace == "prod" ? "${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
+}
+
 resource "aws_apigatewayv2_api" "api" {
   name        = "${terraform.workspace}-${var.app}-api"
   description = "${terraform.workspace} ${var.app} API Gateway"
@@ -67,13 +71,14 @@ resource "aws_apigatewayv2_integration" "postclaims" {
 }
 
 resource "aws_apigatewayv2_deployment" "deployment" {
-  depends_on = [aws_apigatewayv2_integration.getclaims, aws_apigatewayv2_integration.getroot, aws_apigatewayv2_integration.postclaims]
+  depends_on = [aws_apigatewayv2_integration.getclaim, aws_apigatewayv2_integration.getclaims, aws_apigatewayv2_integration.getroot, aws_apigatewayv2_integration.postclaims]
   triggers = {
     redeployment = sha1(join(",", [
       jsonencode(aws_apigatewayv2_integration.getclaim),
-      jsonencode(aws_apigatewayv2_integration.postclaims),
       jsonencode(aws_apigatewayv2_integration.getclaims),
+      jsonencode(aws_apigatewayv2_integration.postclaims),
       jsonencode(aws_apigatewayv2_integration.getroot),
+      jsonencode(aws_apigatewayv2_route.getclaim),
       jsonencode(aws_apigatewayv2_route.getclaims),
       jsonencode(aws_apigatewayv2_route.getroot),
       jsonencode(aws_apigatewayv2_route.postclaims),
@@ -97,7 +102,7 @@ data "terraform_remote_state" "shared" {
 }
 
 resource "aws_acm_certificate" "cert" {
-  domain_name       = terraform.workspace == "prod" ? "${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
+  domain_name       = local.domain_name
   validation_method = "DNS"
   
   lifecycle {
@@ -119,7 +124,7 @@ resource "aws_acm_certificate_validation" "cert" {
   validation_record_fqdns = [ aws_route53_record.cert_validation.fqdn ]
 }
 resource "aws_apigatewayv2_domain_name" "custom_domain" {
-  domain_name = "${terraform.workspace}.${var.app}.storacha.network"
+  domain_name = local.domain_name
 
   domain_name_configuration {
     certificate_arn = aws_acm_certificate_validation.cert.certificate_arn
@@ -130,6 +135,8 @@ resource "aws_apigatewayv2_domain_name" "custom_domain" {
 resource "aws_apigatewayv2_stage" "stage" {
   api_id = aws_apigatewayv2_api.api.id
   name   = "$default"
+  deployment_id = aws_apigatewayv2_deployment.deployment.id
+
   lifecycle {
     create_before_destroy = true
   }
@@ -137,13 +144,13 @@ resource "aws_apigatewayv2_stage" "stage" {
 
 resource "aws_apigatewayv2_api_mapping" "api_mapping" {
   api_id      = aws_apigatewayv2_api.api.id
-  stage  = aws_apigatewayv2_stage.stage.id
+  stage       = aws_apigatewayv2_stage.stage.id
   domain_name = aws_apigatewayv2_domain_name.custom_domain.id
 }
 
 resource "aws_route53_record" "api_gateway" {
   zone_id = data.terraform_remote_state.shared.outputs.primary_zone.zone_id
-  name    = "${terraform.workspace}.${var.app}.storacha.network"
+  name    = aws_apigatewayv2_domain_name.custom_domain.domain_name
   type    = "A"
 
   alias {

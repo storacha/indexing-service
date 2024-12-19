@@ -349,7 +349,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 			return nil, fmt.Errorf("creating legacy claims store: %w", err)
 		}
 	} else {
-		legacyClaims = providerindex.NewNotFoundLegacyClaimsFinder()
+		legacyClaims = providerindex.NewNoResultsLegacyClaimsFinder()
 	}
 
 	providerIndex := providerindex.New(providersCache, findClient, publisher, legacyClaims)

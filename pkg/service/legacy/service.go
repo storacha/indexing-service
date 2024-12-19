@@ -61,6 +61,9 @@ func (l *IndexingService) Query(ctx context.Context, q types.Query) (types.Query
 		content := assert.FromHash(h)
 		records, err := l.blockIndexStore.Query(ctx, content.Hash())
 		if err != nil {
+			if errors.Is(err, types.ErrKeyNotFound) {
+				continue
+			}
 			return nil, err
 		}
 
