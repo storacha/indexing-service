@@ -71,13 +71,14 @@ resource "aws_apigatewayv2_integration" "postclaims" {
 }
 
 resource "aws_apigatewayv2_deployment" "deployment" {
-  depends_on = [aws_apigatewayv2_integration.getclaims, aws_apigatewayv2_integration.getroot, aws_apigatewayv2_integration.postclaims]
+  depends_on = [aws_apigatewayv2_integration.getclaim, aws_apigatewayv2_integration.getclaims, aws_apigatewayv2_integration.getroot, aws_apigatewayv2_integration.postclaims]
   triggers = {
     redeployment = sha1(join(",", [
       jsonencode(aws_apigatewayv2_integration.getclaim),
-      jsonencode(aws_apigatewayv2_integration.postclaims),
       jsonencode(aws_apigatewayv2_integration.getclaims),
+      jsonencode(aws_apigatewayv2_integration.postclaims),
       jsonencode(aws_apigatewayv2_integration.getroot),
+      jsonencode(aws_apigatewayv2_route.getclaim),
       jsonencode(aws_apigatewayv2_route.getclaims),
       jsonencode(aws_apigatewayv2_route.getroot),
       jsonencode(aws_apigatewayv2_route.postclaims),
@@ -134,6 +135,8 @@ resource "aws_apigatewayv2_domain_name" "custom_domain" {
 resource "aws_apigatewayv2_stage" "stage" {
   api_id = aws_apigatewayv2_api.api.id
   name   = "$default"
+  deployment_id = aws_apigatewayv2_deployment.deployment.id
+
   lifecycle {
     create_before_destroy = true
   }
