@@ -22,7 +22,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/legacy"
-	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
 )
@@ -162,10 +161,7 @@ func Construct(cfg Config) (types.Service, error) {
 	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName)
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
 	legacyClaimsUrl := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
-	legacyClaims, err := providerindex.NewLegacyClaimsStore(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsUrl)
-	if err != nil {
-		return nil, err
-	}
+
 	service, err := construct.Construct(
 		cfg.ServiceConfig,
 		construct.SkipNotification(),
@@ -173,7 +169,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims(legacyClaims),
+		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsUrl),
 	)
 	if err != nil {
 		return nil, err

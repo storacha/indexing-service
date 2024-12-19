@@ -25,10 +25,38 @@ import (
 )
 
 func TestFind(t *testing.T) {
-	t.Run("happy path, unsupported claims are filtered out", func(t *testing.T) {
+	t.Run("claims fetched from the store are written to the claim cache", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
+
+		ctx := context.Background()
+		contentHash := testutil.RandomMultihash()
+
+		locationDelegation := testutil.RandomLocationDelegation()
+		locationDelegationCid := link.ToCID(testutil.RandomCID())
+		indexDelegation := testutil.RandomIndexDelegation()
+		indexDelegationCid := link.ToCID(testutil.RandomCID())
+
+		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
+		mockCache.EXPECT().Get(ctx, mock.Anything).Twice().Return(nil, types.ErrKeyNotFound)
+		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: indexDelegationCid}).Return(indexDelegation, nil)
+		mockCache.EXPECT().Set(ctx, locationDelegationCid, locationDelegation, true).Return(nil)
+		mockCache.EXPECT().Set(ctx, indexDelegationCid, indexDelegation, true).Return(nil)
+
+		results, err := legacyClaims.Find(ctx, contentHash)
+
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+	})
+
+	t.Run("unsupported claims are filtered out", func(t *testing.T) {
+		mockMapper := mocks.NewMockContentToClaimsMapper(t)
+		mockStore := mocks.NewMockContentClaimsStore(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
 
 		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
@@ -46,9 +74,12 @@ func TestFind(t *testing.T) {
 		indexDelegationCid := link.ToCID(testutil.RandomCID())
 
 		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{partitionDelegationCid, locationDelegationCid, indexDelegationCid}, nil)
+		mockCache.EXPECT().Get(ctx, mock.Anything).Times(3).Return(nil, types.ErrKeyNotFound)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: partitionDelegationCid}).Return(partitionDelegation, nil)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: indexDelegationCid}).Return(indexDelegation, nil)
+		mockCache.EXPECT().Set(ctx, locationDelegationCid, locationDelegation, true).Return(nil)
+		mockCache.EXPECT().Set(ctx, indexDelegationCid, indexDelegation, true).Return(nil)
 
 		results, err := legacyClaims.Find(ctx, contentHash)
 
@@ -59,7 +90,8 @@ func TestFind(t *testing.T) {
 	t.Run("returns no error, but empty results, when the content hash is not found in the mapper", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
 
 		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 
@@ -69,14 +101,35 @@ func TestFind(t *testing.T) {
 		require.Empty(t, results)
 	})
 
+	t.Run("claims are not fetched from the store if they are found in the cache. Also, they are not cached again", func(t *testing.T) {
+		mockMapper := mocks.NewMockContentToClaimsMapper(t)
+		mockStore := mocks.NewMockContentClaimsStore(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
+
+		ctx := context.Background()
+		testCID := link.ToCID(testutil.RandomCID())
+		testDelegation := testutil.RandomLocationDelegation()
+
+		mockMapper.EXPECT().GetClaims(ctx, mock.Anything).Return([]cid.Cid{testCID}, nil)
+		mockCache.EXPECT().Get(ctx, testCID).Return(testDelegation, nil)
+
+		results, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
+
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+	})
+
 	t.Run("returns no error, but empty results, when claims are not found in the store", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
 
 		testCID := link.ToCID(testutil.RandomCID())
 
 		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return([]cid.Cid{testCID}, nil)
+		mockCache.EXPECT().Get(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 		mockStore.EXPECT().Get(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
 
 		results, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
@@ -90,7 +143,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	t.Run("location claim", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
 
 		contentLink := testutil.RandomCID()
 		contentCid := link.ToCID(contentLink)
@@ -130,7 +184,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	t.Run("index claim", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
 
 		contentLink := testutil.RandomCID()
 		indexLink := testutil.RandomCID()
@@ -164,7 +219,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	t.Run("equals claim", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
 
 		contentHash := link.ToCID(testutil.RandomCID()).Hash()
 		equalsLink := testutil.RandomCID()
@@ -199,7 +255,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	t.Run("unsupported claim", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
-		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}"))(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
 
 		contentHash := link.ToCID(testutil.RandomCID()).Hash()
 
