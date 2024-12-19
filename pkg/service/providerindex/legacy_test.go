@@ -25,7 +25,34 @@ import (
 )
 
 func TestFind(t *testing.T) {
-	t.Run("happy path, unsupported claims are filtered out", func(t *testing.T) {
+	t.Run("claims fetched from the store are written to the claim cache", func(t *testing.T) {
+		mockMapper := mocks.NewMockContentToClaimsMapper(t)
+		mockStore := mocks.NewMockContentClaimsStore(t)
+		mockCache := mocks.NewMockContentClaimsCache(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore(mockMapper, mockStore, "https://storacha.network/claims/{claim}", mockCache))(t)
+
+		ctx := context.Background()
+		contentHash := testutil.RandomMultihash()
+
+		locationDelegation := testutil.RandomLocationDelegation()
+		locationDelegationCid := link.ToCID(testutil.RandomCID())
+		indexDelegation := testutil.RandomIndexDelegation()
+		indexDelegationCid := link.ToCID(testutil.RandomCID())
+
+		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
+		mockCache.EXPECT().Get(ctx, mock.Anything).Twice().Return(nil, types.ErrKeyNotFound)
+		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: indexDelegationCid}).Return(indexDelegation, nil)
+		mockCache.EXPECT().Set(ctx, locationDelegationCid, locationDelegation, true).Return(nil)
+		mockCache.EXPECT().Set(ctx, indexDelegationCid, indexDelegation, true).Return(nil)
+
+		results, err := legacyClaims.Find(ctx, contentHash)
+
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+	})
+
+	t.Run("unsupported claims are filtered out", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
 		mockCache := mocks.NewMockContentClaimsCache(t)
@@ -47,9 +74,7 @@ func TestFind(t *testing.T) {
 		indexDelegationCid := link.ToCID(testutil.RandomCID())
 
 		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{partitionDelegationCid, locationDelegationCid, indexDelegationCid}, nil)
-		mockCache.EXPECT().Get(ctx, partitionDelegationCid).Return(nil, types.ErrKeyNotFound)
-		mockCache.EXPECT().Get(ctx, locationDelegationCid).Return(nil, types.ErrKeyNotFound)
-		mockCache.EXPECT().Get(ctx, indexDelegationCid).Return(nil, types.ErrKeyNotFound)
+		mockCache.EXPECT().Get(ctx, mock.Anything).Times(3).Return(nil, types.ErrKeyNotFound)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: partitionDelegationCid}).Return(partitionDelegation, nil)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: locationDelegationCid}).Return(locationDelegation, nil)
 		mockStore.EXPECT().Get(ctx, cidlink.Link{Cid: indexDelegationCid}).Return(indexDelegation, nil)
@@ -76,7 +101,7 @@ func TestFind(t *testing.T) {
 		require.Empty(t, results)
 	})
 
-	t.Run("claims are not fetched from the store if they are found in the cache", func(t *testing.T) {
+	t.Run("claims are not fetched from the store if they are found in the cache. Also, they are not cached again", func(t *testing.T) {
 		mockMapper := mocks.NewMockContentToClaimsMapper(t)
 		mockStore := mocks.NewMockContentClaimsStore(t)
 		mockCache := mocks.NewMockContentClaimsCache(t)
@@ -88,7 +113,6 @@ func TestFind(t *testing.T) {
 
 		mockMapper.EXPECT().GetClaims(ctx, mock.Anything).Return([]cid.Cid{testCID}, nil)
 		mockCache.EXPECT().Get(ctx, testCID).Return(testDelegation, nil)
-		mockCache.EXPECT().Set(ctx, testCID, testDelegation, true).Return(nil)
 
 		results, err := legacyClaims.Find(context.Background(), testutil.RandomMultihash())
 

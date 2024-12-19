@@ -75,6 +75,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 	results := []model.ProviderResult{}
 
 	for _, claimCid := range claimsCids {
+		fromCache := true
 		claim, err := ls.claimsCache.Get(ctx, claimCid)
 		if err != nil {
 			if !errors.Is(err, types.ErrKeyNotFound) {
@@ -89,6 +90,8 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 
 				return nil, err
 			}
+
+			fromCache = false
 		}
 
 		pr, err := ls.synthetizeProviderResult(claim)
@@ -99,8 +102,11 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 
 		results = append(results, pr)
 
-		if err := ls.claimsCache.Set(ctx, claimCid, claim, true); err != nil {
-			log.Warnf("error caching legacy claim %s: %s", claimCid, err)
+		// do not cache claim if it is already there
+		if !fromCache {
+			if err := ls.claimsCache.Set(ctx, claimCid, claim, true); err != nil {
+				log.Warnf("error caching legacy claim %s: %s", claimCid, err)
+			}
 		}
 	}
 
