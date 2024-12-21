@@ -343,8 +343,8 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		if !strings.Contains(cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder) {
 			return nil, fmt.Errorf("legacy claims url %s must contain the claim placeholder %s", cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder)
 		}
-
-		legacyClaims, err = providerindex.NewLegacyClaimsStore(cfg.legacyClaimsMapper, cfg.legacyClaimsBucket, cfg.legacyClaimsUrl, claimsCache)
+		legacyFinder := contentclaims.WithCache(contentclaims.WithStore(contentclaims.NewNotFoundFinder(), cfg.legacyClaimsBucket), claimsCache)
+		legacyClaims, err = providerindex.NewLegacyClaimsStore(cfg.legacyClaimsMapper, legacyFinder, cfg.legacyClaimsUrl)
 		if err != nil {
 			return nil, fmt.Errorf("creating legacy claims store: %w", err)
 		}
@@ -362,7 +362,11 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		claimsStore = contentclaims.NewStoreFromDatastore(namespace.Wrap(ds, contentClaimsNamespace))
 	}
 
-	claims := contentclaims.New(claimsStore, claimsCache, http.DefaultClient)
+	finder := contentclaims.NewSimpleFinder(http.DefaultClient)
+	if cfg.legacyClaimsBucket != nil {
+		finder = contentclaims.WithStore(finder, cfg.legacyClaimsBucket)
+	}
+	claims := contentclaims.New(claimsStore, claimsCache, finder)
 	blobIndexLookup := blobindexlookup.WithCache(
 		blobindexlookup.NewBlobIndexLookup(http.DefaultClient),
 		shardDagIndexesCache,

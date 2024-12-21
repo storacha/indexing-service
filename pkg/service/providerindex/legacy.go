@@ -12,6 +12,7 @@ import (
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 
 	"github.com/ipfs/go-cid"
@@ -34,9 +35,8 @@ type LegacyClaimsFinder interface {
 // LegacyClaimsStore allows finding claims on a legacy store
 type LegacyClaimsStore struct {
 	contentToClaims ContentToClaimsMapper
-	claimsStore     types.ContentClaimsStore
+	claimsStore     contentclaims.Finder
 	claimsAddr      ma.Multiaddr
-	claimsCache     types.ContentClaimsCache
 }
 
 // ContentToClaimsMapper maps content hashes to claim cids
@@ -44,7 +44,7 @@ type ContentToClaimsMapper interface {
 	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
-func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore, claimsUrl string, claimsCache types.ContentClaimsCache) (LegacyClaimsStore, error) {
+func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore contentclaims.Finder, claimsUrl string) (LegacyClaimsStore, error) {
 	legacyClaimsUrl, err := url.Parse(claimsUrl)
 	if err != nil {
 		return LegacyClaimsStore{}, err
@@ -58,7 +58,6 @@ func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStor
 		contentToClaims: contentToClaimsMapper,
 		claimsStore:     claimStore,
 		claimsAddr:      claimsAddr,
-		claimsCache:     claimsCache,
 	}, nil
 }
 
@@ -77,23 +76,13 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 	results := []model.ProviderResult{}
 
 	for _, claimCid := range claimsCids {
-		fromCache := true
-		claim, err := ls.claimsCache.Get(ctx, claimCid)
+		claim, err := ls.claimsStore.Find(ctx, cidlink.Link{Cid: claimCid}, url.URL{})
 		if err != nil {
-			if !errors.Is(err, types.ErrKeyNotFound) {
-				log.Warnf("error getting legacy claim %s from cache: %s", claimCid, err)
+			if errors.Is(err, types.ErrKeyNotFound) {
+				continue
 			}
 
-			claim, err = ls.claimsStore.Get(ctx, cidlink.Link{Cid: claimCid})
-			if err != nil {
-				if errors.Is(err, types.ErrKeyNotFound) {
-					continue
-				}
-
-				return nil, err
-			}
-
-			fromCache = false
+			return nil, err
 		}
 
 		pr, err := ls.synthetizeProviderResult(claim)
@@ -103,13 +92,6 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 		}
 
 		results = append(results, pr)
-
-		// do not cache claim if it is already there
-		if !fromCache {
-			if err := ls.claimsCache.Set(ctx, claimCid, claim, true); err != nil {
-				log.Warnf("error caching legacy claim %s: %s", claimCid, err)
-			}
-		}
 	}
 
 	return results, nil
