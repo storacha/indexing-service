@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -158,9 +159,13 @@ func Construct(cfg Config) (types.Service, error) {
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
-	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName)
+	legacyDataBucketURL, err := url.Parse(cfg.LegacyDataBucketURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing carpark url: %s", err)
+	}
+	legacyClaimsMapper := NewBucketFallbackMapper(cfg.Signer, *legacyDataBucketURL, NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName))
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
-	legacyClaimsUrl := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
+	legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
 
 	service, err := construct.Construct(
 		cfg.ServiceConfig,
@@ -169,7 +174,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsUrl),
+		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsURL),
 	)
 	if err != nil {
 		return nil, err

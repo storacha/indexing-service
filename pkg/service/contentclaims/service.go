@@ -55,6 +55,6 @@ func (cs *ClaimService) Publish(ctx context.Context, claim delegation.Delegation
 }
 
 func New(store types.ContentClaimsStore, cache types.ContentClaimsCache, finder Finder) *ClaimService {
-	f := WithCache(WithStore(finder, store), cache)
+	f := WithIdentityCids(WithCache(WithStore(finder, store), cache))
 	return &ClaimService{store, cache, f}
 }
