@@ -37,6 +37,11 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
+const (
+	ClaimUrlPlaceholder = "{claim}"
+	blobUrlPlaceholder  = "{blob}"
+)
+
 var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
 
 // IndexingService implements read/write logic for indexing data with IPNI, content claims, sharded dag indexes, and a cache layer
@@ -242,7 +247,7 @@ func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.Quer
 	return queryresult.Build(qs.qr.Claims, qs.qr.Indexes)
 }
 
-func urlForResource(provider peer.AddrInfo, resourceType string, resourceID string) (*url.URL, error) {
+func urlForResource(provider peer.AddrInfo, resourcePlaceholder string, resourceID string) (*url.URL, error) {
 	for _, addr := range provider.Addrs {
 		// first, attempt to convert the addr to a url scheme
 		url, err := maurl.ToURL(addr)
@@ -255,18 +260,18 @@ func urlForResource(provider peer.AddrInfo, resourceType string, resourceID stri
 			continue
 		}
 		// we must have a place to place the resourceId in the path
-		if !strings.Contains(url.Path, resourceType) {
+		if !strings.Contains(url.Path, resourcePlaceholder) {
 			continue
 		}
-		// ok we have a matching URL, return with all resource type components replaced with the id
-		url.Path = strings.ReplaceAll(url.Path, resourceType, resourceID)
+		// ok we have a matching URL, return with all resource placeholders replaced with the id
+		url.Path = strings.ReplaceAll(url.Path, resourcePlaceholder, resourceID)
 		return url, nil
 	}
-	return nil, errors.New("no claim endpoint found")
+	return nil, fmt.Errorf("no %s endpoint found", resourcePlaceholder)
 }
 
 func fetchClaimURL(provider peer.AddrInfo, claimCid cid.Cid) (*url.URL, error) {
-	return urlForResource(provider, "{claim}", claimCid.String())
+	return urlForResource(provider, ClaimUrlPlaceholder, claimCid.String())
 }
 
 func fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) {
@@ -310,7 +315,7 @@ func WithConcurrency(concurrency int) Option {
 func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claims contentclaims.Service, publicAddrInfo peer.AddrInfo, providerIndex providerindex.ProviderIndex, options ...Option) *IndexingService {
 	provider := peer.AddrInfo{ID: publicAddrInfo.ID}
 	for _, addr := range publicAddrInfo.Addrs {
-		claimSuffix, _ := multiaddr.NewMultiaddr("/http-path/" + url.PathEscape("claim/{claim}"))
+		claimSuffix, _ := multiaddr.NewMultiaddr("/http-path/" + url.PathEscape("claim/"+ClaimUrlPlaceholder))
 		provider.Addrs = append(provider.Addrs, multiaddr.Join(addr, claimSuffix))
 	}
 	is := &IndexingService{

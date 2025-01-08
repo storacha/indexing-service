@@ -3,7 +3,6 @@ package contentclaims
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 
 	"github.com/ipld/go-ipld-prime"
@@ -55,7 +54,7 @@ func (cs *ClaimService) Publish(ctx context.Context, claim delegation.Delegation
 	return cs.Cache(ctx, claim)
 }
 
-func New(store types.ContentClaimsStore, cache types.ContentClaimsCache, httpClient *http.Client) *ClaimService {
-	f := WithCache(WithStore(NewSimpleFinder(httpClient), store), cache)
+func New(store types.ContentClaimsStore, cache types.ContentClaimsCache, finder Finder) *ClaimService {
+	f := WithCache(WithStore(finder, store), cache)
 	return &ClaimService{store, cache, f}
 }

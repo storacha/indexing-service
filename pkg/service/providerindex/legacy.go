@@ -12,6 +12,7 @@ import (
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 
 	"github.com/ipfs/go-cid"
@@ -34,7 +35,7 @@ type LegacyClaimsFinder interface {
 // LegacyClaimsStore allows finding claims on a legacy store
 type LegacyClaimsStore struct {
 	contentToClaims ContentToClaimsMapper
-	claimsStore     types.ContentClaimsStore
+	claimsStore     contentclaims.Finder
 	claimsAddr      ma.Multiaddr
 }
 
@@ -43,7 +44,7 @@ type ContentToClaimsMapper interface {
 	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
-func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore types.ContentClaimsStore, claimsUrl string) (LegacyClaimsStore, error) {
+func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore contentclaims.Finder, claimsUrl string) (LegacyClaimsStore, error) {
 	legacyClaimsUrl, err := url.Parse(claimsUrl)
 	if err != nil {
 		return LegacyClaimsStore{}, err
@@ -75,7 +76,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 	results := []model.ProviderResult{}
 
 	for _, claimCid := range claimsCids {
-		claim, err := ls.claimsStore.Get(ctx, cidlink.Link{Cid: claimCid})
+		claim, err := ls.claimsStore.Find(ctx, cidlink.Link{Cid: claimCid}, url.URL{})
 		if err != nil {
 			if errors.Is(err, types.ErrKeyNotFound) {
 				continue

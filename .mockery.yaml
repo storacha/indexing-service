@@ -10,8 +10,15 @@ packages:
     interfaces:
       ContentToClaimsMapper:
       LegacyClaimsFinder:
+  github.com/storacha/indexing-service/pkg/service/contentclaims:
+    interfaces:
+      Finder:
+        config:
+          filename: 'mock_ContentClaimsFinder.go'
+          mockname: MockContentClaimsFinder
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
+      ContentClaimsCache:
       ContentClaimsStore:
       ProviderStore:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
