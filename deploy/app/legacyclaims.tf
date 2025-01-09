@@ -16,6 +16,12 @@ variable "legacy_block_index_table_name" {
   default = ""
 }
 
+variable "legacy_block_index_table_region" {
+  description = "The region where the legacy block index DynamoDB table is provisioned"
+  type = string
+  default = "us-west-2"
+}
+
 locals {
     inferred_legacy_block_index_table_name = var.legacy_block_index_table_name != "" ? var.legacy_block_index_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
 }
@@ -28,7 +34,14 @@ data "aws_dynamodb_table" "legacy_claims_table" {
   name = var.legacy_claims_table_name
 }
 
+# the block index table is always deployed in us-west-2 for both prod and staging
+provider "aws" {
+  alias = "block_index"
+  region = var.legacy_block_index_table_region
+}
+
 data "aws_dynamodb_table" "legacy_block_index_table" {
+  provider = aws.block_index
   name = local.inferred_legacy_block_index_table_name
 }
 
