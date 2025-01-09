@@ -31,8 +31,3 @@ provider "aws" {
 }
 
 data "aws_region" "current" {}
-
-provider "aws" {
-  alias = "virginia"
-  region = "us-east-1"
-}
