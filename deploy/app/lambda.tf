@@ -144,10 +144,10 @@ data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
     ]
 
     resources = [
-      "arn:aws:elasticache:${data.aws_region.current.name}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["providers"].id}",
-      "arn:aws:elasticache:${data.aws_region.current.name}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["indexes"].id}",
-      "arn:aws:elasticache:${data.aws_region.current.name}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["claims"].id}",
-      "arn:aws:elasticache:${data.aws_region.current.name}:${var.allowed_account_ids[0]}:user:${aws_elasticache_user.cache_iam_user.user_id}"
+      "${aws_elasticache_serverless_cache.cache["providers"].arn}",
+      "${aws_elasticache_serverless_cache.cache["indexes"].arn}",
+      "${aws_elasticache_serverless_cache.cache["claims"].arn}",
+      "${aws_elasticache_user.cache_iam_user.arn}"
     ]
   }
 }
