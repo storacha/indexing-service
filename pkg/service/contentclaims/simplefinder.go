@@ -37,7 +37,7 @@ func (sf *simpleFinder) Find(ctx context.Context, id ipld.Link, fetchURL url.URL
 		return nil, fmt.Errorf("reading fetched claim body: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("failure response fetching claim. status: %s, message: %s", resp.Status, string(body))
+		return nil, fmt.Errorf("failure response fetching claim. URL: %s, status: %s, message: %s", fetchURL.String(), resp.Status, string(body))
 	}
 	dlg, err := delegation.Extract(body)
 	if err != nil {
