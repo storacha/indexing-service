@@ -30,6 +30,10 @@ concurrency:
 env:
   AWS_ACCOUNT_ID: ${{ secrets.aws-account-id }}
   AWS_REGION: ${{ secrets.aws-region }}
+  ENV: ${{ inputs.env }}
+  TF_WORKSPACE: ${{ inputs.workspace }}
+  TF_VAR_private_key: ${{ secrets.private-key }}
+  TF_VAR_did: ${{ inputs.did }}
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -44,18 +48,11 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-region: ${{ inputs.aws-region }}
-          role-to-assume: arn:aws:iam::${{ secrets.aws-account-id }}:role/terraform-ci
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/terraform-ci
 
       - uses: opentofu/setup-opentofu@v1
       - uses: actions/setup-go@v5
-
-      - name: Set Environment Variables
-        run: |
-          echo "ENV=${{ inputs.env }}" >> $GITHUB_ENV
-          echo "TF_WORKSPACE=${{ inputs.workspace }}" >> $GITHUB_ENV
-          echo "TF_VAR_private_key=${{ secrets.private-key }}" >> $GITHUB_ENV
-          echo "TF_VAR_did=${{ inputs.did }}" >> $GITHUB_ENV
 
       - name: Tofu Init
         run: |
