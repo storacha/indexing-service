@@ -5,8 +5,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -15,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/redis/go-redis/v9"
 	"github.com/storacha/go-metadata"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
@@ -158,9 +161,20 @@ func Construct(cfg Config) (types.Service, error) {
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
-	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName)
+	legacyDataBucketURL, err := url.Parse(cfg.LegacyDataBucketURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing carpark url: %s", err)
+	}
+	legacyClaimsMapper := NewBucketFallbackMapper(
+		cfg.Signer,
+		legacyDataBucketURL,
+		NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName),
+		func() []delegation.Option {
+			return []delegation.Option{delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix()))}
+		},
+	)
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
-	legacyClaimsUrl := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
+	legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
 
 	service, err := construct.Construct(
 		cfg.ServiceConfig,
@@ -169,7 +183,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsUrl),
+		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsURL),
 	)
 	if err != nil {
 		return nil, err
