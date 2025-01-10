@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -46,7 +47,7 @@ func TestSimpleFinder__Find(t *testing.T) {
 		{
 			name:        "failure",
 			handler:     http.NotFound,
-			expectedErr: errors.New("failure response fetching claim. status: 404 Not Found, message: 404 page not found\n"),
+			expectedErr: errors.New("failure response fetching claim. URL: {url}, status: 404 Not Found, message: 404 page not found\n"),
 		},
 	}
 	// Run test cases
@@ -58,7 +59,7 @@ func TestSimpleFinder__Find(t *testing.T) {
 			cl := contentclaims.NewSimpleFinder(testServer.Client())
 			claim, err := cl.Find(context.Background(), claim.Link(), *testutil.Must(url.Parse(testServer.URL))(t))
 			if tc.expectedErr != nil {
-				require.EqualError(t, err, tc.expectedErr.Error())
+				require.EqualError(t, err, strings.ReplaceAll(tc.expectedErr.Error(), "{url}", testServer.URL))
 			} else {
 				require.NoError(t, err)
 			}
