@@ -4,6 +4,12 @@ variable "legacy_claims_table_name" {
   default = ""
 }
 
+variable "legacy_claims_table_region" {
+  description = "The region where the legacy content-claims DynamoDB table is provisioned"
+  type = string
+  default = ""
+}
+
 variable "legacy_claims_bucket_name" {
   description = "The name of the S3 bucket used by the legacy content-claims service"
   type = string
@@ -16,6 +22,7 @@ variable "legacy_block_index_table_name" {
   default = ""
 }
 
+# the block index table is always deployed in us-west-2 for both prod and staging
 variable "legacy_block_index_table_region" {
   description = "The region where the legacy block index DynamoDB table is provisioned"
   type = string
@@ -24,6 +31,7 @@ variable "legacy_block_index_table_region" {
 
 locals {
     inferred_legacy_claims_table_name = var.legacy_claims_table_name != "" ? var.legacy_claims_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-content-claims-claims-v1"
+    inferred_legacy_claims_table_region = var.legacy_claims_table_region != "" ? var.legacy_claims_table_region : "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
     inferred_legacy_claims_bucket_name = var.legacy_claims_bucket_name != "" ? var.legacy_claims_bucket_name : "${terraform.workspace == "prod" ? "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8" : "staging-content-claims-buc-claimsv1bucketefd46802-1xx2brszve6t3"}"
     inferred_legacy_block_index_table_name = var.legacy_block_index_table_name != "" ? var.legacy_block_index_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
 }
@@ -32,11 +40,16 @@ data "aws_s3_bucket" "legacy_claims_bucket" {
   bucket = local.inferred_legacy_claims_bucket_name
 }
 
+provider "aws" {
+  alias = "legacy_claims"
+  region = local.inferred_legacy_claims_table_region
+}
+
 data "aws_dynamodb_table" "legacy_claims_table" {
+  provider = aws.legacy_claims
   name = local.inferred_legacy_claims_table_name
 }
 
-# the block index table is always deployed in us-west-2 for both prod and staging
 provider "aws" {
   alias = "block_index"
   region = var.legacy_block_index_table_region
