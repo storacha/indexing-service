@@ -7,13 +7,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multicodec"
 	multihash "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/principal"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -22,16 +23,18 @@ type ContentToClaimsMapper interface {
 }
 
 type BucketFallbackMapper struct {
-	id               principal.Signer
-	carparkPublicURL url.URL
-	baseMapper       ContentToClaimsMapper
+	id         principal.Signer
+	bucketURL  *url.URL
+	baseMapper ContentToClaimsMapper
+	getOpts    func() []delegation.Option
 }
 
-func NewBucketFallbackMapper(id principal.Signer, carparkPublicURL url.URL, baseMapper ContentToClaimsMapper) BucketFallbackMapper {
+func NewBucketFallbackMapper(id principal.Signer, bucketURL *url.URL, baseMapper ContentToClaimsMapper, getOpts func() []delegation.Option) BucketFallbackMapper {
 	return BucketFallbackMapper{
-		id:               id,
-		carparkPublicURL: carparkPublicURL,
-		baseMapper:       baseMapper,
+		id:         id,
+		bucketURL:  bucketURL,
+		baseMapper: baseMapper,
+		getOpts:    getOpts,
 	}
 }
 
@@ -41,7 +44,7 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 		return claims, err
 	}
 
-	resp, err := http.DefaultClient.Head(cfm.carparkPublicURL.JoinPath(toBlobKey(contentHash)).String())
+	resp, err := http.DefaultClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
 	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, types.ErrKeyNotFound
 	}
@@ -52,10 +55,10 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 		cfm.id.DID().String(),
 		assert.LocationCaveats{
 			Content:  assert.FromHash(contentHash),
-			Location: []url.URL{*cfm.carparkPublicURL.JoinPath(toBlobKey(contentHash))},
+			Location: []url.URL{*cfm.bucketURL.JoinPath(toBlobKey(contentHash))},
 			Range:    &assert.Range{Offset: 0, Length: &size},
 		},
-		delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix())),
+		cfm.getOpts()...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("generating delegation: %w", err)
@@ -66,7 +69,7 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 	}
 	c, err := cid.Prefix{
 		Version:  1,
-		Codec:    cid.Raw,
+		Codec:    uint64(multicodec.Car),
 		MhType:   multihash.IDENTITY,
 		MhLength: len(delegationData),
 	}.Sum(delegationData)
@@ -77,6 +80,6 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 }
 
 func toBlobKey(contentHash multihash.Multihash) string {
-	mhStr := contentHash.B58String()
-	return fmt.Sprintf("%s/%s.blob", mhStr)
+	mhStr := digestutil.Format(contentHash)
+	return fmt.Sprintf("%s/%s.blob", mhStr, mhStr)
 }
