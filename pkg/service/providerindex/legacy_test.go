@@ -104,7 +104,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.LocationCaveats]{locationClaim}))(t)
 
-		result, err := legacyClaims.synthetizeProviderResult(locationDelegation)
+		result, err := legacyClaims.synthetizeProviderResult(link.ToCID(locationDelegation.Link()), locationDelegation)
 
 		require.NoError(t, err)
 
@@ -142,7 +142,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		})
 		indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.IndexCaveats]{indexClaim}))(t)
 
-		result, err := legacyClaims.synthetizeProviderResult(indexDelegation)
+		result, err := legacyClaims.synthetizeProviderResult(link.ToCID(indexDelegation.Link()), indexDelegation)
 
 		require.NoError(t, err)
 
@@ -177,7 +177,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 
 		equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.EqualsCaveats]{equalsClaim}))(t)
 
-		result, err := legacyClaims.synthetizeProviderResult(equalsDelegation)
+		result, err := legacyClaims.synthetizeProviderResult(link.ToCID(equalsDelegation.Link()), equalsDelegation)
 
 		require.NoError(t, err)
 
@@ -211,7 +211,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 
 		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.PartitionCaveats]{partitionClaim}))(t)
 
-		_, err := legacyClaims.synthetizeProviderResult(partitionDelegation)
+		_, err := legacyClaims.synthetizeProviderResult(link.ToCID(partitionDelegation.Link()), partitionDelegation)
 
 		require.Error(t, err)
 	})
