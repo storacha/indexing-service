@@ -9,7 +9,7 @@ import (
 	cid "github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
-	adm "github.com/storacha/go-capabilities/pkg/assert/datamodel"
+	"github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
@@ -21,7 +21,7 @@ func TestContentClaimsStore(t *testing.T) {
 	mockRedis := NewMockRedis()
 	contentClaimsStore := redis.NewContentClaimsStore(mockRedis)
 	claim1 := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-		Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: testutil.RandomMultihash()}))(t),
+		Content:  types.FromHash(testutil.RandomMultihash()),
 		Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 	})
 	delegation1 := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.LocationCaveats]{claim1}))(t)

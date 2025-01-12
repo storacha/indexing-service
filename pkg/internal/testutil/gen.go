@@ -20,6 +20,7 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	"github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -128,7 +129,7 @@ func RandomMultihashes(count int) []mh.Multihash {
 
 func RandomLocationClaim() ucan.Capability[assert.LocationCaveats] {
 	return assert.Location.New(Service.DID().String(), assert.LocationCaveats{
-		Content:  assert.FromHash(RandomMultihash()),
+		Content:  types.FromHash(RandomMultihash()),
 		Location: []url.URL{*TestURL},
 	})
 }

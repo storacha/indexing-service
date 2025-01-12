@@ -13,6 +13,8 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
+
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/blobindex"
@@ -124,7 +126,7 @@ func TestLegacyService(t *testing.T) {
 	t.Run("returns claims from underlying indexing service", func(t *testing.T) {
 		mockStore := newMockBlockIndexStore()
 		digest := testutil.RandomMultihash()
-		nb := assert.LocationCaveats{Content: assert.FromHash(digest)}
+		nb := assert.LocationCaveats{Content: capabilitytypes.FromHash(digest)}
 		claim, err := assert.Location.Delegate(id, id, id.DID().String(), nb)
 		require.NoError(t, err)
 
@@ -187,7 +189,7 @@ func TestLegacyService(t *testing.T) {
 		service, err := NewService(id, &mockService, mockStore, bucketURL.String())
 		require.NoError(t, err)
 
-		nb := assert.LocationCaveats{Content: assert.FromHash(digest)}
+		nb := assert.LocationCaveats{Content: capabilitytypes.FromHash(digest)}
 		claim, err := assert.Location.Delegate(id, id, id.DID().String(), nb)
 		require.NoError(t, err)
 

@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
@@ -36,6 +37,8 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
 )
+
+var log = logging.Logger("indexer/service")
 
 const (
 	ClaimUrlPlaceholder = "{claim}"
@@ -115,6 +118,9 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 		Spaces:       state.Access().q.Match.Subject,
 		TargetClaims: targetClaims[j.jobType],
 	})
+
+	log.Debugw("providers index query", "job", j.key(), "results", results)
+
 	if err != nil {
 		return err
 	}

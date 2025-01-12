@@ -12,6 +12,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
+
 	"github.com/storacha/go-capabilities/pkg/claim"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -50,7 +52,7 @@ func TestServer(t *testing.T) {
 		testutil.Alice,
 		testutil.Alice.DID().String(),
 		assert.LocationCaveats{
-			Content:  assert.FromHash(testutil.RandomMultihash()),
+			Content:  capabilitytypes.FromHash(testutil.RandomMultihash()),
 			Location: []url.URL{*testutil.Must(url.Parse("https://www.yahoo.com"))(t)},
 			Space:    testutil.Bob.DID(),
 		}))(t)
@@ -76,7 +78,7 @@ func TestServer(t *testing.T) {
 			testutil.Service,
 			testutil.Service.DID().String(),
 			assert.EqualsCaveats{
-				Content: assert.FromHash(testutil.RandomMultihash()),
+				Content: capabilitytypes.FromHash(testutil.RandomMultihash()),
 				Equals:  testutil.RandomCID(),
 			},
 		))(t),
@@ -149,7 +151,7 @@ func TestPrincipalResolver(t *testing.T) {
 		testutil.Service,
 		testutil.Service.DID().String(),
 		assert.EqualsCaveats{
-			Content: assert.FromHash(testutil.RandomMultihash()),
+			Content: capabilitytypes.FromHash(testutil.RandomMultihash()),
 			Equals:  testutil.RandomCID(),
 		},
 		delegation.WithProof(proof),

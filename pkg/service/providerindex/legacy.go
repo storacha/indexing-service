@@ -14,27 +14,31 @@ import (
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
+	"golang.org/x/exp/slices"
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/ipni/go-libipni/maurl"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 )
 
+var ErrIgnoreFiltered = errors.New("claim type is not in list of target claims")
+
 // LegacyClaimsFinder is a read-only interface to find claims on a legacy system
 type LegacyClaimsFinder interface {
 	// Find returns a list of claims for a given content hash.
 	// Implementations should return an empty slice and no error if no results are found.
-	Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error)
+	Find(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error)
 }
 
 // LegacyClaimsStore allows finding claims on a legacy store
 type LegacyClaimsStore struct {
-	contentToClaims ContentToClaimsMapper
+	contentToClaims []ContentToClaimsMapper
 	claimsStore     contentclaims.Finder
 	claimsAddr      ma.Multiaddr
 }
@@ -44,7 +48,7 @@ type ContentToClaimsMapper interface {
 	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
-func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStore contentclaims.Finder, claimsUrl string) (LegacyClaimsStore, error) {
+func NewLegacyClaimsStore(contentToClaimsMappers []ContentToClaimsMapper, claimStore contentclaims.Finder, claimsUrl string) (LegacyClaimsStore, error) {
 	legacyClaimsUrl, err := url.Parse(claimsUrl)
 	if err != nil {
 		return LegacyClaimsStore{}, err
@@ -55,7 +59,7 @@ func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStor
 	}
 
 	return LegacyClaimsStore{
-		contentToClaims: contentToClaimsMapper,
+		contentToClaims: contentToClaimsMappers,
 		claimsStore:     claimStore,
 		claimsAddr:      claimsAddr,
 	}, nil
@@ -63,8 +67,21 @@ func NewLegacyClaimsStore(contentToClaimsMapper ContentToClaimsMapper, claimStor
 
 // Find looks for the corresponding claims for a given content hash in the mapper and then fetches the claims from the
 // claims store
-func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
-	claimsCids, err := ls.contentToClaims.GetClaims(ctx, contentHash)
+func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
+	for _, mapper := range ls.contentToClaims {
+		claims, err := ls.findOne(ctx, contentHash, targetClaims, mapper)
+		if err != nil {
+			return nil, err
+		}
+		if len(claims) > 0 {
+			return claims, nil
+		}
+	}
+	return nil, nil
+}
+
+func (ls LegacyClaimsStore) findOne(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code, mapper ContentToClaimsMapper) ([]model.ProviderResult, error) {
+	claimsCids, err := mapper.GetClaims(ctx, contentHash)
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotFound) {
 			return []model.ProviderResult{}, nil
@@ -85,9 +102,11 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 			return nil, err
 		}
 
-		pr, err := ls.synthetizeProviderResult(claimCid, claim)
+		pr, err := ls.synthetizeProviderResult(claimCid, claim, targetClaims)
 		if err != nil {
-			log.Warnf("error synthetizing provider result for claim %s: %s", claimCid, err)
+			if !errors.Is(err, ErrIgnoreFiltered) {
+				log.Warnf("error synthetizing provider result for claim %s: %s", claimCid, err)
+			}
 			continue
 		}
 
@@ -98,7 +117,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 }
 
 // synthetizeProviderResult synthetizes a provider result, including metadata, from a given claim
-func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegation.Delegation) (model.ProviderResult, error) {
+func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegation.Delegation, targetClaims []multicodec.Code) (model.ProviderResult, error) {
 	expiration := int64(0)
 	if claim.Expiration() != nil {
 		expiration = int64(*claim.Expiration())
@@ -111,6 +130,9 @@ func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim del
 	cap := claim.Capabilities()[0]
 	switch cap.Can() {
 	case assert.LocationAbility:
+		if !slices.Contains(targetClaims, metadata.LocationCommitmentID) {
+			return model.ProviderResult{}, ErrIgnoreFiltered
+		}
 		caveats, err := assert.LocationCaveatsReader.Read(cap.Nb())
 		if err != nil {
 			return model.ProviderResult{}, err
@@ -118,6 +140,9 @@ func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim del
 		return ls.synthetizeLocationProviderResult(caveats, claimCid, expiration)
 
 	case assert.IndexAbility:
+		if !slices.Contains(targetClaims, metadata.IndexClaimID) {
+			return model.ProviderResult{}, ErrIgnoreFiltered
+		}
 		caveats, err := assert.IndexCaveatsReader.Read(cap.Nb())
 		if err != nil {
 			return model.ProviderResult{}, err
@@ -125,6 +150,9 @@ func (ls LegacyClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim del
 		return ls.synthetizeIndexProviderResult(caveats, claimCid, expiration)
 
 	case assert.EqualsAbility:
+		if !slices.Contains(targetClaims, metadata.EqualsClaimID) {
+			return model.ProviderResult{}, ErrIgnoreFiltered
+		}
 		caveats, err := assert.EqualsCaveatsReader.Read(cap.Nb())
 		if err != nil {
 			return model.ProviderResult{}, err
@@ -270,6 +298,6 @@ func NewNoResultsLegacyClaimsFinder() NoResultsLegacyClaimsFinder {
 }
 
 // Find always returns no results
-func (f NoResultsLegacyClaimsFinder) Find(ctx context.Context, contentHash multihash.Multihash) ([]model.ProviderResult, error) {
+func (f NoResultsLegacyClaimsFinder) Find(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	return []model.ProviderResult{}, nil
 }

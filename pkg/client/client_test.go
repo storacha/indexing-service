@@ -19,6 +19,8 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
+
 	"github.com/storacha/go-capabilities/pkg/claim"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/car"
@@ -95,7 +97,7 @@ func TestClient(t *testing.T) {
 		storageID.DID().String(),
 		assert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(digest),
+			Content:  capabilitytypes.FromHash(digest),
 			Location: []url.URL{*storageURL.JoinPath("/blob/%s", digestutil.Format(digest))},
 		},
 	)
@@ -120,7 +122,7 @@ func TestClient(t *testing.T) {
 		storageID.DID().String(),
 		assert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(indexDigest),
+			Content:  capabilitytypes.FromHash(indexDigest),
 			Location: []url.URL{*storageURL.JoinPath("/blob/%s", digestutil.Format(indexDigest))},
 		},
 	)
