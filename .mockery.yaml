@@ -1,21 +1,26 @@
 issue-845-fix: True
 resolve-type-alias: False
 with-expecter: True
-filename: 'mock_{{.InterfaceName}}.go'
-dir: 'pkg/internal/testutil/mocks'
-mockname: 'Mock{{.InterfaceName}}'
-outpkg: 'mocks'
+filename: "mock_{{.InterfaceName}}.go"
+dir: "pkg/internal/testutil/mocks"
+mockname: "Mock{{.InterfaceName}}"
+outpkg: "mocks"
 packages:
+  github.com/storacha/indexing-service/pkg/service/blobindexlookup:
+    interfaces:
+      BlobIndexLookup:
+  github.com/storacha/indexing-service/pkg/service/contentclaims:
+    config:
+      filename: "mock_ContentClaims{{.InterfaceName}}.go"
+      mockname: "MockContentClaims{{.InterfaceName}}"
+    interfaces:
+      Finder:
+      Service:
   github.com/storacha/indexing-service/pkg/service/providerindex:
     interfaces:
       ContentToClaimsMapper:
       LegacyClaimsFinder:
-  github.com/storacha/indexing-service/pkg/service/contentclaims:
-    interfaces:
-      Finder:
-        config:
-          filename: 'mock_ContentClaimsFinder.go'
-          mockname: MockContentClaimsFinder
+      ProviderIndex:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
       ContentClaimsCache:
