@@ -77,7 +77,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 			return claims, nil
 		}
 	}
-	return nil, nil
+	return []model.ProviderResult{}, nil
 }
 
 func (ls LegacyClaimsStore) findOne(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code, mapper ContentToClaimsMapper) ([]model.ProviderResult, error) {
