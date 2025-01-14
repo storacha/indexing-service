@@ -10,7 +10,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil/mocks"
+	"github.com/storacha/indexing-service/pkg/internal/testutil/extmocks"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ func TestGetClaims(t *testing.T) {
 	testTable := "sometable"
 
 	t.Run("happy path", func(t *testing.T) {
-		mockDynamoDBClient := mocks.NewMockQueryAPIClient(t)
+		mockDynamoDBClient := extmocks.NewMockDynamoDBQueryClient(t)
 		dynamoDBMapper := NewDynamoContentToClaimsMapper(mockDynamoDBClient, testTable)
 
 		contentHash := testutil.RandomMultihash()
@@ -55,7 +55,7 @@ func TestGetClaims(t *testing.T) {
 	})
 
 	t.Run("returns ErrKeyNotFound when there are no results in the DB", func(t *testing.T) {
-		mockDynamoDBClient := mocks.NewMockQueryAPIClient(t)
+		mockDynamoDBClient := extmocks.NewMockDynamoDBQueryClient(t)
 		dynamoDBMapper := NewDynamoContentToClaimsMapper(mockDynamoDBClient, testTable)
 
 		ctx := context.Background()
