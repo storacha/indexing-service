@@ -43,10 +43,13 @@ func SingleWalker[Job, State any](ctx context.Context, initial []Job, initialSta
 		}
 		next := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		handler(ctx, next, func(j Job) error {
+		err := handler(ctx, next, func(j Job) error {
 			stack = append(stack, j)
 			return nil
 		}, state)
+		if err != nil {
+			return state.Access(), err
+		}
 	}
 	return state.Access(), nil
 }
