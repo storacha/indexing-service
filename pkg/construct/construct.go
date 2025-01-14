@@ -182,7 +182,7 @@ func WithIndexesClient(client redis.Client) Option {
 	}
 }
 
-// WithLegacyClaims uses the given LegacyClaimsFinder to find claims on legacy systems and storage
+// WithLegacyClaims configures the service to find claims on legacy systems and storage
 func WithLegacyClaims(legacyClaimsMappers []providerindex.ContentToClaimsMapper, legacyClaimsBucket types.ContentClaimsStore, legacyClaimsUrl string) Option {
 	return func(cfg *config) error {
 		cfg.legacyClaimsMappers = legacyClaimsMappers
