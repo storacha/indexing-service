@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -116,6 +117,122 @@ func TestQuery(t *testing.T) {
 
 		require.ElementsMatch(t, expectedResult.Claims(), result.Claims())
 		require.ElementsMatch(t, expectedResult.Indexes(), result.Indexes())
+	})
+
+	t.Run("returns error when ProviderIndex service errors", func(t *testing.T) {
+		mockBlobIndexLookup := mocks.NewMockBlobIndexLookup(t)
+		mockClaimsService := mocks.NewMockContentClaimsService(t)
+		mockProviderIndex := mocks.NewMockProviderIndex(t)
+
+		contentLink := testutil.RandomCID()
+		contentHash := contentLink.(cidlink.Link).Hash()
+
+		ctx := context.Background()
+
+		// expect a call to find records for content
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         contentHash,
+			TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{}, errors.New("provider index error"))
+
+		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer()}, mockProviderIndex)
+
+		_, err := service.Query(ctx, types.Query{Hashes: []mh.Multihash{contentHash}})
+
+		require.Error(t, err)
+	})
+
+	t.Run("returns error when ContentClaims service errors", func(t *testing.T) {
+		mockBlobIndexLookup := mocks.NewMockBlobIndexLookup(t)
+		mockClaimsService := mocks.NewMockContentClaimsService(t)
+		mockProviderIndex := mocks.NewMockProviderIndex(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		contentLink := testutil.RandomCID()
+		contentHash := contentLink.(cidlink.Link).Hash()
+
+		ctx := context.Background()
+
+		// content will have a location claim
+		locationDelegationCid, _, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		contentResults := []model.ProviderResult{locationProviderResult}
+
+		// expect a call to find records for content
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         contentHash,
+			TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+		}).Return(contentResults, nil)
+
+		// the results for content should make the IndexingService ask for the location claim, but that will fail
+		locationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", locationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(ctx, locationDelegationCid, locationClaimUrl).Return(nil, errors.New("content claims service error"))
+		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer()}, mockProviderIndex)
+
+		_, err := service.Query(ctx, types.Query{Hashes: []mh.Multihash{contentHash}})
+
+		require.Error(t, err)
+	})
+
+	t.Run("returns error when BlobIndexLookup service errors", func(t *testing.T) {
+		mockBlobIndexLookup := mocks.NewMockBlobIndexLookup(t)
+		mockClaimsService := mocks.NewMockContentClaimsService(t)
+		mockProviderIndex := mocks.NewMockProviderIndex(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+			},
+		}
+
+		contentLink := testutil.RandomCID()
+		contentHash := contentLink.(cidlink.Link).Hash()
+
+		ctx := context.Background()
+
+		// content will have a location claim and an index claim
+		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		indexDelegationCid, indexDelegation, indexResult, indexCid, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		contentResults := []model.ProviderResult{locationProviderResult, indexResult}
+
+		// expect a call to find records for content
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         contentHash,
+			TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+		}).Return(contentResults, nil)
+
+		// the results for content should make the IndexingService ask for both claims
+		locationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", locationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(ctx, locationDelegationCid, locationClaimUrl).Return(locationDelegation, nil)
+		indexClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", indexDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(ctx, indexDelegationCid, indexClaimUrl).Return(indexDelegation, nil)
+
+		// then attempt to find records for the index referenced in the index claim
+		indexLocationDelegationCid, indexLocationDelegation, indexLocationProviderResult := buildTestLocationClaim(t, indexCid, providerAddr)
+
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         indexCid.Hash(),
+			TargetClaims: []multicodec.Code{metadata.IndexClaimID, metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{indexLocationProviderResult}, nil)
+
+		// fetch the index's location claim
+		indexLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", indexLocationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(ctx, indexLocationDelegationCid, indexLocationClaimUrl).Return(indexLocationDelegation, nil)
+
+		// and finally call the blob index lookup service to fetch the actual index, which will fail
+		indexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexCid.Hash()))))(t)
+		mockBlobIndexLookup.EXPECT().Find(ctx, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, indexBlobUrl, (*metadata.Range)(nil)).Return(nil, errors.New("blob index lookup error"))
+
+		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer()}, mockProviderIndex)
+
+		_, err := service.Query(ctx, types.Query{Hashes: []mh.Multihash{contentHash}})
+
+		require.Error(t, err)
 	})
 }
 
