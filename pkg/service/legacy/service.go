@@ -16,6 +16,7 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/principal"
@@ -58,7 +59,7 @@ func (l *IndexingService) Query(ctx context.Context, q types.Query) (types.Query
 	var locs []assert.LocationCaveats
 	for _, h := range q.Hashes {
 		// lets see if we can materialize some location claims
-		content := assert.FromHash(h)
+		content := capabilitytypes.FromHash(h)
 		records, err := l.blockIndexStore.Query(ctx, content.Hash())
 		if err != nil {
 			if errors.Is(err, types.ErrKeyNotFound) {

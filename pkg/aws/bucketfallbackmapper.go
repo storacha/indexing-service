@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"github.com/multiformats/go-multicodec"
 	multihash "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
@@ -23,27 +23,20 @@ type ContentToClaimsMapper interface {
 }
 
 type BucketFallbackMapper struct {
-	id         principal.Signer
-	bucketURL  *url.URL
-	baseMapper ContentToClaimsMapper
-	getOpts    func() []delegation.Option
+	id        principal.Signer
+	bucketURL *url.URL
+	getOpts   func() []delegation.Option
 }
 
-func NewBucketFallbackMapper(id principal.Signer, bucketURL *url.URL, baseMapper ContentToClaimsMapper, getOpts func() []delegation.Option) BucketFallbackMapper {
+func NewBucketFallbackMapper(id principal.Signer, bucketURL *url.URL, getOpts func() []delegation.Option) BucketFallbackMapper {
 	return BucketFallbackMapper{
-		id:         id,
-		bucketURL:  bucketURL,
-		baseMapper: baseMapper,
-		getOpts:    getOpts,
+		id:        id,
+		bucketURL: bucketURL,
+		getOpts:   getOpts,
 	}
 }
 
 func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
-	claims, err := cfm.baseMapper.GetClaims(ctx, contentHash)
-	if err == nil || !errors.Is(err, types.ErrKeyNotFound) {
-		return claims, err
-	}
-
 	resp, err := http.DefaultClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
 	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, types.ErrKeyNotFound
@@ -54,7 +47,7 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 		cfm.id,
 		cfm.id.DID().String(),
 		assert.LocationCaveats{
-			Content:  assert.FromHash(contentHash),
+			Content:  capabilitytypes.FromHash(contentHash),
 			Location: []url.URL{*cfm.bucketURL.JoinPath(toBlobKey(contentHash))},
 			Range:    &assert.Range{Offset: 0, Length: &size},
 		},
@@ -76,7 +69,7 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 	if err != nil {
 		return nil, fmt.Errorf("generating identity cid: %w", err)
 	}
-	return []cid.Cid{c}, err
+	return []cid.Cid{c}, nil
 }
 
 func toBlobKey(contentHash multihash.Multihash) string {

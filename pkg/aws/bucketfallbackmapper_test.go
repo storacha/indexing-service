@@ -2,7 +2,6 @@ package aws_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,10 +11,11 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
-	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
+
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/bytemap"
@@ -27,18 +27,9 @@ import (
 
 func TestBucketFallbackMapper(t *testing.T) {
 	ctx := context.Background()
-	baseMap := bytemap.NewByteMap[multihash.Multihash, cidsAndError](-1)
 	responses := bytemap.NewByteMap[multihash.Multihash, resp](-1)
 	signer := testutil.RandomSigner()
 	serverURL := testutil.Must(url.Parse("http://localhost:8888"))(t)
-
-	hasBaseResultsHash := testutil.RandomMultihash()
-	hasBaseResultCids := []cid.Cid{testutil.RandomCID().(cidlink.Link).Cid}
-	baseMap.Set(hasBaseResultsHash, cidsAndError{hasBaseResultCids, nil})
-
-	hasBaseErrorHash := testutil.RandomMultihash()
-	hasBaseError := errors.New("something went real wrong")
-	baseMap.Set(hasBaseErrorHash, cidsAndError{nil, hasBaseError})
 
 	hasNonSuccessHash := testutil.RandomMultihash()
 	responses.Set(hasNonSuccessHash, resp{0, http.StatusInternalServerError})
@@ -51,7 +42,7 @@ func TestBucketFallbackMapper(t *testing.T) {
 		signer,
 		signer.DID().String(),
 		assert.LocationCaveats{
-			Content: assert.FromHash(hasSuccessHash),
+			Content: capabilitytypes.FromHash(hasSuccessHash),
 			Location: []url.URL{
 				*serverURL.JoinPath(digestutil.Format(hasSuccessHash), fmt.Sprintf("%s.blob", digestutil.Format(hasSuccessHash))),
 			},
@@ -80,16 +71,6 @@ func TestBucketFallbackMapper(t *testing.T) {
 		expectedClaim delegation.Delegation
 	}{
 		{
-			name:         "base mapper has results",
-			hash:         hasBaseResultsHash,
-			expectedCids: hasBaseResultCids,
-		},
-		{
-			name:        "base mapper has error other than not found",
-			hash:        hasBaseErrorHash,
-			expectedErr: hasBaseError,
-		},
-		{
 			name:        "non 200 status code from fallback bucket",
 			hash:        hasNonSuccessHash,
 			expectedErr: types.ErrKeyNotFound,
@@ -113,7 +94,7 @@ func TestBucketFallbackMapper(t *testing.T) {
 			go func() {
 				doneErr <- server.ListenAndServe()
 			}()
-			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, serverURL, mockMapper{baseMap}, func() []delegation.Option {
+			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, serverURL, func() []delegation.Option {
 				return []delegation.Option{delegation.WithNoExpiration()}
 			})
 			cids, err := bucketFallbackMapper.GetClaims(ctx, testCase.hash)
@@ -179,17 +160,4 @@ func (m mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type cidsAndError struct {
 	cids []cid.Cid
 	err  error
-}
-
-type mockMapper struct {
-	contentMap bytemap.ByteMap[multihash.Multihash, cidsAndError]
-}
-
-// GetClaims implements aws.ContentToClaimsMapper.
-func (m mockMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
-	if !m.contentMap.Has(contentHash) {
-		return nil, types.ErrKeyNotFound
-	}
-	resp := m.contentMap.Get(contentHash)
-	return resp.cids, resp.err
 }
