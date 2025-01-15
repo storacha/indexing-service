@@ -86,6 +86,10 @@ resource "aws_lambda_function" "lambda" {
         LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
         LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
+        OTEL_SERVICE_NAME = "${terraform.workspace}-${var.app}"
+        OTEL_EXPORTER_OTLP_ENDPOINT = "https://api.honeycomb.io:443" # US instance
+        # OTEL_EXPORTER_OTLP_ENDPOINT = "https://api.eu1.honeycomb.io:443" # EU instance
+        HONEYCOMB_API_KEY_PARAM = aws_ssm_parameter.honeycomb_api_key.name
     }
   }
 
