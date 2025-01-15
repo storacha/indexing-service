@@ -9,17 +9,17 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil/mocks"
+	"github.com/storacha/indexing-service/pkg/internal/testutil/extmocks"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetProviderResults(t *testing.T) {
 	t.Run("results found in the cache", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -37,10 +37,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("results not cached, found in IPNI, results cached afterwards", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -68,10 +68,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("results not cached, no results from IPNI, found in legacy claims service, results cached afterwards", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -92,10 +92,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("results not cached, IPNI returns uninteresting results, search in legacy claims", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -125,10 +125,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("returns an empty slice when results are not found anywhere, nothing gets cached", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -147,10 +147,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("error in cache returns error", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -165,10 +165,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("error fetching from IPNI returns an error", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -184,10 +184,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("error in legacy claims service returns an error", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
@@ -204,10 +204,10 @@ func TestGetProviderResults(t *testing.T) {
 	})
 
 	t.Run("error caching results returns an error", func(t *testing.T) {
-		mockStore := mocks.NewMockProviderStore(t)
-		mockIpniFinder := mocks.NewMockFinder(t)
-		mockIpniPublisher := mocks.NewMockPublisher(t)
-		mockLegacyClaims := mocks.NewMockLegacyClaimsFinder(t)
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 

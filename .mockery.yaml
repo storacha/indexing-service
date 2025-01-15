@@ -1,10 +1,10 @@
 issue-845-fix: True
 resolve-type-alias: False
 with-expecter: True
-filename: 'mock_{{.InterfaceName}}.go'
-dir: 'pkg/internal/testutil/mocks'
-mockname: 'Mock{{.InterfaceName}}'
-outpkg: 'mocks'
+inpackage: True
+filename: "mock_{{.InterfaceName}}.go"
+dir: "{{.InterfaceDir}}"
+mockname: "Mock{{.InterfaceName}}"
 packages:
   github.com/storacha/indexing-service/pkg/service/providerindex:
     interfaces:
@@ -14,7 +14,7 @@ packages:
     interfaces:
       Finder:
         config:
-          filename: 'mock_ContentClaimsFinder.go'
+          filename: mock_ContentClaimsFinder.go
           mockname: MockContentClaimsFinder
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
@@ -24,9 +24,27 @@ packages:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
     interfaces:
       QueryAPIClient:
+        config:
+          inpackage: False
+          dir: "pkg/internal/testutil/extmocks"
+          outpkg: "extmocks"
+          filename: mock_DynamoDBQueryClient.go
+          mockname: MockDynamoDBQueryClient
   github.com/ipni/go-libipni/find/client:
     interfaces:
       Finder:
+        config:
+          inpackage: False
+          dir: "pkg/internal/testutil/extmocks"
+          outpkg: "extmocks"
+          filename: mock_IpniFinder.go
+          mockname: MockIpniFinder
   github.com/storacha/ipni-publisher/pkg/publisher:
     interfaces:
       Publisher:
+        config:
+          inpackage: False
+          dir: "pkg/internal/testutil/extmocks"
+          outpkg: "extmocks"
+          filename: mock_IpniPublisher.go
+          mockname: MockIpniPublisher
