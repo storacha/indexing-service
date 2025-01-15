@@ -60,6 +60,7 @@ type Config struct {
 	LegacyBlockIndexTableName   string
 	LegacyBlockIndexTableRegion string
 	LegacyDataBucketURL         string
+	HoneycombAPIKey             string
 	principal.Signer
 }
 
@@ -108,6 +109,18 @@ func FromEnv(ctx context.Context) Config {
 
 	ipniPublisherAnnounceAddress := fmt.Sprintf("/dns/%s/https", mustGetEnv("IPNI_STORE_BUCKET_REGIONAL_DOMAIN"))
 
+	var honeycombAPIKey string
+	response, err = ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String(mustGetEnv("HONEYCOMB_API_KEY_PARAM")),
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		panic(fmt.Errorf("retrieving honeycomb API key: %w", err))
+	}
+	if response.Parameter != nil && response.Parameter.Value != nil {
+		honeycombAPIKey = *response.Parameter.Value
+	}
+
 	return Config{
 		Config: awsConfig,
 		Signer: id,
@@ -154,6 +167,7 @@ func FromEnv(ctx context.Context) Config {
 		LegacyBlockIndexTableName:   mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
 		LegacyBlockIndexTableRegion: mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
 		LegacyDataBucketURL:         mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		HoneycombAPIKey:             honeycombAPIKey,
 	}
 }
 
