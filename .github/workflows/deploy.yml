@@ -36,6 +36,7 @@ jobs:
       aws-account-id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.STAGING_AWS_REGION }}
       private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
+      honeycomb-api-key: ${{ secrets.STAGING_HONEYCOMB_API_KEY }}
 
   # deploy to prod on new releases
   production:
@@ -50,3 +51,4 @@ jobs:
       aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.PROD_AWS_REGION }}
       private-key: ${{ secrets.PROD_PRIVATE_KEY }}
+      honeycomb-api-key: ${{ secrets.PROD_HONEYCOMB_API_KEY }}
