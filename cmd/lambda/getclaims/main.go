@@ -19,14 +19,20 @@ func main() {
 		panic(err)
 	}
 
-	// set up OpenTelemetry SDK
-	otelShutdown, err := otelconfig.ConfigureOpenTelemetry()
-	if err != nil {
-		panic(fmt.Errorf("error setting up OpenTelemetry: %s", err))
-	}
-	defer otelShutdown()
-
 	handler := server.GetClaimsHandler(service)
-	instrumentedHandler := otelhttp.NewHandler(handler, "GetClaims")
-	lambda.Start(httpadapter.NewV2(instrumentedHandler).ProxyWithContext)
+
+	// an empty API key disables instrumentation
+	if config.HoneycombAPIKey != "" {
+		headers := map[string]string{"x-honeycomb-team": config.HoneycombAPIKey}
+		otelShutdown, err := otelconfig.ConfigureOpenTelemetry(otelconfig.WithHeaders(headers))
+		if err != nil {
+			panic(fmt.Errorf("error setting up OpenTelemetry: %s", err))
+		}
+		defer otelShutdown()
+
+		instrumentedHandler := otelhttp.NewHandler(handler, "GetClaims")
+		lambda.Start(httpadapter.NewV2(instrumentedHandler).ProxyWithContext)
+	} else {
+		lambda.Start(httpadapter.NewV2(handler).ProxyWithContext)
+	}
 }

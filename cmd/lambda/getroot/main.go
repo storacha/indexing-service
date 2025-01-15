@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
@@ -16,14 +15,20 @@ import (
 func main() {
 	config := aws.FromEnv(context.Background())
 
-	// set up OpenTelemetry SDK
-	otelShutdown, err := otelconfig.ConfigureOpenTelemetry()
-	if err != nil {
-		panic(fmt.Errorf("error setting up OpenTelemetry: %s", err))
-	}
-	defer otelShutdown()
-
 	handler := server.GetRootHandler(config.Signer)
-	instrumentedHandler := otelhttp.NewHandler(http.HandlerFunc(handler), "GetRoot")
-	lambda.Start(httpadapter.NewV2(instrumentedHandler).ProxyWithContext)
+
+	// an empty API key disables instrumentation
+	if config.HoneycombAPIKey != "" {
+		headers := map[string]string{"x-honeycomb-team": config.HoneycombAPIKey}
+		otelShutdown, err := otelconfig.ConfigureOpenTelemetry(otelconfig.WithHeaders(headers))
+		if err != nil {
+			panic(fmt.Errorf("error setting up OpenTelemetry: %s", err))
+		}
+		defer otelShutdown()
+
+		instrumentedHandler := otelhttp.NewHandler(handler, "GetRoot")
+		lambda.Start(httpadapter.NewV2(instrumentedHandler).ProxyWithContext)
+	} else {
+		lambda.Start(httpadapter.NewV2(handler).ProxyWithContext)
+	}
 }
