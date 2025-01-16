@@ -4,12 +4,6 @@ variable "app" {
   default = "indexer"
 }
 
-variable "region" {
-  description = "aws region for all services"
-  type = string
-  default = "us-west-2"
-}
-
 variable "allowed_account_ids" {
   description = "account ids used for AWS"
   type = list(string)

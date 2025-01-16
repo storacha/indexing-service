@@ -34,6 +34,13 @@ data "archive_file" "function_archive" {
 }
 
 # Define functions
+data "aws_region" "legacy_claims" {
+  provider = aws.legacy_claims
+}
+
+data "aws_region" "block_index" {
+  provider = aws.block_index
+}
 
 resource "aws_lambda_function" "lambda" {
   depends_on = [ aws_cloudwatch_log_group.lambda_log_group ]
@@ -73,8 +80,10 @@ resource "aws_lambda_function" "lambda" {
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
         CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
         LEGACY_CLAIMS_TABLE_NAME = data.aws_dynamodb_table.legacy_claims_table.id
+        LEGACY_CLAIMS_TABLE_REGION = data.aws_region.legacy_claims.name
         LEGACY_CLAIMS_BUCKET_NAME = data.aws_s3_bucket.legacy_claims_bucket.id
         LEGACY_BLOCK_INDEX_TABLE_NAME = data.aws_dynamodb_table.legacy_block_index_table.id
+        LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
         LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
     }
@@ -144,10 +153,10 @@ data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
     ]
 
     resources = [
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["providers"].id}",
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["indexes"].id}",
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["claims"].id}",
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:user:${aws_elasticache_user.cache_iam_user.user_id}"
+      "${aws_elasticache_serverless_cache.cache["providers"].arn}",
+      "${aws_elasticache_serverless_cache.cache["indexes"].arn}",
+      "${aws_elasticache_serverless_cache.cache["claims"].arn}",
+      "${aws_elasticache_user.cache_iam_user.arn}"
     ]
   }
 }

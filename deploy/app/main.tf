@@ -16,7 +16,6 @@ terraform {
 }
 
 provider "aws" {
-  region              = var.region
   allowed_account_ids = var.allowed_account_ids
   default_tags {
     
@@ -29,9 +28,4 @@ provider "aws" {
       Project       = "${var.app}"
     }
   }
-}
-
-provider "aws" {
-  alias = "virginia"
-  region = "us-east-1"
 }

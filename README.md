@@ -4,11 +4,11 @@
 
 ## Table of Contents
 
-* [Overview](#overview)
-* [Installation](#installation)
-* [Deployment](#deployment)
-* [Contribute](#contribute)
-* [License](#license)
+- [Overview](#overview)
+- [Installation](#installation)
+- [Deployment](#deployment)
+- [Contribute](#contribute)
+- [License](#license)
 
 ## Overview
 
@@ -33,6 +33,14 @@ First, install OpenTofu e.g.
 ```sh
 brew install opentofu
 ```
+
+### AWS settings
+
+The terraform configuration will fetch AWS settings (such as credentials and the region to deploy resources to) from your local AWS configuration. Although an installation of the AWS CLI is not strictly required, it can be a convenient way to manage these settings.
+
+OpenTofu will go to the same places as the AWS CLI to find settings, which means it will read environment variables such as `AWS_REGION` and `AWS_PROFILE` and the `~/.aws/config` and `~/.aws/credentials` files.
+
+Make sure you are using the correct AWS profile and region before invoking `make` targets.
 
 ### `.env`
 
