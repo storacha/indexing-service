@@ -34,6 +34,14 @@ First, install OpenTofu e.g.
 brew install opentofu
 ```
 
+or for Linux distributions that support Snap:
+
+```sh
+snap install --classic opentofu
+```
+
+for other Operating Systems see: https://opentofu.org/docs/intro/install
+
 ### AWS settings
 
 The terraform configuration will fetch AWS settings (such as credentials and the region to deploy resources to) from your local AWS configuration. Although an installation of the AWS CLI is not strictly required, it can be a convenient way to manage these settings.
