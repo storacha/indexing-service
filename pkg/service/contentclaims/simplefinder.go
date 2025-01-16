@@ -26,7 +26,7 @@ func NewSimpleFinder(httpClient *http.Client) Finder {
 }
 
 // Find attempts to fetch a claim from the provided URL.
-func (sf *simpleFinder) Find(ctx context.Context, id ipld.Link, fetchURL url.URL) (delegation.Delegation, error) {
+func (sf *simpleFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL) (delegation.Delegation, error) {
 	// attempt to fetch the claim from provided url
 	resp, err := sf.httpClient.Get(fetchURL.String())
 	if err != nil {

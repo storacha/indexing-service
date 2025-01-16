@@ -46,9 +46,9 @@ func TestFind(t *testing.T) {
 		indexDelegationCid := link.ToCID(testutil.RandomCID())
 
 		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{partitionDelegationCid, locationDelegationCid, indexDelegationCid}, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: partitionDelegationCid}, url.URL{}).Return(partitionDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, url.URL{}).Return(locationDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, url.URL{}).Return(indexDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: partitionDelegationCid}, &url.URL{}).Return(partitionDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
 
 		results, err := legacyClaims.Find(ctx, contentHash)
 

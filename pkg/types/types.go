@@ -86,7 +86,7 @@ type Query struct {
 // QueryResult is an encodable result of a query
 type QueryResult interface {
 	ipld.View
-	// Claims is a list of links to the root bock of claims that can be found in this message
+	// Claims is a list of links to the root block of claims that can be found in this message
 	Claims() []ipld.Link
 	// Indexes is a list of links to the CID hash of archived sharded dag indexes that can be found in this
 	// message

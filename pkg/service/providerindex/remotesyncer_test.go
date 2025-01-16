@@ -111,7 +111,9 @@ func (i *mockIpniStore) Entries(ctx context.Context, root datamodel.Link) iter.S
 	return func(yield func(multihash.Multihash, error) bool) {
 		ent := i.ents[root.String()]
 		for _, digest := range ent.Entries {
-			yield(digest, nil)
+			if !yield(digest, nil) {
+				return
+			}
 		}
 	}
 }

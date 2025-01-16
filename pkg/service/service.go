@@ -140,7 +140,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			if err != nil {
 				return err
 			}
-			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, *url)
+			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, url)
 			if err != nil {
 				return err
 			}
@@ -190,7 +190,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					if err != nil {
 						return err
 					}
-					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, *url, typedProtocol.Range)
+					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
 					if err != nil {
 						return err
 					}
@@ -222,12 +222,11 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 
 // Query returns back relevant content claims for the given query using the following steps
 // 1. Query the ProviderIndex for all matching records
-// 2. For any index records, query the ProviderIndex for any location claims for that index cid
-// 3. For any index claims, query the ProviderIndex for location claims for the index cid
-// 4. Query the BlobIndexLookup to get the full ShardedDagIndex for any index claims
-// 5. Query ProviderIndex for any location claims for any shards that contain the multihash based on the ShardedDagIndex
-// 6. Read the requisite claims from the ClaimLookup
-// 7. Return all discovered claims and sharded dag indexes
+// 2. For any index claims, query the ProviderIndex for location claims for the index cid
+// 3. Query the BlobIndexLookup to get the full ShardedDagIndex for any index claims
+// 4. Query ProviderIndex for any location claims for any shards that contain the multihash based on the ShardedDagIndex
+// 5. Read the requisite claims from the ClaimLookup
+// 6. Return all discovered claims and sharded dag indexes
 func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.QueryResult, error) {
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
@@ -557,7 +556,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 			return
 		}
 
-		dlg, err := claims.Find(ctx, cidlink.Link{Cid: lcmeta.Claim}, *claimURL)
+		dlg, err := claims.Find(ctx, cidlink.Link{Cid: lcmeta.Claim}, claimURL)
 		if err != nil {
 			validateErr = err
 			return
@@ -571,7 +570,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 	}()
 
 	// Note: the ContextID here is of a location commitment provider
-	idx, err := blobIndex.Find(ctx, result.ContextID, result, *blobURL, lcmeta.Range)
+	idx, err := blobIndex.Find(ctx, result.ContextID, result, blobURL, lcmeta.Range)
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
 	}

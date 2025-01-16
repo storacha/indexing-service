@@ -105,7 +105,7 @@ func TestWithCache__Find(t *testing.T) {
 			// Create ClaimLookup instance
 			cl := contentclaims.WithCache(finder, mockCache)
 
-			claim, err := cl.Find(context.Background(), tc.claimCid, *testutil.TestURL)
+			claim, err := cl.Find(context.Background(), tc.claimCid, testutil.TestURL)
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {
@@ -162,7 +162,7 @@ type mockFinder struct {
 	err   error
 }
 
-func (m *mockFinder) Find(ctx context.Context, link ipld.Link, url url.URL) (delegation.Delegation, error) {
+func (m *mockFinder) Find(ctx context.Context, link ipld.Link, url *url.URL) (delegation.Delegation, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
