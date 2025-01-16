@@ -90,6 +90,8 @@ This will simply compile the lambdas locally and put then in the `build` directo
 
 You should only need to run this once -- initializes your terraform deployment and workspace. Make sure you've set `TF_WORKSPACE` first!
 
+If the `make init` fails you will need to execute `tofu init` directly from the `deploy/app` folder to install the required dependencies, and it will update the `.terraform.lock.hcl` file if needed.
+
 #### `make validate`
 
 This will validate your terraform configuration -- good to run to check errors in any changes you make to terraform configs.
