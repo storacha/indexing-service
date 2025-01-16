@@ -104,6 +104,17 @@ This will plan a deployment, but not execute it -- useful to see ahead what chan
 
 The big kahuna! This will deploy all of your changes, including redeploying lambdas if any of code changes.
 
+## Query
+
+#### `./indexer query <CID>`
+Attempts to find the given CID in the Indexer node. The result is a Location Claim that needs to be used to fetch the actual content associated with that CID. In case you want to query a specific node, you can use the following command:
+
+```sh
+./indexer query -u https://<NODE_NAME>.indexer.storacha.network <CID>
+```
+
+If you don't specify a node it will query the Storacha Production node at https://indexer.storacha.network
+
 ## Releasing a new version
 
 Every time changes are merged to `main` the staging environment is automatically updated. Therefore, staging always runs the latest version of the code. The production environment, however, is only updated when a new version is released.
