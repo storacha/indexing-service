@@ -86,6 +86,16 @@ This will plan a deployment, but not execute it -- useful to see ahead what chan
 
 The big kahuna! This will deploy all of your changes, including redeploying lambdas if any of code changes.
 
+## Releasing a new version
+
+Every time changes are merged to `main` the staging environment is automatically updated. Therefore, staging always runs the latest version of the code. The production environment, however, is only updated when a new version is released.
+
+The release process is automated in the repo's GitHub Actions workflows. Releasing a new version is as easy as updating the version in [version.json](version.json).
+
+When a branch with changes to [version.json](version.json) is merged to `main`, the release workflow will automatically tag the commit with the version, build and upload binaries, and create a new release.
+
+The release workflow not only publishes new releases. On successful runs, it will also trigger an additional deployment workflow that will deploy the new version to production by applying the Terraform configuration.
+
 ## Contribute
 
 Early days PRs are welcome!

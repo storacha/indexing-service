@@ -25,7 +25,8 @@ import (
 	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil/mocks"
+	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -34,9 +35,9 @@ import (
 
 func TestQuery(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		mockBlobIndexLookup := mocks.NewMockBlobIndexLookup(t)
-		mockClaimsService := mocks.NewMockContentClaimsService(t)
-		mockProviderIndex := mocks.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		providerAddr := &peer.AddrInfo{
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
@@ -120,9 +121,9 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("returns error when ProviderIndex service errors", func(t *testing.T) {
-		mockBlobIndexLookup := mocks.NewMockBlobIndexLookup(t)
-		mockClaimsService := mocks.NewMockContentClaimsService(t)
-		mockProviderIndex := mocks.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 
 		contentLink := testutil.RandomCID()
 		contentHash := contentLink.(cidlink.Link).Hash()
@@ -143,9 +144,9 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("returns error when ContentClaims service errors", func(t *testing.T) {
-		mockBlobIndexLookup := mocks.NewMockBlobIndexLookup(t)
-		mockClaimsService := mocks.NewMockContentClaimsService(t)
-		mockProviderIndex := mocks.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		providerAddr := &peer.AddrInfo{
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
@@ -179,9 +180,9 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("returns error when BlobIndexLookup service errors", func(t *testing.T) {
-		mockBlobIndexLookup := mocks.NewMockBlobIndexLookup(t)
-		mockClaimsService := mocks.NewMockContentClaimsService(t)
-		mockProviderIndex := mocks.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		providerAddr := &peer.AddrInfo{
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
