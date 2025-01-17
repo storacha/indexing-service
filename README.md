@@ -27,6 +27,9 @@ $ go install github.com/storacha/indexing-service/cmd@latest
 
 ## Deployment
 
+> [!TIP]
+> Take a look at the [infrastructure diagram](docs/infra.md) for an overview of what gets deployed.
+
 Deployment of this service to AWS is managed by terraform which you can invoke with `make`.
 
 First, install OpenTofu e.g.
