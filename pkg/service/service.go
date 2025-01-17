@@ -332,6 +332,10 @@ func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claims 
 
 func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
+	if len(caps) == 0 {
+		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	}
+
 	switch caps[0].Can() {
 	case assert.LocationAbility:
 		return cacheLocationCommitment(ctx, claims, provIndex, provider, claim)
@@ -342,10 +346,6 @@ func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claim
 
 func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
-	if len(caps) == 0 {
-		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
-	}
-
 	if caps[0].Can() != assert.LocationAbility {
 		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
 	}

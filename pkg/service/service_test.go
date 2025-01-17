@@ -378,6 +378,30 @@ func TestCacheClaim(t *testing.T) {
 		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
+
+	t.Run("returns error when claim has no capabilities", func(t *testing.T) {
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		// Create a claim with no capabilities
+		claim, err := delegation.Delegate(
+			testutil.Alice,
+			testutil.Bob,
+			[]ucan.Capability[ok.Unit]{}, // No capabilities
+		)
+		require.NoError(t, err)
+
+		err = Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("missing capabilities in claim: %s", claim.Link()))
+	})
 }
 
 func TestUrlForResource(t *testing.T) {
