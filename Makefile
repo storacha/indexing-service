@@ -19,6 +19,11 @@ indexer:
 clean-indexer:
 	rm -f ./indexer
 
+.PHONY: test
+
+test:
+	go test -race -v ./...
+
 ucangen:
 	go build -o ./ucangen cmd/ucangen/main.go
 

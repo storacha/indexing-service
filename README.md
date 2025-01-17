@@ -7,6 +7,7 @@
 - [Overview](#overview)
 - [Installation](#installation)
 - [Deployment](#deployment)
+- [CLI](#cli)
 - [Contribute](#contribute)
 - [License](#license)
 
@@ -33,6 +34,14 @@ First, install OpenTofu e.g.
 ```sh
 brew install opentofu
 ```
+
+or for Linux distributions that support Snap:
+
+```sh
+snap install --classic opentofu
+```
+
+for other Operating Systems see: https://opentofu.org/docs/intro/install
 
 ### AWS settings
 
@@ -82,6 +91,8 @@ This will simply compile the lambdas locally and put then in the `build` directo
 
 You should only need to run this once -- initializes your terraform deployment and workspace. Make sure you've set `TF_WORKSPACE` first!
 
+If the `make init` fails you will need to execute `tofu init` directly from the `deploy/app` folder to install the required dependencies, and it will update the `.terraform.lock.hcl` file if needed.
+
 #### `make validate`
 
 This will validate your terraform configuration -- good to run to check errors in any changes you make to terraform configs.
@@ -93,6 +104,23 @@ This will plan a deployment, but not execute it -- useful to see ahead what chan
 #### `make apply`
 
 The big kahuna! This will deploy all of your changes, including redeploying lambdas if any of code changes.
+
+## CLI
+
+The command line interface can be used to query an indexer node. You'll need to compile the binary first:
+
+```sh
+make indexer
+```
+
+#### `./indexer query <CID>`
+Attempts to find the given CID in the Indexer node. The result can be multiple Location Claims, as there may be several storage nodes that store copies of the content, as well as potential indexes and the indexes themselves. If you want to query a specific node, you can use the following command:
+
+```sh
+./indexer query -u https://<INDEXING_SERVICE_URL> <CID>
+```
+
+If you don't specify a node it will query the Storacha Production node at https://indexer.storacha.network .
 
 ## Releasing a new version
 
