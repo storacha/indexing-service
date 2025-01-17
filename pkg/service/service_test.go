@@ -30,6 +30,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -340,6 +341,7 @@ func TestPublishClaim(t *testing.T) {
 }
 
 func TestCacheClaim(t *testing.T) {
+
 	t.Run("does not cache unknown claims", func(t *testing.T) {
 		claim, err := delegation.Delegate(
 			testutil.Alice,
@@ -351,6 +353,30 @@ func TestCacheClaim(t *testing.T) {
 		require.NoError(t, err)
 		err = Cache(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
+	})
+
+	t.Run("successful caching for assert/location claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		_, locationDelegation, _ := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)
+
+		anyContextID := mock.AnythingOfType("string")
+		anyMultihash := mock.AnythingOfType("iter.Seq[github.com/multiformats/go-multihash.Multihash]")
+		anyMetadata := mock.AnythingOfType("metadata.Metadata")
+		mockProviderIndex.EXPECT().Cache(ctx, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(nil)
+
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.NoError(t, err)
 	})
 }
 
