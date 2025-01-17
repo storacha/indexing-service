@@ -1,16 +1,16 @@
 ```mermaid
 graph TB
-%% VPC and Networking
-VPC[VPC\n10.0.0.0/16] --> PublicSubnets[Public Subnets]
-VPC --> PrivateSubnets[Private Subnets]
-PublicSubnets --> IGW[Internet Gateway]
-PublicSubnets --> NAT[NAT Gateways]
-NAT --> PrivateSubnets
+    %% VPC and Networking
+    VPC[VPC<br/>10.0.0.0/16] --> PublicSubnets[Public Subnets]
+    VPC --> PrivateSubnets[Private Subnets]
+    PublicSubnets --> IGW[Internet Gateway]
+    PublicSubnets --> NAT[NAT Gateways]
+    NAT --> PrivateSubnets
 
     %% API Gateway
-    APIGW[API Gateway v2\nHTTP API] --> Lambda
-    APIGW --> CustomDomain[Custom Domain\n*.indexer.storacha.network]
-    CustomDomain --> Route53[Route53\nDNS Zone]
+    APIGW[API Gateway v2<br/>HTTP API] --> Lambda
+    APIGW --> CustomDomain[Custom Domain<br/>*.indexer.storacha.network]
+    CustomDomain --> Route53[Route53<br/>DNS Zone]
     CustomDomain --> ACM[ACM Certificate]
 
     %% Lambda Functions
@@ -25,9 +25,9 @@ NAT --> PrivateSubnets
     end
 
     %% Event Sources
-    EventBridge[EventBridge\nScheduler] --> notifier
-    SNSTopic[SNS Topic\nHead Changes] --> remotesync
-    SQSQueue[SQS Queue\nCaching.fifo] --> providercache
+    EventBridge[EventBridge<br/>Scheduler] --> notifier
+    SNSTopic[SNS Topic<br/>Head Changes] --> remotesync
+    SQSQueue[SQS Queue<br/>Caching.fifo] --> providercache
     SQSQueue --> SQSDLQueue[Dead Letter Queue]
 
     %% Storage
@@ -57,8 +57,8 @@ NAT --> PrivateSubnets
     end
 
     %% Parameters
-    Lambda --> SSM[SSM Parameter Store\nPrivate Key]
+    Lambda --> SSM[SSM Parameter Store<br/>Private Key]
 
     %% Security
-    SecurityGroup[Security Group\nLambda] --> CacheSecurityGroup[Security Group\nRedis]
+    SecurityGroup[Security Group<br/>Lambda] --> CacheSecurityGroup[Security Group<br/>Redis]
 ```
