@@ -7,6 +7,7 @@
 - [Overview](#overview)
 - [Installation](#installation)
 - [Deployment](#deployment)
+- [CLI](#cli)
 - [Contribute](#contribute)
 - [License](#license)
 
@@ -104,16 +105,22 @@ This will plan a deployment, but not execute it -- useful to see ahead what chan
 
 The big kahuna! This will deploy all of your changes, including redeploying lambdas if any of code changes.
 
-## Query
+## CLI
 
-#### `./indexer query <CID>`
-Attempts to find the given CID in the Indexer node. The result is a Location Claim that needs to be used to fetch the actual content associated with that CID. In case you want to query a specific node, you can use the following command:
+The command line interface can be used to query an indexer node. You'll need to compile the binary first:
 
 ```sh
-./indexer query -u https://<NODE_NAME>.indexer.storacha.network <CID>
+make indexer
 ```
 
-If you don't specify a node it will query the Storacha Production node at https://indexer.storacha.network
+#### `./indexer query <CID>`
+Attempts to find the given CID in the Indexer node. The result can be multiple Location Claims, as there may be several storage nodes that store copies of the content, as well as potential indexes and the indexes themselves. If you want to query a specific node, you can use the following command:
+
+```sh
+./indexer query -u https://<INDEXING_SERVICE_URL> <CID>
+```
+
+If you don't specify a node it will query the Storacha Production node at https://indexer.storacha.network .
 
 ## Releasing a new version
 
