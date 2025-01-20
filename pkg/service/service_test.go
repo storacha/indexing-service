@@ -437,10 +437,46 @@ func TestCacheClaim(t *testing.T) {
 		}
 		ctx := context.Background()
 
+		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
+			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+		})
+		locationDelegation := testutil.Must(delegation.Delegate(
+			testutil.Service,
+			testutil.Alice,
+			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+			// set the expiration to 1 hour in the future
+			delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix())),
+		))(t)
+
+		anyContextID := mock.AnythingOfType("string")
+		anyMultihash := mock.AnythingOfType("iter.Seq[github.com/multiformats/go-multihash.Multihash]")
+		anyMetadata := mock.AnythingOfType("metadata.Metadata")
+		mockProviderIndex.EXPECT().Cache(ctx, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(nil)
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)
+
+		// Cache the claim with expiration
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.NoError(t, err)
+	})
+
+	t.Run("handle a delegation with a range in the caveats and cache the claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
 		// Create a claim with a context ID that will fail to encode
 		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
 			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+			// set the range
+			Range: &assert.Range{Offset: 0, Length: &[]uint64{3}[0]},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(
 			testutil.Service,
