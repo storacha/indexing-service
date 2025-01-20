@@ -517,12 +517,50 @@ func TestCacheClaim(t *testing.T) {
 		))(t)
 
 		// mock the error from the claims.Cache function call
-		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(errors.New("something went wrong while caching claim in claims.Cache"))
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(
+			errors.New("something went wrong while caching claim in claims.Cache"),
+		)
 
 		// Attempt to cache the claim
 		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "something went wrong while caching claim in claims.Cache")
+	})
+
+	t.Run("handle the error from the providerIndex.Cache function call", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
+			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+		})
+		locationDelegation := testutil.Must(delegation.Delegate(
+			testutil.Service,
+			testutil.Alice,
+			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+		))(t)
+
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)
+		// mock the error from the providerIndex.Cache function call
+		anyContextID := mock.AnythingOfType("string")
+		anyMultihash := mock.AnythingOfType("iter.Seq[github.com/multiformats/go-multihash.Multihash]")
+		anyMetadata := mock.AnythingOfType("metadata.Metadata")
+		mockProviderIndex.EXPECT().Cache(ctx, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(
+			errors.New("something went wrong while caching claim in providerIndex.Cache"),
+		)
+
+		// Attempt to cache the claim
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "something went wrong while caching claim in providerIndex.Cache")
 	})
 
 }
