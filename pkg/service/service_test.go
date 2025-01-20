@@ -402,6 +402,28 @@ func TestCacheClaim(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), fmt.Sprintf("missing capabilities in claim: %s", claim.Link()))
 	})
+
+	t.Run("returns error when reading location claim caveats fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		// Create a faulty location claim that will cause the Read method to fail
+		c := ucan.NewCapability("assert/location", testutil.Alice.DID().String(), ucan.NoCaveats{})
+		faultyLocationClaim, err := delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[ucan.NoCaveats]{c})
+		require.NoError(t, err)
+
+		// Attempt to cache the claim, which will fail
+		err = Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyLocationClaim)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "reading index claim data")
+	})
 }
 
 func TestUrlForResource(t *testing.T) {
