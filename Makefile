@@ -78,3 +78,8 @@ plan: deploy/app/.terraform .tfworkspace $(LAMBDAS)
 
 apply: deploy/app/.terraform .tfworkspace $(LAMBDAS)
 	tofu -chdir=deploy/app apply
+
+.PHONY: mockery
+
+mockery:
+	@InterfaceDir="pkg/internal/testutil/extmocks" mockery --config=.mockery.yaml

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
@@ -30,6 +31,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -340,6 +342,7 @@ func TestPublishClaim(t *testing.T) {
 }
 
 func TestCacheClaim(t *testing.T) {
+
 	t.Run("does not cache unknown claims", func(t *testing.T) {
 		claim, err := delegation.Delegate(
 			testutil.Alice,
@@ -352,6 +355,214 @@ func TestCacheClaim(t *testing.T) {
 		err = Cache(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
 	})
+
+	t.Run("successful caching for assert/location claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		_, locationDelegation, _ := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)
+
+		anyContextID := mock.AnythingOfType("string")
+		anyMultihash := mock.AnythingOfType("iter.Seq[github.com/multiformats/go-multihash.Multihash]")
+		anyMetadata := mock.AnythingOfType("metadata.Metadata")
+		mockProviderIndex.EXPECT().Cache(ctx, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(nil)
+
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error when claim has no capabilities", func(t *testing.T) {
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		// Create a claim with no capabilities
+		claim, err := delegation.Delegate(
+			testutil.Alice,
+			testutil.Bob,
+			[]ucan.Capability[ok.Unit]{}, // No capabilities
+		)
+		require.NoError(t, err)
+
+		err = Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), fmt.Sprintf("missing capabilities in claim: %s", claim.Link()))
+	})
+
+	t.Run("returns error when reading location claim caveats fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		// Create a faulty location claim that will cause the Read method to fail
+		c := ucan.NewCapability("assert/location", testutil.Alice.DID().String(), ucan.NoCaveats{})
+		faultyLocationClaim, err := delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[ucan.NoCaveats]{c})
+		require.NoError(t, err)
+
+		// Attempt to cache the claim, which will fail
+		err = Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyLocationClaim)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "reading index claim data")
+	})
+
+	t.Run("handle the expiration correctly and cache the claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
+			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+		})
+		locationDelegation := testutil.Must(delegation.Delegate(
+			testutil.Service,
+			testutil.Alice,
+			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+			// set the expiration to 1 hour in the future
+			delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix())),
+		))(t)
+
+		anyContextID := mock.AnythingOfType("string")
+		anyMultihash := mock.AnythingOfType("iter.Seq[github.com/multiformats/go-multihash.Multihash]")
+		anyMetadata := mock.AnythingOfType("metadata.Metadata")
+		mockProviderIndex.EXPECT().Cache(ctx, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(nil)
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)
+
+		// Cache the claim with expiration
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.NoError(t, err)
+	})
+
+	t.Run("handle a delegation with a range in the caveats and cache the claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
+			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+			// set the range
+			Range: &assert.Range{Offset: 0, Length: &[]uint64{3}[0]},
+		})
+		locationDelegation := testutil.Must(delegation.Delegate(
+			testutil.Service,
+			testutil.Alice,
+			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+			delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix())),
+		))(t)
+
+		anyContextID := mock.AnythingOfType("string")
+		anyMultihash := mock.AnythingOfType("iter.Seq[github.com/multiformats/go-multihash.Multihash]")
+		anyMetadata := mock.AnythingOfType("metadata.Metadata")
+		mockProviderIndex.EXPECT().Cache(ctx, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(nil)
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)
+
+		// Cache the claim with expiration
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.NoError(t, err)
+	})
+
+	t.Run("handle the error from the claims.Cache function call", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
+			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+		})
+		locationDelegation := testutil.Must(delegation.Delegate(
+			testutil.Service,
+			testutil.Alice,
+			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+		))(t)
+
+		// mock the error from the claims.Cache function call
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(
+			errors.New("something went wrong while caching claim in claims.Cache"),
+		)
+
+		// Attempt to cache the claim
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "something went wrong while caching claim in claims.Cache")
+	})
+
+	t.Run("handle the error from the providerIndex.Cache function call", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		ctx := context.Background()
+
+		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
+			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+		})
+		locationDelegation := testutil.Must(delegation.Delegate(
+			testutil.Service,
+			testutil.Alice,
+			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+		))(t)
+
+		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)
+		// mock the error from the providerIndex.Cache function call
+		anyContextID := mock.AnythingOfType("string")
+		anyMultihash := mock.AnythingOfType("iter.Seq[github.com/multiformats/go-multihash.Multihash]")
+		anyMetadata := mock.AnythingOfType("metadata.Metadata")
+		mockProviderIndex.EXPECT().Cache(ctx, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(
+			errors.New("something went wrong while caching claim in providerIndex.Cache"),
+		)
+
+		// Attempt to cache the claim
+		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "something went wrong while caching claim in providerIndex.Cache")
+	})
+
 }
 
 func TestUrlForResource(t *testing.T) {
