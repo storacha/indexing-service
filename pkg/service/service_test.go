@@ -471,7 +471,6 @@ func TestCacheClaim(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		// Create a claim with a context ID that will fail to encode
 		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
 			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
@@ -495,6 +494,7 @@ func TestCacheClaim(t *testing.T) {
 		err := Cache(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
+
 }
 
 func TestUrlForResource(t *testing.T) {
