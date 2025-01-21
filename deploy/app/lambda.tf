@@ -24,16 +24,17 @@ locals {
   }
 }
 
-// zip the binary, as we can use only zip files to AWS lambda
+// zip the binary along with the config file for the otel collector
 data "archive_file" "function_archive" {
   for_each = local.functions
 
   type        = "zip"
-  source_file = "${path.root}/../../build/${each.key}/bootstrap"
+  source_dir = "${path.root}/../../build/${each.key}"
   output_path = "${path.root}/../../build/${each.key}/${each.key}.zip"
 }
 
-# Define functions
+data "aws_region" "current" {}
+
 data "aws_region" "legacy_claims" {
   provider = aws.legacy_claims
 }
@@ -42,6 +43,7 @@ data "aws_region" "block_index" {
   provider = aws.block_index
 }
 
+# Define functions
 resource "aws_lambda_function" "lambda" {
   depends_on = [ aws_cloudwatch_log_group.lambda_log_group ]
   for_each = local.functions
@@ -56,6 +58,9 @@ resource "aws_lambda_function" "lambda" {
   reserved_concurrent_executions = try(each.value.concurrency, -1)
   source_code_hash = data.archive_file.function_archive[each.key].output_base64sha256
   filename      = data.archive_file.function_archive[each.key].output_path # Path to your Lambda zip files
+  layers = [
+      "arn:aws:lambda:${data.aws_region.current.name}:901920570463:layer:aws-otel-collector-arm64-ver-0-115-0:2"
+    ]
 
   environment {
     variables = {
@@ -87,8 +92,9 @@ resource "aws_lambda_function" "lambda" {
         LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
         OTEL_SERVICE_NAME = "${terraform.workspace}-${var.app}"
-        OTEL_EXPORTER_OTLP_ENDPOINT = "https://api.honeycomb.io:443" # US instance
-        # OTEL_EXPORTER_OTLP_ENDPOINT = "https://api.eu1.honeycomb.io:443" # EU instance
+        OPENTELEMETRY_COLLECTOR_CONFIG_URI = "/var/task/otel-collector-config.yaml"
+        HONEYCOMB_OTLP_ENDPOINT = "api.honeycomb.io:443"
+        HONEYCOMB_API_KEY = "${var.honeycomb_api_key}"
         HONEYCOMB_API_KEY_PARAM = aws_ssm_parameter.honeycomb_api_key.name
     }
   }
