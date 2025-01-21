@@ -419,6 +419,33 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "missing capabilities in claim")
 	})
+
+	t.Run("error when reading index claim caveats fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Create a faulty index claim that will cause the Read method to fail
+		c := ucan.NewCapability("assert/index", testutil.Alice.DID().String(), ucan.NoCaveats{})
+		faultyIndexClaim, err := delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[ucan.NoCaveats]{c})
+		require.NoError(t, err)
+
+		// Attempt to publish the claim
+		err = Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyIndexClaim)
+
+		// Expect an error indicating a problem with reading the index claim caveats
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "reading index claim data: missing required fields: content,index")
+	})
+
 }
 
 func TestCacheClaim(t *testing.T) {
