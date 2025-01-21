@@ -474,6 +474,74 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.Contains(t, err.Error(), "caching claim with claim lookup: failed to cache claim")
 	})
 
+	t.Run("error when no location commitments found", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Create a valid index claim
+		_, indexDelegation, _, indexLink, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// Simulate caching the claim in claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, indexDelegation).Return(nil)
+
+		// Simulate an empty result set from provIndex.Find
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         indexLink.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{}, nil) // no location commitments found
+
+		// Attempt to publish the claim
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+
+		// Expect an error indicating no location commitments found
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no location commitments found for index")
+	})
+
+	t.Run("error when finding location commitments fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Create a valid index claim
+		_, indexDelegation, _, indexLink, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// Simulate caching the claim in claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, indexDelegation).Return(nil)
+
+		// Simulate an error when finding location commitments
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         indexLink.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{}, fmt.Errorf("failed to find location commitments"))
+
+		// Attempt to publish the claim
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+
+		// Expect an error indicating a problem with finding location commitments
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "finding location commitment: failed to find location commitments")
+	})
+
 }
 
 func TestCacheClaim(t *testing.T) {
