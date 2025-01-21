@@ -446,6 +446,34 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.Contains(t, err.Error(), "reading index claim data: missing required fields: content,index")
 	})
 
+	t.Run("error when caching the claim in claims.Publish fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Create a valid index claim
+		_, indexDelegation, _, _, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// Simulate an error when caching the claim in claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, indexDelegation).Return(fmt.Errorf("failed to cache claim"))
+
+		// Attempt to publish the claim
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+
+		// Expect an error indicating a problem with caching the claim
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "caching claim with claim lookup: failed to cache claim")
+	})
+
 }
 
 func TestCacheClaim(t *testing.T) {
