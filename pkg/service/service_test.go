@@ -355,7 +355,7 @@ func TestPublishIndexClaim(t *testing.T) {
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 			},
 		}
-		// content will have a location claim, an index claim and an equals claim
+		// content will have a location claim, an index claim
 		locationDelegationCid, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
 		_, indexDelegation, _, indexLink, shardIndex := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
@@ -608,6 +608,42 @@ func TestPublishIndexClaim(t *testing.T) {
 		// Expect an error indicating a problem with the metadata type
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fetching blob index: metadata is not expected type")
+	})
+
+	t.Run("error when fetching the blob index fails to build the retrieval URL", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				// Only the claim URL is provided, it is missing the Blob URL which is used to build the retrieval URL
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// content will have a location claim, an index claim
+		_, _, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, indexDelegation, _, indexLink, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// Simulate caching the claim in claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, indexDelegation).Return(nil)
+
+		// Simulate a successful result from provIndex.Find
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         indexLink.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{locationResult}, nil)
+
+		// Attempt to publish the claim
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+
+		// Expect an error indicating a problem with building the retrieval URL
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "fetching blob index: building retrieval URL")
 	})
 
 }
