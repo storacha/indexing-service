@@ -346,7 +346,6 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID()
-		// contentHash := contentLink.(cidlink.Link).Hash()
 
 		ctx := context.Background()
 
@@ -388,17 +387,37 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 		mockProviderIndex.EXPECT().Publish(ctx, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		// claims.Publish
-		// providerIndex.Find
-		// fetchBlobIndex for each result from providerIndex.Find
-		// >> fetchRetrievalURL
-		// >> fetchClaimURL
-		// >> claims.Find
-		// > blobIndex.Find
-		// providerIndex.Publish
-
 		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.NoError(t, err)
+	})
+
+	t.Run("error when index claim has no capabilities", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Create a claim with no capabilities
+		claim, err := delegation.Delegate(
+			testutil.Alice,
+			testutil.Bob,
+			[]ucan.Capability[ok.Unit]{}, // No capabilities
+		)
+		require.NoError(t, err)
+
+		// Attempt to publish the claim
+		err = Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
+
+		// Expect an error indicating missing capabilities
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "missing capabilities in claim")
 	})
 }
 
