@@ -82,4 +82,4 @@ apply: deploy/app/.terraform .tfworkspace $(LAMBDAS)
 .PHONY: mockery
 
 mockery:
-	@InterfaceDir="pkg/internal/testutil/extmocks" mockery --config=.mockery.yaml
+	mockery --config=.mockery.yaml
