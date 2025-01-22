@@ -572,7 +572,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 
 	wg.Wait()
 	if validateErr != nil {
-		return nil, fmt.Errorf("verifying claim: %w", err)
+		return nil, fmt.Errorf("verifying claim: %w", validateErr)
 	}
 
 	return idx, nil
