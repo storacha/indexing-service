@@ -409,18 +409,14 @@ func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, cla
 
 func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	capability := claim.Capabilities()[0]
-	if capability.Can() != assert.EqualsAbility {
-		return fmt.Errorf("unsupported claim: %s", capability.Can())
-	}
-
 	nb, rerr := assert.EqualsCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
-		return fmt.Errorf("reading index claim data: %w", rerr)
+		return fmt.Errorf("reading equals claim data: %w", rerr)
 	}
 
 	err := claims.Publish(ctx, claim)
 	if err != nil {
-		return fmt.Errorf("caching claim with claim service: %w", err)
+		return fmt.Errorf("caching equals claim with claim service: %w", err)
 	}
 
 	var exp int
@@ -442,7 +438,7 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	contextID := nb.Equals.Binary()
 	err = provIndex.Publish(ctx, provider, contextID, slices.Values(digests), meta)
 	if err != nil {
-		return fmt.Errorf("publishing claim: %w", err)
+		return fmt.Errorf("publishing equals claim: %w", err)
 	}
 
 	return nil
@@ -450,10 +446,6 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 
 func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	capability := claim.Capabilities()[0]
-	if capability.Can() != assert.IndexAbility {
-		return fmt.Errorf("unsupported claim: %s", capability.Can())
-	}
-
 	nb, rerr := assert.IndexCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)
@@ -461,7 +453,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 
 	err := claims.Publish(ctx, claim)
 	if err != nil {
-		return fmt.Errorf("caching claim with claim lookup: %w", err)
+		return fmt.Errorf("caching index claim with claim lookup: %w", err)
 	}
 
 	results, err := provIndex.Find(ctx, providerindex.QueryKey{
@@ -511,7 +503,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	contextID := nb.Index.Binary()
 	err = provIndex.Publish(ctx, provider, contextID, digests.Keys(), meta)
 	if err != nil {
-		return fmt.Errorf("publishing claim: %w", err)
+		return fmt.Errorf("publishing index claim: %w", err)
 	}
 
 	return nil

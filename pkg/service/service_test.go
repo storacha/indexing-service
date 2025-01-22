@@ -315,8 +315,9 @@ func buildTestEqualsClaim(t *testing.T, contentLink cidlink.Link, providerAddr *
 	}.Sum(testutil.Must(io.ReadAll(delegation.Archive(equalsDelegation)))(t)))(t)
 
 	equalsMetadata := metadata.EqualsClaimMetadata{
-		Equals: equivalentCid.(cidlink.Link).Cid,
-		Claim:  equalsDelegationCid,
+		Equals:     equivalentCid.(cidlink.Link).Cid,
+		Claim:      equalsDelegationCid,
+		Expiration: time.Now().Add(time.Hour).Unix(),
 	}
 
 	equalsProviderResults := model.ProviderResult{
@@ -391,7 +392,6 @@ func TestPublishIndexClaim(t *testing.T) {
 		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.NoError(t, err)
 	})
-
 	t.Run("error when index claim has no capabilities", func(t *testing.T) {
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
@@ -472,7 +472,7 @@ func TestPublishIndexClaim(t *testing.T) {
 
 		// Expect an error indicating a problem with caching the claim
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "caching claim with claim lookup: failed to cache claim")
+		require.Contains(t, err.Error(), "caching index claim with claim lookup: failed to cache claim")
 	})
 
 	t.Run("error when no location commitments found", func(t *testing.T) {
@@ -764,7 +764,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		// Attempt to publish the claim
 		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "publishing claim: failed to publish claim")
+		require.Contains(t, err.Error(), "publishing index claim: failed to publish claim")
 	})
 
 	t.Run("error when publishing the claim", func(t *testing.T) {
@@ -807,7 +807,120 @@ func TestPublishIndexClaim(t *testing.T) {
 		// Attempt to publish the claim
 		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "publishing claim: failed to publish claim")
+		require.Contains(t, err.Error(), "publishing index claim: failed to publish claim")
+	})
+
+}
+
+func TestPublishEqualsClaim(t *testing.T) {
+
+	t.Run("successful publishing the equals claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// content will have an equals claim
+		_, equalsDelegation, _, _ := buildTestEqualsClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// expect a call to cache the equals claim using claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, equalsDelegation).Return(nil)
+
+		// Simulate a successful result from provIndex.Publish
+		mockProviderIndex.EXPECT().Publish(ctx, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		require.NoError(t, err)
+	})
+
+	t.Run("error when reading index claim caveats fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Create a faulty equals claim that will cause the Read method to fail
+		c := ucan.NewCapability("assert/equals", testutil.Alice.DID().String(), ucan.NoCaveats{})
+		faultyEqualsClaim, err := delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[ucan.NoCaveats]{c})
+		require.NoError(t, err)
+
+		// Attempt to publish the claim
+		err = Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyEqualsClaim)
+
+		// Expect an error indicating a problem with reading the claim caveats
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "reading equals claim data: missing required fields: Content,Equals")
+	})
+
+	t.Run("error when publishing claim in claims service fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// content will have an equals claim
+		_, equalsDelegation, _, _ := buildTestEqualsClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// Simulate a failure from claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, equalsDelegation).Return(fmt.Errorf("failed to publish claim"))
+
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "caching equals claim with claim service: failed to publish claim")
+	})
+
+	t.Run("error when publishing claim in claims service fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// content will have an equals claim
+		_, equalsDelegation, _, _ := buildTestEqualsClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// expect a call to cache the equals claim using claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, equalsDelegation).Return(nil)
+
+		// Simulate a failure from provIndex.Publish
+		mockProviderIndex.EXPECT().Publish(ctx, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
+
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "publishing equals claim: failed to publish claim")
 	})
 
 }

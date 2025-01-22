@@ -22,7 +22,12 @@ clean-indexer:
 .PHONY: test
 
 test:
-	go clean -testcache && go test -race -v ./...
+	go test -race -v ./...
+
+.PHONY: test-nocache
+
+test-nocache:
+	go clean -testcache && make test
 
 ucangen:
 	go build -o ./ucangen cmd/ucangen/main.go
