@@ -683,7 +683,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.Contains(t, err.Error(), "fetching blob index: verifying claim: building claim URL: no {claim} endpoint found")
 	})
 
-	t.Run("error when fetching the blob index fails to find the claim", func(t *testing.T) {
+	t.Run("error when fetching the blob index fails to find the location commitment claim", func(t *testing.T) {
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
@@ -721,6 +721,49 @@ func TestPublishIndexClaim(t *testing.T) {
 		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fetching blob index: verifying claim: failed to find claim")
+	})
+
+	t.Run("error when publishing the claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+			},
+		}
+
+		// content will have a location claim, an index claim
+		_, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, indexDelegation, _, indexLink, shardIndex := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// Simulate caching the claim in claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, indexDelegation).Return(nil)
+
+		// Simulate a successful result from provIndex.Find
+		mockProviderIndex.EXPECT().Find(ctx, providerindex.QueryKey{
+			Hash:         indexLink.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{locationResult}, nil)
+
+		// Simulate a successful result from blobIndexLookup.Find
+		mockBlobIndexLookup.EXPECT().Find(ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
+
+		// Simulate a failure from claims.Find
+		mockClaimsService.EXPECT().Find(ctx, mock.Anything, mock.Anything).Return(locationDelegation, nil)
+
+		// Simulate a failure from provIndex.Publish
+		mockProviderIndex.EXPECT().Publish(ctx, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
+
+		// Attempt to publish the claim
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "publishing claim: failed to publish claim")
 	})
 
 }
