@@ -416,7 +416,7 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 
 	err := claims.Publish(ctx, claim)
 	if err != nil {
-		return fmt.Errorf("caching claim with claim service: %w", err)
+		return fmt.Errorf("caching equals claim with claim service: %w", err)
 	}
 
 	var exp int
@@ -438,7 +438,7 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	contextID := nb.Equals.Binary()
 	err = provIndex.Publish(ctx, provider, contextID, slices.Values(digests), meta)
 	if err != nil {
-		return fmt.Errorf("publishing claim: %w", err)
+		return fmt.Errorf("publishing equals claim: %w", err)
 	}
 
 	return nil
@@ -453,7 +453,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 
 	err := claims.Publish(ctx, claim)
 	if err != nil {
-		return fmt.Errorf("caching claim with claim lookup: %w", err)
+		return fmt.Errorf("caching index claim with claim lookup: %w", err)
 	}
 
 	results, err := provIndex.Find(ctx, providerindex.QueryKey{
@@ -503,7 +503,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	contextID := nb.Index.Binary()
 	err = provIndex.Publish(ctx, provider, contextID, digests.Keys(), meta)
 	if err != nil {
-		return fmt.Errorf("publishing claim: %w", err)
+		return fmt.Errorf("publishing index claim: %w", err)
 	}
 
 	return nil
