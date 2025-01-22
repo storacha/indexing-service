@@ -409,13 +409,9 @@ func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, cla
 
 func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	capability := claim.Capabilities()[0]
-	if capability.Can() != assert.EqualsAbility {
-		return fmt.Errorf("unsupported claim: %s", capability.Can())
-	}
-
 	nb, rerr := assert.EqualsCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
-		return fmt.Errorf("reading index claim data: %w", rerr)
+		return fmt.Errorf("reading equals claim data: %w", rerr)
 	}
 
 	err := claims.Publish(ctx, claim)
@@ -450,10 +446,6 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 
 func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	capability := claim.Capabilities()[0]
-	if capability.Can() != assert.IndexAbility {
-		return fmt.Errorf("unsupported claim: %s", capability.Can())
-	}
-
 	nb, rerr := assert.IndexCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)

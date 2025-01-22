@@ -391,7 +391,6 @@ func TestPublishIndexClaim(t *testing.T) {
 		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.NoError(t, err)
 	})
-
 	t.Run("error when index claim has no capabilities", func(t *testing.T) {
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
@@ -841,6 +840,33 @@ func TestPublishEqualsClaim(t *testing.T) {
 		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
 		require.NoError(t, err)
 	})
+
+	t.Run("error when reading index claim caveats fails", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Create a faulty equals claim that will cause the Read method to fail
+		c := ucan.NewCapability("assert/equals", testutil.Alice.DID().String(), ucan.NoCaveats{})
+		faultyEqualsClaim, err := delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[ucan.NoCaveats]{c})
+		require.NoError(t, err)
+
+		// Attempt to publish the claim
+		err = Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyEqualsClaim)
+
+		// Expect an error indicating a problem with reading the claim caveats
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "reading equals claim data: missing required fields: Content,Equals")
+	})
+
 }
 
 func TestCacheClaim(t *testing.T) {
