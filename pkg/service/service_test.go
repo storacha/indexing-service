@@ -812,6 +812,37 @@ func TestPublishIndexClaim(t *testing.T) {
 
 }
 
+func TestPublishEqualsClaim(t *testing.T) {
+
+	t.Run("successful publishing the equals claim", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID()
+
+		ctx := context.Background()
+
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// content will have an equals claim
+		_, equalsDelegation, _, _ := buildTestEqualsClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// expect a call to cache the equals claim using claims.Publish
+		mockClaimsService.EXPECT().Publish(ctx, equalsDelegation).Return(nil)
+
+		// Simulate a successful result from provIndex.Publish
+		mockProviderIndex.EXPECT().Publish(ctx, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		err := Publish(ctx, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		require.NoError(t, err)
+	})
+}
+
 func TestCacheClaim(t *testing.T) {
 
 	t.Run("does not cache unknown claims", func(t *testing.T) {
