@@ -409,7 +409,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		claim, err := delegation.Delegate(
 			testutil.Alice,
 			testutil.Bob,
-			[]ucan.Capability[ok.Unit]{}, // No capabilities
+			[]ucan.Capability[ucan.NoCaveats]{},
 		)
 		require.NoError(t, err)
 
