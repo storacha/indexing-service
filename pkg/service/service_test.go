@@ -315,8 +315,9 @@ func buildTestEqualsClaim(t *testing.T, contentLink cidlink.Link, providerAddr *
 	}.Sum(testutil.Must(io.ReadAll(delegation.Archive(equalsDelegation)))(t)))(t)
 
 	equalsMetadata := metadata.EqualsClaimMetadata{
-		Equals: equivalentCid.(cidlink.Link).Cid,
-		Claim:  equalsDelegationCid,
+		Equals:     equivalentCid.(cidlink.Link).Cid,
+		Claim:      equalsDelegationCid,
+		Expiration: time.Now().Add(time.Hour).Unix(),
 	}
 
 	equalsProviderResults := model.ProviderResult{
