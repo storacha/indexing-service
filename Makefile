@@ -22,7 +22,7 @@ clean-indexer:
 .PHONY: test
 
 test:
-	go test -race -v ./...
+	go clean -testcache && go test -race -v ./...
 
 ucangen:
 	go build -o ./ucangen cmd/ucangen/main.go
@@ -82,4 +82,4 @@ apply: deploy/app/.terraform .tfworkspace $(LAMBDAS)
 .PHONY: mockery
 
 mockery:
-	@InterfaceDir="pkg/internal/testutil/extmocks" mockery --config=.mockery.yaml
+	mockery --config=.mockery.yaml

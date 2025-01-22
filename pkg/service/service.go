@@ -345,12 +345,12 @@ func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claim
 }
 
 func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
-	caps := claim.Capabilities()
-	if caps[0].Can() != assert.LocationAbility {
-		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
+	capability := claim.Capabilities()[0]
+	if capability.Can() != assert.LocationAbility {
+		return fmt.Errorf("unsupported claim: %s", capability.Can())
 	}
 
-	nb, rerr := assert.LocationCaveatsReader.Read(caps[0].Nb())
+	nb, rerr := assert.LocationCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
@@ -394,6 +394,9 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 
 func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
+	if len(caps) == 0 {
+		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	}
 	switch caps[0].Can() {
 	case assert.EqualsAbility:
 		return publishEqualsClaim(ctx, claims, provIndex, provider, claim)
@@ -405,16 +408,12 @@ func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, cla
 }
 
 func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
-	caps := claim.Capabilities()
-	if len(caps) == 0 {
-		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	capability := claim.Capabilities()[0]
+	if capability.Can() != assert.EqualsAbility {
+		return fmt.Errorf("unsupported claim: %s", capability.Can())
 	}
 
-	if caps[0].Can() != assert.EqualsAbility {
-		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
-	}
-
-	nb, rerr := assert.EqualsCaveatsReader.Read(caps[0].Nb())
+	nb, rerr := assert.EqualsCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
@@ -450,16 +449,12 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 }
 
 func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
-	caps := claim.Capabilities()
-	if len(caps) == 0 {
-		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	capability := claim.Capabilities()[0]
+	if capability.Can() != assert.IndexAbility {
+		return fmt.Errorf("unsupported claim: %s", capability.Can())
 	}
 
-	if caps[0].Can() != assert.IndexAbility {
-		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
-	}
-
-	nb, rerr := assert.IndexCaveatsReader.Read(caps[0].Nb())
+	nb, rerr := assert.IndexCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
@@ -577,7 +572,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 
 	wg.Wait()
 	if validateErr != nil {
-		return nil, fmt.Errorf("verifying claim: %w", err)
+		return nil, fmt.Errorf("verifying claim: %w", validateErr)
 	}
 
 	return idx, nil
