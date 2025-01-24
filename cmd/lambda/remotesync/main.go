@@ -13,10 +13,45 @@ import (
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/ipni-publisher/pkg/store"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 )
 
-func makeHandler(remoteSyncer *providerindex.RemoteSyncer) func(ctx context.Context, snsEvent events.SNSEvent) error {
+func main() {
+	cfg := aws.FromEnv(context.Background())
+
+	// an empty API key disables instrumentation
+	if cfg.HoneycombAPIKey != "" {
+		ctx := context.Background()
+		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, cfg)
+		if err != nil {
+			panic(err)
+		}
+		defer telemetryShutdown(ctx)
+
+		handler := makeHandler(cfg)
+
+		instrumentedHandler := otellambda.InstrumentHandler(
+			handler,
+			otellambda.WithTracerProvider(tp),
+			otellambda.WithFlusher(tp),
+		)
+		lambda.Start(instrumentedHandler)
+	} else {
+		lambda.Start(makeHandler(cfg))
+	}
+}
+
+func makeHandler(cfg aws.Config) func(ctx context.Context, snsEvent events.SNSEvent) error {
+	providerRedis := goredis.NewClient(&cfg.ProvidersRedis)
+	providerStore := redis.NewProviderStore(providerRedis)
+	ipniStore := aws.NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
+	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
+	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
+	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
+	remoteSyncer := providerindex.NewRemoteSyncer(providerStore, publisherStore)
+
 	return func(ctx context.Context, snsEvent events.SNSEvent) error {
 		for _, record := range snsEvent.Records {
 			snsRecord := record.SNS
@@ -39,16 +74,4 @@ func makeHandler(remoteSyncer *providerindex.RemoteSyncer) func(ctx context.Cont
 		}
 		return nil
 	}
-}
-
-func main() {
-	cfg := aws.FromEnv(context.Background())
-	providerRedis := goredis.NewClient(&cfg.ProvidersRedis)
-	providerStore := redis.NewProviderStore(providerRedis)
-	ipniStore := aws.NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
-	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
-	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
-	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
-	remoteSyncer := providerindex.NewRemoteSyncer(providerStore, publisherStore)
-	lambda.Start(makeHandler(remoteSyncer))
 }
