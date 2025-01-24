@@ -4,10 +4,3 @@ resource "aws_ssm_parameter" "private_key" {
   type        = "SecureString"
   value       = var.private_key
 }
-
-resource "aws_ssm_parameter" "honeycomb_api_key" {
-  name        = "/${var.app}/${terraform.workspace}/honeycomb_api_key"
-  description = "Honeycomb ingestion API key to send traces"
-  type        = "SecureString"
-  value       = var.honeycomb_api_key
-}

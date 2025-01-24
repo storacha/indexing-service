@@ -62,6 +62,10 @@ resource "aws_lambda_function" "lambda" {
       "arn:aws:lambda:${data.aws_region.current.name}:901920570463:layer:aws-otel-collector-arm64-ver-0-115-0:2"
     ]
 
+  tracing_config {
+    mode = "PassThrough"
+  }
+
   environment {
     variables = {
       	PROVIDERS_REDIS_URL = aws_elasticache_serverless_cache.cache["providers"].endpoint[0].address
@@ -95,7 +99,6 @@ resource "aws_lambda_function" "lambda" {
         OPENTELEMETRY_COLLECTOR_CONFIG_URI = "/var/task/otel-collector-config.yaml"
         HONEYCOMB_OTLP_ENDPOINT = "api.honeycomb.io:443"
         HONEYCOMB_API_KEY = "${var.honeycomb_api_key}"
-        HONEYCOMB_API_KEY_PARAM = aws_ssm_parameter.honeycomb_api_key.name
     }
   }
 
