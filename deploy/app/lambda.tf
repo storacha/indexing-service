@@ -300,8 +300,7 @@ data "aws_iam_policy_document" "lambda_ssm_document" {
     ]
 
     resources = [
-      aws_ssm_parameter.private_key.arn,
-      aws_ssm_parameter.honeycomb_api_key.arn
+      aws_ssm_parameter.private_key.arn
     ]
   }
 }
