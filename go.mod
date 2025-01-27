@@ -28,9 +28,9 @@ require (
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/v9 v9.6.1
-	github.com/storacha/go-capabilities v0.0.0-20241030160329-4cf19ffc732d
+	github.com/storacha/go-capabilities v0.0.0-20250120154346-44180817ecb7
 	github.com/storacha/go-metadata v0.0.0-20241216142904-a60e20043cef
-	github.com/storacha/go-ucanto v0.1.1-0.20241028163940-34de8cd912bb
+	github.com/storacha/go-ucanto v0.2.1-0.20241105025747-aa8566a3a3fb
 	github.com/storacha/ipni-publisher v0.0.0-20241112152400-07a540928427
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.34.0
@@ -74,6 +74,8 @@ require (
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/filecoin-project/go-data-segment v0.0.1 // indirect
+	github.com/filecoin-project/go-fil-commcid v0.2.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -136,6 +138,7 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+	github.com/storacha/go-piece v0.0.0-20241102032446-a7c497f05d55 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect

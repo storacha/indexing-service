@@ -12,7 +12,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/blobindex"
@@ -108,10 +109,10 @@ func TestLegacyService(t *testing.T) {
 			claim, err := delegation.NewDelegationView(results.Claims()[0], br)
 			require.NoError(t, err)
 			require.Equal(t, id.DID().String(), claim.Issuer().DID().String())
-			require.Equal(t, assert.LocationAbility, claim.Capabilities()[0].Can())
+			require.Equal(t, cassert.LocationAbility, claim.Capabilities()[0].Can())
 			require.NotNil(t, claim.Expiration())
 
-			nb, err := assert.LocationCaveatsReader.Read(claim.Capabilities()[0].Nb())
+			nb, err := cassert.LocationCaveatsReader.Read(claim.Capabilities()[0].Nb())
 			require.NoError(t, err)
 			require.Equal(t, f.digest, nb.Content.Hash())
 			require.Equal(t, 1, len(nb.Location))
@@ -124,8 +125,8 @@ func TestLegacyService(t *testing.T) {
 	t.Run("returns claims from underlying indexing service", func(t *testing.T) {
 		mockStore := newMockBlockIndexStore()
 		digest := testutil.RandomMultihash()
-		nb := assert.LocationCaveats{Content: assert.FromHash(digest)}
-		claim, err := assert.Location.Delegate(id, id, id.DID().String(), nb)
+		nb := cassert.LocationCaveats{Content: ctypes.FromHash(digest)}
+		claim, err := cassert.Location.Delegate(id, id, id.DID().String(), nb)
 		require.NoError(t, err)
 
 		claims := map[cid.Cid]delegation.Delegation{link.ToCID(claim.Link()): claim}
@@ -187,8 +188,8 @@ func TestLegacyService(t *testing.T) {
 		service, err := NewService(id, &mockService, mockStore, bucketURL.String())
 		require.NoError(t, err)
 
-		nb := assert.LocationCaveats{Content: assert.FromHash(digest)}
-		claim, err := assert.Location.Delegate(id, id, id.DID().String(), nb)
+		nb := cassert.LocationCaveats{Content: ctypes.FromHash(digest)}
+		claim, err := cassert.Location.Delegate(id, id, id.DID().String(), nb)
 		require.NoError(t, err)
 
 		err = service.Cache(context.Background(), peer.AddrInfo{}, claim)

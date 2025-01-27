@@ -18,8 +18,9 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-capabilities/pkg/claim"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -69,12 +70,12 @@ func TestClient(t *testing.T) {
 				alice,
 				[]ucan.Capability[ucan.NoCaveats]{
 					ucan.NewCapability(
-						assert.EqualsAbility,
+						cassert.EqualsAbility,
 						indexingID.DID().String(),
 						ucan.NoCaveats{},
 					),
 					ucan.NewCapability(
-						assert.IndexAbility,
+						cassert.IndexAbility,
 						indexingID.DID().String(),
 						ucan.NoCaveats{},
 					),
@@ -89,13 +90,13 @@ func TestClient(t *testing.T) {
 	index, err := blobindex.FromShardArchives(root, [][]byte{bytes})
 	require.NoError(t, err)
 
-	locationClaim, err := assert.Location.Delegate(
+	locationClaim, err := cassert.Location.Delegate(
 		storageID,
 		space,
 		storageID.DID().String(),
-		assert.LocationCaveats{
+		cassert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(digest),
+			Content:  ctypes.FromHash(digest),
 			Location: []url.URL{*storageURL.JoinPath("/blob/%s", digestutil.Format(digest))},
 		},
 	)
@@ -114,13 +115,13 @@ func TestClient(t *testing.T) {
 	require.NoError(t, err)
 	indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), indexDigest)}
 
-	indexLocationClaim, err := assert.Location.Delegate(
+	indexLocationClaim, err := cassert.Location.Delegate(
 		storageID,
 		space,
 		storageID.DID().String(),
-		assert.LocationCaveats{
+		cassert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(indexDigest),
+			Content:  ctypes.FromHash(indexDigest),
 			Location: []url.URL{*storageURL.JoinPath("/blob/%s", digestutil.Format(indexDigest))},
 		},
 	)
@@ -161,7 +162,7 @@ func TestClient(t *testing.T) {
 		err = c.PublishIndexClaim(
 			context.Background(),
 			alice,
-			assert.IndexCaveats{
+			cassert.IndexCaveats{
 				Content: root,
 				Index:   indexLink,
 			},
@@ -171,7 +172,7 @@ func TestClient(t *testing.T) {
 
 		assertIndexInvocation := indexingUCANInvocations[len(indexingUCANInvocations)-1]
 		require.NotNil(t, assertIndexInvocation)
-		require.Equal(t, assert.IndexAbility, assertIndexInvocation.Capabilities()[0].Can())
+		require.Equal(t, cassert.IndexAbility, assertIndexInvocation.Capabilities()[0].Can())
 	})
 
 	t.Run("query", func(t *testing.T) {
@@ -214,20 +215,20 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 	s, err := ucanserver.NewServer(
 		id,
 		ucanserver.WithServiceMethod(
-			assert.EqualsAbility,
+			cassert.EqualsAbility,
 			ucanserver.Provide(
-				assert.Equals,
-				func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				cassert.Equals,
+				func(cap ucan.Capability[cassert.EqualsCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
 					notifyInvocation(inv)
 					return ok.Unit{}, nil, nil
 				},
 			),
 		),
 		ucanserver.WithServiceMethod(
-			assert.IndexAbility,
+			cassert.IndexAbility,
 			ucanserver.Provide(
-				assert.Index,
-				func(cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				cassert.Index,
+				func(cap ucan.Capability[cassert.IndexCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
 					notifyInvocation(inv)
 					return ok.Unit{}, nil, nil
 				},

@@ -11,7 +11,8 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multicodec"
 	multihash "github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
@@ -49,14 +50,14 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 		return nil, types.ErrKeyNotFound
 	}
 	size := uint64(resp.ContentLength)
-	delegation, err := assert.Location.Delegate(
+	delegation, err := cassert.Location.Delegate(
 		cfm.id,
 		cfm.id,
 		cfm.id.DID().String(),
-		assert.LocationCaveats{
-			Content:  assert.FromHash(contentHash),
+		cassert.LocationCaveats{
+			Content:  ctypes.FromHash(contentHash),
 			Location: []url.URL{*cfm.bucketURL.JoinPath(toBlobKey(contentHash))},
-			Range:    &assert.Range{Offset: 0, Length: &size},
+			Range:    &cassert.Range{Offset: 0, Length: &size},
 		},
 		cfm.getOpts()...,
 	)
