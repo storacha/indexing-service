@@ -16,8 +16,8 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
-	adm "github.com/storacha/go-capabilities/pkg/assert/datamodel"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/result/ok"
@@ -240,12 +240,12 @@ func TestQuery(t *testing.T) {
 }
 
 func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
-	locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-		Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: contentLink.Hash()}))(t),
+	locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+		Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: contentLink.Hash()}))(t),
 		Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 	})
 
-	locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.LocationCaveats]{locationClaim}))(t)
+	locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[cassert.LocationCaveats]{locationClaim}))(t)
 	locationDelegationCid := testutil.Must(cid.Prefix{
 		Version:  1,
 		Codec:    uint64(multicodec.Car),
@@ -271,12 +271,12 @@ func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr
 func buildTestIndexClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult, cidlink.Link, blobindex.ShardedDagIndexView) {
 	indexHash, index := testutil.RandomShardedDagIndexView(32)
 	indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), indexHash)}
-	indexClaim := assert.Index.New(testutil.Service.DID().String(), assert.IndexCaveats{
+	indexClaim := cassert.Index.New(testutil.Service.DID().String(), cassert.IndexCaveats{
 		Content: contentLink,
 		Index:   indexLink,
 	})
 
-	indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.IndexCaveats]{indexClaim}))(t)
+	indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.IndexCaveats]{indexClaim}))(t)
 	indexDelegationCid := testutil.Must(cid.Prefix{
 		Version:  1,
 		Codec:    uint64(multicodec.Car),
@@ -301,12 +301,12 @@ func buildTestIndexClaim(t *testing.T, contentLink cidlink.Link, providerAddr *p
 
 func buildTestEqualsClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult, cidlink.Link) {
 	equivalentCid := testutil.RandomCID()
-	equalsClaim := assert.Equals.New(testutil.Service.DID().String(), assert.EqualsCaveats{
-		Content: testutil.Must(assert.Digest(adm.DigestModel{Digest: contentLink.Hash()}))(t),
+	equalsClaim := cassert.Equals.New(testutil.Service.DID().String(), cassert.EqualsCaveats{
+		Content: testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: contentLink.Hash()}))(t),
 		Equals:  equivalentCid,
 	})
 
-	equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.EqualsCaveats]{equalsClaim}))(t)
+	equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[cassert.EqualsCaveats]{equalsClaim}))(t)
 	equalsDelegationCid := testutil.Must(cid.Prefix{
 		Version:  1,
 		Codec:    uint64(multicodec.Car),
@@ -865,7 +865,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 
 		// Expect an error indicating a problem with reading the claim caveats
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "reading equals claim data: missing required fields: Content,Equals")
+		require.Contains(t, err.Error(), "reading equals claim data: missing required fields: content,equals")
 	})
 
 	t.Run("error when publishing claim in claims service fails", func(t *testing.T) {
@@ -1021,14 +1021,14 @@ func TestCacheClaim(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(
 			testutil.Service,
 			testutil.Alice,
-			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+			[]ucan.Capability[cassert.LocationCaveats]{locationClaim},
 			// set the expiration to 1 hour in the future
 			delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix())),
 		))(t)
@@ -1055,16 +1055,16 @@ func TestCacheClaim(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 			// set the range
-			Range: &assert.Range{Offset: 0, Length: &[]uint64{3}[0]},
+			Range: &cassert.Range{Offset: 0, Length: &[]uint64{3}[0]},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(
 			testutil.Service,
 			testutil.Alice,
-			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+			[]ucan.Capability[cassert.LocationCaveats]{locationClaim},
 			delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix())),
 		))(t)
 
@@ -1090,14 +1090,14 @@ func TestCacheClaim(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(
 			testutil.Service,
 			testutil.Alice,
-			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+			[]ucan.Capability[cassert.LocationCaveats]{locationClaim},
 		))(t)
 
 		// mock the error from the claims.Cache function call
@@ -1122,14 +1122,14 @@ func TestCacheClaim(t *testing.T) {
 		}
 		ctx := context.Background()
 
-		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(
 			testutil.Service,
 			testutil.Alice,
-			[]ucan.Capability[assert.LocationCaveats]{locationClaim},
+			[]ucan.Capability[cassert.LocationCaveats]{locationClaim},
 		))(t)
 
 		mockClaimsService.EXPECT().Cache(ctx, locationDelegation).Return(nil)

@@ -22,7 +22,8 @@ import (
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld/block"
@@ -59,34 +60,34 @@ func main() {
 	indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), indexDigest)}
 
 	carLocationURL := blobURL(randomURL(), carDigest)
-	carLocationCommitment := must(assert.Location.Delegate(
+	carLocationCommitment := must(cassert.Location.Delegate(
 		storageID,
 		space,
 		storageID.DID().String(),
-		assert.LocationCaveats{
+		cassert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(carDigest),
+			Content:  ctypes.FromHash(carDigest),
 			Location: []url.URL{*carLocationURL},
 		},
 	))
 
 	indexLocationURL := blobURL(randomURL(), indexDigest)
-	indexLocationCommitment := must(assert.Location.Delegate(
+	indexLocationCommitment := must(cassert.Location.Delegate(
 		storageID,
 		space,
 		storageID.DID().String(),
-		assert.LocationCaveats{
+		cassert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(indexDigest),
+			Content:  ctypes.FromHash(indexDigest),
 			Location: []url.URL{*indexLocationURL},
 		},
 	))
 
-	indexClaim := must(assert.Index.Delegate(
+	indexClaim := must(cassert.Index.Delegate(
 		uploadServiceID,
 		indexingServiceID,
 		indexingServiceID.DID().String(),
-		assert.IndexCaveats{
+		cassert.IndexCaveats{
 			Content: blockLink,
 			Index:   indexLink,
 		},
@@ -99,7 +100,7 @@ func main() {
 					uploadServiceID,
 					[]ucan.Capability[ucan.NoCaveats]{
 						ucan.NewCapability(
-							assert.IndexAbility,
+							cassert.IndexAbility,
 							indexingServiceID.DID().String(),
 							ucan.NoCaveats{},
 						),

@@ -16,8 +16,8 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/maurl"
-	"github.com/storacha/go-capabilities/pkg/assert"
-	adm "github.com/storacha/go-capabilities/pkg/assert/datamodel"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/stretchr/testify/mock"
@@ -33,12 +33,12 @@ func TestFind(t *testing.T) {
 		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
 
-		partitionClaim := assert.Partition.New(testutil.Service.DID().String(), assert.PartitionCaveats{
-			Content: assert.FromHash(contentHash),
+		partitionClaim := cassert.Partition.New(testutil.Service.DID().String(), cassert.PartitionCaveats{
+			Content: ctypes.FromHash(contentHash),
 			Blocks:  nil,
 			Parts:   nil,
 		})
-		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.PartitionCaveats]{partitionClaim}))(t)
+		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.PartitionCaveats]{partitionClaim}))(t)
 		partitionDelegationCid := link.ToCID(testutil.RandomCID())
 		locationDelegation := testutil.RandomLocationDelegation()
 		locationDelegationCid := link.ToCID(testutil.RandomCID())
@@ -97,12 +97,12 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		contentHash := contentCid.Hash()
 		spaceDID := testutil.RandomPrincipal().DID()
 
-		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-			Content:  testutil.Must(assert.Digest(adm.DigestModel{Digest: contentHash}))(t),
+		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: contentHash}))(t),
 			Location: []url.URL{*testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(contentHash))))(t)},
 			Space:    spaceDID,
 		})
-		locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.LocationCaveats]{locationClaim}))(t)
+		locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[cassert.LocationCaveats]{locationClaim}))(t)
 
 		result, err := legacyClaims.synthetizeProviderResult(locationDelegation)
 
@@ -136,11 +136,11 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		indexLink := testutil.RandomCID()
 		indexCid := link.ToCID(indexLink)
 
-		indexClaim := assert.Index.New(testutil.Service.DID().String(), assert.IndexCaveats{
+		indexClaim := cassert.Index.New(testutil.Service.DID().String(), cassert.IndexCaveats{
 			Content: contentLink,
 			Index:   indexLink,
 		})
-		indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.IndexCaveats]{indexClaim}))(t)
+		indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.IndexCaveats]{indexClaim}))(t)
 
 		result, err := legacyClaims.synthetizeProviderResult(indexDelegation)
 
@@ -170,12 +170,12 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		equalsLink := testutil.RandomCID()
 		equalsCid := link.ToCID(equalsLink)
 
-		equalsClaim := assert.Equals.New(testutil.Service.DID().String(), assert.EqualsCaveats{
-			Content: testutil.Must(assert.Digest(adm.DigestModel{Digest: contentHash}))(t),
+		equalsClaim := cassert.Equals.New(testutil.Service.DID().String(), cassert.EqualsCaveats{
+			Content: testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: contentHash}))(t),
 			Equals:  equalsLink,
 		})
 
-		equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.EqualsCaveats]{equalsClaim}))(t)
+		equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.EqualsCaveats]{equalsClaim}))(t)
 
 		result, err := legacyClaims.synthetizeProviderResult(equalsDelegation)
 
@@ -203,13 +203,13 @@ func TestSynthetizeProviderResult(t *testing.T) {
 
 		contentHash := link.ToCID(testutil.RandomCID()).Hash()
 
-		partitionClaim := assert.Partition.New(testutil.Service.DID().String(), assert.PartitionCaveats{
-			Content: assert.FromHash(contentHash),
+		partitionClaim := cassert.Partition.New(testutil.Service.DID().String(), cassert.PartitionCaveats{
+			Content: ctypes.FromHash(contentHash),
 			Blocks:  nil,
 			Parts:   nil,
 		})
 
-		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.PartitionCaveats]{partitionClaim}))(t)
+		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.PartitionCaveats]{partitionClaim}))(t)
 
 		_, err := legacyClaims.synthetizeProviderResult(partitionDelegation)
 

@@ -15,7 +15,8 @@ import (
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/principal"
@@ -55,10 +56,10 @@ func (l *IndexingService) Query(ctx context.Context, q types.Query) (types.Query
 		return results, nil
 	}
 
-	var locs []assert.LocationCaveats
+	var locs []cassert.LocationCaveats
 	for _, h := range q.Hashes {
 		// lets see if we can materialize some location claims
-		content := assert.FromHash(h)
+		content := ctypes.FromHash(h)
 		records, err := l.blockIndexStore.Query(ctx, content.Hash())
 		if err != nil {
 			if errors.Is(err, types.ErrKeyNotFound) {
@@ -80,25 +81,25 @@ func (l *IndexingService) Query(ctx context.Context, q types.Query) (types.Query
 				}
 
 				u = l.bucketURL.JoinPath(fmt.Sprintf("/%s/%s.car", shard.String(), shard.String()))
-				locs = append(locs, assert.LocationCaveats{
+				locs = append(locs, cassert.LocationCaveats{
 					Content:  content,
 					Location: []url.URL{*u},
-					Range:    &assert.Range{Offset: r.Offset, Length: &r.Length},
+					Range:    &cassert.Range{Offset: r.Offset, Length: &r.Length},
 				})
 				continue
 			}
 
-			locs = append(locs, assert.LocationCaveats{
+			locs = append(locs, cassert.LocationCaveats{
 				Content:  content,
 				Location: []url.URL{*u},
-				Range:    &assert.Range{Offset: r.Offset, Length: &r.Length},
+				Range:    &cassert.Range{Offset: r.Offset, Length: &r.Length},
 			})
 		}
 	}
 
 	claims := map[cid.Cid]delegation.Delegation{}
 	for _, loc := range locs {
-		claim, err := assert.Location.Delegate(
+		claim, err := cassert.Location.Delegate(
 			l.id,
 			l.id,
 			l.id.DID().String(),
