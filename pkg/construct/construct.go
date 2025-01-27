@@ -3,9 +3,11 @@ package construct
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -81,6 +83,7 @@ type config struct {
 	legacyClaimsMapper providerindex.ContentToClaimsMapper
 	legacyClaimsBucket types.ContentClaimsStore
 	legacyClaimsUrl    string
+	httpClient         *http.Client
 }
 
 // Option configures how the node is construct
@@ -188,6 +191,14 @@ func WithLegacyClaims(legacyClaimsMapper providerindex.ContentToClaimsMapper, le
 		cfg.legacyClaimsMapper = legacyClaimsMapper
 		cfg.legacyClaimsBucket = legacyClaimsBucket
 		cfg.legacyClaimsUrl = legacyClaimsUrl
+		return nil
+	}
+}
+
+// WithHTTPClient configures the HTTP client used when consuming HTTP APIs
+func WithHTTPClient(httpClient *http.Client) Option {
+	return func(cfg *config) error {
+		cfg.httpClient = httpClient
 		return nil
 	}
 }
@@ -362,13 +373,29 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		claimsStore = contentclaims.NewStoreFromDatastore(namespace.Wrap(ds, contentClaimsNamespace))
 	}
 
-	finder := contentclaims.NewSimpleFinder(http.DefaultClient)
+	var httpClient *http.Client
+	if cfg.httpClient != nil {
+		httpClient = cfg.httpClient
+	} else {
+		var transport http.RoundTripper = &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: 5 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 5 * time.Second,
+		}
+
+		httpClient = &http.Client{
+			Transport: transport,
+		}
+	}
+
+	finder := contentclaims.NewSimpleFinder(httpClient)
 	if cfg.legacyClaimsBucket != nil {
 		finder = contentclaims.WithStore(finder, cfg.legacyClaimsBucket)
 	}
 	claims := contentclaims.New(claimsStore, claimsCache, finder)
 	blobIndexLookup := blobindexlookup.WithCache(
-		blobindexlookup.NewBlobIndexLookup(http.DefaultClient),
+		blobindexlookup.NewBlobIndexLookup(httpClient),
 		shardDagIndexesCache,
 		cachingQueue,
 	)

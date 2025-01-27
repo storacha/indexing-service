@@ -114,7 +114,8 @@ func TestBucketFallbackMapper(t *testing.T) {
 			go func() {
 				doneErr <- server.ListenAndServe()
 			}()
-			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, serverURL, mockMapper{baseMap}, func() []delegation.Option {
+
+			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, http.DefaultClient, serverURL, mockMapper{baseMap}, func() []delegation.Option {
 				return []delegation.Option{delegation.WithNoExpiration()}
 			})
 			cids, err := bucketFallbackMapper.GetClaims(ctx, testCase.hash)

@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -27,6 +29,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/legacy"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // ErrNoPrivateKey means that the value returned from Secrets was empty
@@ -161,6 +164,22 @@ func FromEnv(ctx context.Context) Config {
 
 // Construct constructs types.Service from AWS deps for Lamda functions
 func Construct(cfg Config) (types.Service, error) {
+	var transport http.RoundTripper = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: 5 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+
+	// enable tracing in the http client if telemetry is enabled
+	if cfg.HoneycombAPIKey != "" {
+		transport = otelhttp.NewTransport(transport)
+	}
+
+	httpClient := &http.Client{
+		Transport: transport,
+	}
+
 	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
@@ -176,6 +195,7 @@ func Construct(cfg Config) (types.Service, error) {
 	legacyClaimsCfg.Region = cfg.LegacyClaimsTableRegion
 	legacyClaimsMapper := NewBucketFallbackMapper(
 		cfg.Signer,
+		httpClient,
 		legacyDataBucketURL,
 		NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName),
 		func() []delegation.Option {
@@ -193,6 +213,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
 		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsURL),
+		construct.WithHTTPClient(httpClient),
 	)
 	if err != nil {
 		return nil, err
