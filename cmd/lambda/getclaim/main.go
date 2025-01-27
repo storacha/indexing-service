@@ -18,7 +18,7 @@ func main() {
 	// an empty API key disables instrumentation
 	if cfg.HoneycombAPIKey != "" {
 		ctx := context.Background()
-		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, cfg)
+		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg)
 		if err != nil {
 			panic(err)
 		}
@@ -31,7 +31,7 @@ func main() {
 			otellambda.WithTracerProvider(tp),
 			otellambda.WithFlusher(tp),
 		)
-		lambda.Start(instrumentedHandler)
+		lambda.StartWithOptions(instrumentedHandler, lambda.WithContext(ctx))
 	} else {
 		lambda.Start(makeHandler(cfg))
 	}

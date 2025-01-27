@@ -12,7 +12,10 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
-func SetupTelemetry(ctx context.Context, config aws.Config) (*trace.TracerProvider, func(context.Context), error) {
+// SetupTelemetry configures the OpenTelemetry SDK by setting up a global tracer provider.
+// It also adds instrumentation middleware to the config so that all AWS SDK clients based on that config are instrumented.
+// This function updates the configuration in place. It should be called before any AWS SDK clients are created.
+func SetupTelemetry(ctx context.Context, cfg *aws.Config) (*trace.TracerProvider, func(context.Context), error) {
 	// WithInsecure is ok here because we are exporting traces to the AWS OpenTelemetry collector which is running
 	// in a layer within the lambda's execution environment
 	exp, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
@@ -39,11 +42,12 @@ func SetupTelemetry(ctx context.Context, config aws.Config) (*trace.TracerProvid
 		}
 	}
 
-	// instrument all aws clients
-	otelaws.AppendMiddlewares(&config.APIOptions, otelaws.WithTracerProvider(tp))
-
-	// set as the global tracer provider
+	// set as the global tracer provider. It is common for OpenTelemetry libraries to use the global tracer provider
+	// as the default provider if one is not provided
 	otel.SetTracerProvider(tp)
+
+	// instrument all aws clients
+	otelaws.AppendMiddlewares(&cfg.APIOptions)
 
 	return tp, shutdownFunc, nil
 }

@@ -95,6 +95,7 @@ resource "aws_lambda_function" "lambda" {
         LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
         LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
+        OTEL_PROPAGATORS = "tracecontext"
         OTEL_SERVICE_NAME = "${terraform.workspace}-${var.app}"
         OPENTELEMETRY_COLLECTOR_CONFIG_URI = "/var/task/otel-collector-config.yaml"
         HONEYCOMB_OTLP_ENDPOINT = "api.honeycomb.io:443"
