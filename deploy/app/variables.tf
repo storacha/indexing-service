@@ -19,3 +19,8 @@ variable "did" {
   description = "DID for this deployment (did:web:... for example)"
   type = string
 }
+
+variable "honeycomb_api_key" {
+  description = "Ingestion API key to send traces to Honeycomb"
+  type = string
+}

@@ -60,6 +60,7 @@ type Config struct {
 	LegacyBlockIndexTableName   string
 	LegacyBlockIndexTableRegion string
 	LegacyDataBucketURL         string
+	HoneycombAPIKey             string
 	principal.Signer
 }
 
@@ -154,6 +155,7 @@ func FromEnv(ctx context.Context) Config {
 		LegacyBlockIndexTableName:   mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
 		LegacyBlockIndexTableRegion: mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
 		LegacyDataBucketURL:         mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		HoneycombAPIKey:             mustGetEnv("HONEYCOMB_API_KEY"),
 	}
 }
 
