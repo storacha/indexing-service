@@ -3,10 +3,16 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"time"
 
-	"github.com/storacha/indexing-service/pkg/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/redis/go-redis/extra/redisotel/v9"
+	"github.com/redis/go-redis/v9"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -50,4 +56,25 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (*trace.TracerProvider
 	otelaws.AppendMiddlewares(&cfg.APIOptions)
 
 	return tp, shutdownFunc, nil
+}
+
+func GetInstrumentedHTTPClient() *http.Client {
+	var transport http.RoundTripper = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: 5 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+
+	instrumentedTransport := otelhttp.NewTransport(transport)
+
+	return &http.Client{
+		Transport: instrumentedTransport,
+	}
+}
+
+func GetInstrumentedRedisClient(opts *redis.Options) *redis.Client {
+	client := redis.NewClient(opts)
+	redisotel.InstrumentTracing(client)
+	return client
 }

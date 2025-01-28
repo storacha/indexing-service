@@ -24,7 +24,7 @@ func main() {
 	// an empty API key disables instrumentation
 	if cfg.HoneycombAPIKey != "" {
 		ctx := context.Background()
-		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg)
+		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg.Config)
 		if err != nil {
 			panic(err)
 		}
@@ -44,8 +44,13 @@ func main() {
 }
 
 func makeHandler(cfg aws.Config) func(ctx context.Context, sqsEvent events.SQSEvent) error {
-	providerRedis := goredis.NewClient(&cfg.ProvidersRedis)
-	providerStore := redis.NewProviderStore(providerRedis)
+	var providersRedis *goredis.Client
+	if cfg.HoneycombAPIKey != "" {
+		providersRedis = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
+	} else {
+		providersRedis = goredis.NewClient(&cfg.ProvidersRedis)
+	}
+	providerStore := redis.NewProviderStore(providersRedis)
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
 

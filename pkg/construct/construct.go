@@ -284,9 +284,25 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		cachingQueue = jq
 	}
 
+	var httpClient *http.Client
+	if cfg.httpClient != nil {
+		httpClient = cfg.httpClient
+	} else {
+		var transport http.RoundTripper = &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: 5 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 5 * time.Second,
+		}
+
+		httpClient = &http.Client{
+			Transport: transport,
+		}
+	}
+
 	// setup IPNI
 	// TODO: switch to double hashed client for reader privacy?
-	findClient, err := ipnifind.New(sc.IndexerURL)
+	findClient, err := ipnifind.New(sc.IndexerURL, ipnifind.WithClient(httpClient))
 	if err != nil {
 		return nil, err
 	}
@@ -371,22 +387,6 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 			ds = initializeDatastore(&cfg)
 		}
 		claimsStore = contentclaims.NewStoreFromDatastore(namespace.Wrap(ds, contentClaimsNamespace))
-	}
-
-	var httpClient *http.Client
-	if cfg.httpClient != nil {
-		httpClient = cfg.httpClient
-	} else {
-		var transport http.RoundTripper = &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout: 5 * time.Second,
-			}).Dial,
-			TLSHandshakeTimeout: 5 * time.Second,
-		}
-
-		httpClient = &http.Client{
-			Transport: transport,
-		}
 	}
 
 	finder := contentclaims.NewSimpleFinder(httpClient)

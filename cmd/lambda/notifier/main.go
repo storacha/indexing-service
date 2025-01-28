@@ -21,7 +21,7 @@ func main() {
 	// an empty API key disables instrumentation
 	if cfg.HoneycombAPIKey != "" {
 		ctx := context.Background()
-		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg)
+		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg.Config)
 		if err != nil {
 			panic(err)
 		}

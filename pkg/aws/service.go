@@ -27,9 +27,9 @@ import (
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/legacy"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // ErrNoPrivateKey means that the value returned from Secrets was empty
@@ -164,20 +164,27 @@ func FromEnv(ctx context.Context) Config {
 
 // Construct constructs types.Service from AWS deps for Lamda functions
 func Construct(cfg Config) (types.Service, error) {
-	var transport http.RoundTripper = &http.Transport{
-		Dial: (&net.Dialer{
-			Timeout: 5 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: 5 * time.Second,
-	}
+	var httpClient *http.Client
+	var providersClient, claimsClient, indexesClient *redis.Client
 
-	// enable tracing in the http client if telemetry is enabled
+	// instrument HTTP and redis clients if telemetry is enabled
 	if cfg.HoneycombAPIKey != "" {
-		transport = otelhttp.NewTransport(transport)
-	}
-
-	httpClient := &http.Client{
-		Transport: transport,
+		httpClient = telemetry.GetInstrumentedHTTPClient()
+		providersClient = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
+		claimsClient = telemetry.GetInstrumentedRedisClient(&cfg.ClaimsRedis)
+		indexesClient = telemetry.GetInstrumentedRedisClient(&cfg.IndexesRedis)
+	} else {
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				Dial: (&net.Dialer{
+					Timeout: 5 * time.Second,
+				}).Dial,
+				TLSHandshakeTimeout: 5 * time.Second,
+			},
+		}
+		providersClient = redis.NewClient(&cfg.ProvidersRedis)
+		claimsClient = redis.NewClient(&cfg.ClaimsRedis)
+		indexesClient = redis.NewClient(&cfg.IndexesRedis)
 	}
 
 	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
@@ -214,6 +221,9 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithClaimsStore(claimBucketStore),
 		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
+		construct.WithProvidersClient(providersClient),
+		construct.WithClaimsClient(claimsClient),
+		construct.WithIndexesClient(indexesClient),
 	)
 	if err != nil {
 		return nil, err
