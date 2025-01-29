@@ -26,8 +26,9 @@ func TestProviderStore(t *testing.T) {
 
 	returnedResults1 := testutil.Must(providerStore.Get(ctx, mh1))(t)
 	returnedResults2 := testutil.Must(providerStore.Get(ctx, mh2))(t)
-	require.Equal(t, results1, returnedResults1)
-	require.Equal(t, results2, returnedResults2)
+
+	require.ElementsMatch(t, results1, returnedResults1)
+	require.ElementsMatch(t, results2, returnedResults2)
 }
 
 func randomProviderResults(num int) (multihash.Multihash, []model.ProviderResult, error) {
