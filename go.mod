@@ -27,6 +27,7 @@ require (
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.3
+	github.com/redis/go-redis/extra/redisotel/v9 v9.7.0
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/storacha/go-capabilities v0.0.0-20250120154346-44180817ecb7
 	github.com/storacha/go-metadata v0.0.0-20241216142904-a60e20043cef
@@ -39,6 +40,7 @@ require (
 	go.opentelemetry.io/contrib/detectors/aws/lambda v0.59.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda v0.59.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws v0.59.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0
 	go.opentelemetry.io/otel v1.34.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0
 	go.opentelemetry.io/otel/sdk v1.34.0
@@ -141,7 +143,6 @@ require (
 	github.com/polydawn/refmt v0.89.1-0.20231129105047-37766d95467a // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/redis/go-redis/extra/rediscmd/v9 v9.7.0 // indirect
-	github.com/redis/go-redis/extra/redisotel/v9 v9.7.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shirou/gopsutil/v3 v3.23.12 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
@@ -156,7 +157,6 @@ require (
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.28.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
