@@ -22,7 +22,6 @@ var (
 	peerIDConverter      = bindnode.NamedBytesConverter("PeerID", bytesToPeerID, peerIDtoBytes)
 	multiaddrConverter   = bindnode.NamedBytesConverter("Multiaddr", bytesToMultiaddr, multiaddrToBytes)
 	providerResultType   schema.Type
-	providerResultsType  schema.Type
 )
 
 func init() {
@@ -31,7 +30,6 @@ func init() {
 		panic(fmt.Errorf("failed to load schema: %w", err))
 	}
 	providerResultType = typeSystem.TypeByName("ProviderResult")
-	providerResultsType = typeSystem.TypeByName("ProviderResults")
 }
 
 func bytesToPeerID(data []byte) (interface{}, error) {
