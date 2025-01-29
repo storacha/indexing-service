@@ -86,6 +86,19 @@ type config struct {
 	httpClient         *http.Client
 }
 
+// DefaultHTTPClient creates a HTTP client with sensible defaults
+func DefaultHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: 5 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 5 * time.Second,
+		},
+	}
+}
+
 // Option configures how the node is construct
 type Option func(*config) error
 
@@ -284,20 +297,9 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		cachingQueue = jq
 	}
 
-	var httpClient *http.Client
+	httpClient := DefaultHTTPClient()
 	if cfg.httpClient != nil {
 		httpClient = cfg.httpClient
-	} else {
-		var transport http.RoundTripper = &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout: 5 * time.Second,
-			}).Dial,
-			TLSHandshakeTimeout: 5 * time.Second,
-		}
-
-		httpClient = &http.Client{
-			Transport: transport,
-		}
 	}
 
 	// setup IPNI

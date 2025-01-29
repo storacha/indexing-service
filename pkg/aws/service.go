@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -174,14 +173,7 @@ func Construct(cfg Config) (types.Service, error) {
 		claimsClient = telemetry.GetInstrumentedRedisClient(&cfg.ClaimsRedis)
 		indexesClient = telemetry.GetInstrumentedRedisClient(&cfg.IndexesRedis)
 	} else {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				Dial: (&net.Dialer{
-					Timeout: 5 * time.Second,
-				}).Dial,
-				TLSHandshakeTimeout: 5 * time.Second,
-			},
-		}
+		httpClient = construct.DefaultHTTPClient()
 		providersClient = redis.NewClient(&cfg.ProvidersRedis)
 		claimsClient = redis.NewClient(&cfg.ClaimsRedis)
 		indexesClient = redis.NewClient(&cfg.IndexesRedis)

@@ -3,13 +3,12 @@ package telemetry
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
+	"github.com/storacha/indexing-service/pkg/construct"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
@@ -71,18 +70,11 @@ func GetInstrumentedLambdaHandler(handlerFunc interface{}) interface{} {
 }
 
 func GetInstrumentedHTTPClient() *http.Client {
-	var transport http.RoundTripper = &http.Transport{
-		Dial: (&net.Dialer{
-			Timeout: 5 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: 5 * time.Second,
-	}
+	httpClient := construct.DefaultHTTPClient()
+	instrumentedTransport := otelhttp.NewTransport(httpClient.Transport)
+	httpClient.Transport = instrumentedTransport
 
-	instrumentedTransport := otelhttp.NewTransport(transport)
-
-	return &http.Client{
-		Transport: instrumentedTransport,
-	}
+	return httpClient
 }
 
 func GetInstrumentedRedisClient(opts *redis.Options) *redis.Client {
