@@ -1,47 +1,22 @@
 package main
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	ucanserver "github.com/storacha/go-ucanto/server"
 	idxconf "github.com/storacha/indexing-service/cmd/config"
+	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/principalresolver"
 	"github.com/storacha/indexing-service/pkg/server"
-	"github.com/storacha/indexing-service/pkg/telemetry"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 )
 
 func main() {
-	cfg := aws.FromEnv(context.Background())
-
-	// an empty API key disables instrumentation
-	if cfg.HoneycombAPIKey != "" {
-		ctx := context.Background()
-		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg.Config)
-		if err != nil {
-			panic(err)
-		}
-		defer telemetryShutdown(ctx)
-
-		handler := makeHandler(cfg)
-
-		instrumentedHandler := otellambda.InstrumentHandler(
-			handler,
-			otellambda.WithTracerProvider(tp),
-			otellambda.WithFlusher(tp),
-		)
-		lambda.StartWithOptions(instrumentedHandler, lambda.WithContext(ctx))
-	} else {
-		lambda.Start(makeHandler(cfg))
-	}
+	lambda.Start(makeHandler)
 }
 
-func makeHandler(cfg aws.Config) func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+func makeHandler(cfg aws.Config) any {
 	service, err := aws.Construct(cfg)
 	if err != nil {
 		panic(err)

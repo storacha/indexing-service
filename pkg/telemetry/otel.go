@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
@@ -21,19 +22,19 @@ import (
 // SetupTelemetry configures the OpenTelemetry SDK by setting up a global tracer provider.
 // It also adds instrumentation middleware to the config so that all AWS SDK clients based on that config are instrumented.
 // This function updates the configuration in place. It should be called before any AWS SDK clients are created.
-func SetupTelemetry(ctx context.Context, cfg *aws.Config) (*trace.TracerProvider, func(context.Context), error) {
+func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context), error) {
 	// WithInsecure is ok here because we are exporting traces to the AWS OpenTelemetry collector which is running
 	// in a layer within the lambda's execution environment
 	exp, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// the resource detector populates some span attributes with information about the environment
 	detector := lambdadetector.NewResourceDetector()
 	resource, err := detector.Detect(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	tp := trace.NewTracerProvider(
@@ -55,7 +56,18 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (*trace.TracerProvider
 	// instrument all aws clients
 	otelaws.AppendMiddlewares(&cfg.APIOptions)
 
-	return tp, shutdownFunc, nil
+	return shutdownFunc, nil
+}
+
+func GetInstrumentedLambdaHandler(handlerFunc interface{}) interface{} {
+	tp := otel.GetTracerProvider()
+	asFlusher := tp.(otellambda.Flusher)
+
+	return otellambda.InstrumentHandler(
+		handlerFunc,
+		otellambda.WithTracerProvider(tp),
+		otellambda.WithFlusher(asFlusher),
+	)
 }
 
 func GetInstrumentedHTTPClient() *http.Client {
