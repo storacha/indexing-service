@@ -74,7 +74,108 @@ func TestRedisStore(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			mockRedis := NewMockRedis(testCase.opts...)
-			redisStore := redis.NewStore[string, string](
+			redisStore := redis.NewStore(
+				func(s string) (string, error) { return s, nil },
+				func(s string) (string, error) { return s, nil },
+				func(s string) string { return s },
+				mockRedis)
+			testCase.behavior(t, redisStore)
+			expectedFinalState := testCase.finalState
+			if expectedFinalState == nil {
+				expectedFinalState = make(map[string]*redisValue)
+			}
+			require.Equal(t, expectedFinalState, mockRedis.data)
+		})
+	}
+}
+
+func TestRedisSetsStore(t *testing.T) {
+	ctx := context.Background()
+	testCases := []struct {
+		name       string
+		opts       []MockOption
+		behavior   func(t *testing.T, store *redis.SetsStore[string, string])
+		finalState map[string]*redisValue
+	}{
+		{
+			name: "normal behavior",
+			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
+				n, err := store.Add(ctx, "key1", "value1", "value2")
+				require.NoError(t, err)
+				require.Equal(t, uint64(2), n)
+
+				n, err = store.Add(ctx, "key1", "value3")
+				require.NoError(t, err)
+				require.Equal(t, uint64(1), n)
+
+				n, err = store.Add(ctx, "key1", "value2")
+				require.NoError(t, err)
+				require.Equal(t, uint64(0), n)
+
+				n, err = store.Add(ctx, "key2", "value4")
+				require.NoError(t, err)
+				require.Equal(t, uint64(1), n)
+
+				n, err = store.Add(ctx, "key3", "value5")
+				require.NoError(t, err)
+				require.Equal(t, uint64(1), n)
+
+				n, err = store.Add(ctx, "key4", "value6")
+				require.NoError(t, err)
+				require.Equal(t, uint64(1), n)
+
+				err = store.SetExpirable(ctx, "key3", true)
+				require.NoError(t, err)
+
+				err = store.SetExpirable(ctx, "key3", false)
+				require.NoError(t, err)
+
+				err = store.SetExpirable(ctx, "key4", true)
+				require.NoError(t, err)
+
+				require.ElementsMatch(t, []string{"value1", "value2", "value3"}, testutil.Must(store.Get(ctx, "key1"))(t))
+				require.ElementsMatch(t, []string{"value4"}, testutil.Must(store.Get(ctx, "key2"))(t))
+				require.ElementsMatch(t, []string{"value5"}, testutil.Must(store.Get(ctx, "key3"))(t))
+				require.ElementsMatch(t, []string{"value6"}, testutil.Must(store.Get(ctx, "key4"))(t))
+				_, err = store.Get(ctx, "key5")
+				require.ErrorIs(t, err, types.ErrKeyNotFound)
+			},
+			finalState: map[string]*redisValue{
+				"key1": {map[string]struct{}{"value1": {}, "value2": {}, "value3": {}}, 0},
+				"key2": {map[string]struct{}{"value4": {}}, 0},
+				"key3": {map[string]struct{}{"value5": {}}, 0},
+				"key4": {map[string]struct{}{"value6": {}}, redis.DefaultExpire},
+			},
+		},
+		{
+			name: "get errors",
+			opts: []MockOption{WithErrorOnGet(errors.New("something went wrong"))},
+			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
+				_, err := store.Get(ctx, "key1")
+				require.EqualError(t, err, "getting set members: something went wrong")
+			},
+		},
+		{
+			name: "add errors",
+			opts: []MockOption{WithErrorOnAdd(errors.New("something went wrong"))},
+			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
+				_, err := store.Add(ctx, "key1", "value1")
+				require.EqualError(t, err, "adding set member: something went wrong")
+			},
+		},
+		{
+			name: "set expiration errors",
+			opts: []MockOption{WithErrorOnSetExpiration(errors.New("something went wrong"))},
+			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
+				err := store.SetExpirable(ctx, "key1", true)
+				require.EqualError(t, err, "setting expire: something went wrong")
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			mockRedis := NewMockRedis(testCase.opts...)
+			redisStore := redis.NewSetsStore(
 				func(s string) (string, error) { return s, nil },
 				func(s string) (string, error) { return s, nil },
 				func(s string) string { return s },
@@ -115,6 +216,12 @@ func WithErrorOnGet(err error) MockOption {
 func WithErrorOnSet(err error) MockOption {
 	return func(m *MockRedis) {
 		m.errSet = err
+	}
+}
+
+func WithErrorOnAdd(err error) MockOption {
+	return func(m *MockRedis) {
+		m.errAdd = err
 	}
 }
 
@@ -221,6 +328,10 @@ func (m *MockRedis) SAdd(ctx context.Context, key string, values ...interface{})
 // SMembers implements redis.RedisClient.
 func (m *MockRedis) SMembers(ctx context.Context, key string) *goredis.StringSliceCmd {
 	cmd := goredis.NewStringSliceCmd(ctx, nil)
+	if m.errGet != nil {
+		cmd.SetErr(m.errGet)
+		return cmd
+	}
 	val, ok := m.data[key]
 	if !ok {
 		cmd.SetErr(goredis.Nil)

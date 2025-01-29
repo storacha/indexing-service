@@ -16,7 +16,6 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/did"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/publisher"
@@ -69,7 +68,6 @@ func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.
 
 func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	res, err := pi.providerStore.Get(ctx, mh)
-	fmt.Printf("provider store results: %s %d\n", digestutil.Format(mh), len(res))
 	if err == nil {
 		return res, nil
 	}
