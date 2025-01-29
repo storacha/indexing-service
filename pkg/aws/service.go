@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/legacy"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
 )
@@ -161,6 +163,22 @@ func FromEnv(ctx context.Context) Config {
 
 // Construct constructs types.Service from AWS deps for Lamda functions
 func Construct(cfg Config) (types.Service, error) {
+	var httpClient *http.Client
+	var providersClient, claimsClient, indexesClient *redis.Client
+
+	// instrument HTTP and redis clients if telemetry is enabled
+	if cfg.HoneycombAPIKey != "" {
+		httpClient = telemetry.GetInstrumentedHTTPClient()
+		providersClient = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
+		claimsClient = telemetry.GetInstrumentedRedisClient(&cfg.ClaimsRedis)
+		indexesClient = telemetry.GetInstrumentedRedisClient(&cfg.IndexesRedis)
+	} else {
+		httpClient = construct.DefaultHTTPClient()
+		providersClient = redis.NewClient(&cfg.ProvidersRedis)
+		claimsClient = redis.NewClient(&cfg.ClaimsRedis)
+		indexesClient = redis.NewClient(&cfg.IndexesRedis)
+	}
+
 	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
@@ -176,6 +194,7 @@ func Construct(cfg Config) (types.Service, error) {
 	legacyClaimsCfg.Region = cfg.LegacyClaimsTableRegion
 	legacyClaimsMapper := NewBucketFallbackMapper(
 		cfg.Signer,
+		httpClient,
 		legacyDataBucketURL,
 		NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName),
 		func() []delegation.Option {
@@ -193,6 +212,10 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
 		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsURL),
+		construct.WithHTTPClient(httpClient),
+		construct.WithProvidersClient(providersClient),
+		construct.WithClaimsClient(claimsClient),
+		construct.WithIndexesClient(indexesClient),
 	)
 	if err != nil {
 		return nil, err

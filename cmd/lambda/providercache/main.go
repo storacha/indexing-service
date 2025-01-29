@@ -6,46 +6,29 @@ import (
 	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
 	logging "github.com/ipfs/go-log/v2"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/telemetry"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 )
 
 var log = logging.Logger("lambda/providercache")
 
 func main() {
-	cfg := aws.FromEnv(context.Background())
-
-	// an empty API key disables instrumentation
-	if cfg.HoneycombAPIKey != "" {
-		ctx := context.Background()
-		tp, telemetryShutdown, err := telemetry.SetupTelemetry(ctx, cfg)
-		if err != nil {
-			panic(err)
-		}
-		defer telemetryShutdown(ctx)
-
-		handler := makeHandler(cfg)
-
-		instrumentedHandler := otellambda.InstrumentHandler(
-			handler,
-			otellambda.WithTracerProvider(tp),
-			otellambda.WithFlusher(tp),
-		)
-		lambda.Start(instrumentedHandler)
-	} else {
-		lambda.Start(makeHandler(cfg))
-	}
+	lambda.Start(makeHandler)
 }
 
-func makeHandler(cfg aws.Config) func(ctx context.Context, sqsEvent events.SQSEvent) error {
-	providerRedis := goredis.NewClient(&cfg.ProvidersRedis)
-	providerStore := redis.NewProviderStore(providerRedis)
+func makeHandler(cfg aws.Config) any {
+	var providersRedis *goredis.Client
+	if cfg.HoneycombAPIKey != "" {
+		providersRedis = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
+	} else {
+		providersRedis = goredis.NewClient(&cfg.ProvidersRedis)
+	}
+	providerStore := redis.NewProviderStore(providersRedis)
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
 

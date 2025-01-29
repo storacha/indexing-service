@@ -25,14 +25,16 @@ type ContentToClaimsMapper interface {
 
 type BucketFallbackMapper struct {
 	id         principal.Signer
+	httpClient *http.Client
 	bucketURL  *url.URL
 	baseMapper ContentToClaimsMapper
 	getOpts    func() []delegation.Option
 }
 
-func NewBucketFallbackMapper(id principal.Signer, bucketURL *url.URL, baseMapper ContentToClaimsMapper, getOpts func() []delegation.Option) BucketFallbackMapper {
+func NewBucketFallbackMapper(id principal.Signer, httpClient *http.Client, bucketURL *url.URL, baseMapper ContentToClaimsMapper, getOpts func() []delegation.Option) BucketFallbackMapper {
 	return BucketFallbackMapper{
 		id:         id,
+		httpClient: httpClient,
 		bucketURL:  bucketURL,
 		baseMapper: baseMapper,
 		getOpts:    getOpts,
@@ -45,7 +47,7 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 		return claims, err
 	}
 
-	resp, err := http.DefaultClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
+	resp, err := cfm.httpClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
 	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, types.ErrKeyNotFound
 	}
