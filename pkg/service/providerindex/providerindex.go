@@ -188,7 +188,6 @@ func filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did
 }
 
 func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
-	fmt.Printf("caching location claim\n")
 	// Cache the entries _with_ expiry - we cannot rely on the IPNI notifier to
 	// tell us when they are published since we are not publishing to IPNI.
 	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, true)
