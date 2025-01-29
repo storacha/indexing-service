@@ -16,6 +16,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/publisher"
@@ -68,6 +69,7 @@ func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.
 
 func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	res, err := pi.providerStore.Get(ctx, mh)
+	fmt.Printf("provider store results: %s %d\n", digestutil.Format(mh), len(res))
 	if err == nil {
 		return res, nil
 	}
@@ -92,8 +94,14 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 
 	// cache results if there are results to cache
 	if len(results) > 0 {
-		if err := pi.providerStore.Set(ctx, mh, results, true); err != nil {
+		n, err := pi.providerStore.Add(ctx, mh, results...)
+		if err != nil {
 			return nil, err
+		}
+		if n > 0 {
+			if err := pi.providerStore.SetExpirable(ctx, mh, true); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -182,6 +190,7 @@ func filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did
 }
 
 func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
+	fmt.Printf("caching location claim\n")
 	// Cache the entries _with_ expiry - we cannot rely on the IPNI notifier to
 	// tell us when they are published since we are not publishing to IPNI.
 	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, true)
@@ -205,7 +214,7 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 	var joberr error
 	q := jobqueue.NewJobQueue(
 		func(ctx context.Context, digest mh.Multihash) error {
-			return appendProviderResult(ctx, providerStore, digest, pr, expire)
+			return addProviderResult(ctx, providerStore, digest, pr, expire)
 		},
 		jobqueue.WithConcurrency(5),
 		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
@@ -251,18 +260,14 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 	return nil
 }
 
-// TODO: atomic append...
-func appendProviderResult(ctx context.Context, providerStore types.ProviderStore, digest mh.Multihash, meta model.ProviderResult, expire bool) error {
-	metas, err := providerStore.Get(ctx, digest)
+func addProviderResult(ctx context.Context, providerStore types.ProviderStore, digest mh.Multihash, meta model.ProviderResult, expire bool) error {
+	_, err := providerStore.Add(ctx, digest, meta)
 	if err != nil {
-		if err != types.ErrKeyNotFound {
-			return fmt.Errorf("getting existing provider results for digest: %s: %w", digest.B58String(), err)
-		}
+		return fmt.Errorf("adding provider result for digest: %s: %w", digest.B58String(), err)
 	}
-	metas = append(metas, meta)
-	err = providerStore.Set(ctx, digest, metas, expire)
+	err = providerStore.SetExpirable(ctx, digest, expire)
 	if err != nil {
-		return fmt.Errorf("setting provider results for digest: %s: %w", digest.B58String(), err)
+		return fmt.Errorf("setting expirable for digest: %s: %w", digest.B58String(), err)
 	}
 	return nil
 }

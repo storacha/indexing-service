@@ -3,6 +3,8 @@ package redis_test
 import (
 	"context"
 	"errors"
+	"maps"
+	"slices"
 	"testing"
 	"time"
 
@@ -38,10 +40,10 @@ func TestRedisStore(t *testing.T) {
 				require.ErrorIs(t, err, types.ErrKeyNotFound)
 			},
 			finalState: map[string]*redisValue{
-				"key1": {"value1", redis.DefaultExpire},
-				"key2": {"value2", 0},
-				"key3": {"value3", 0},
-				"key4": {"value4", redis.DefaultExpire},
+				"key1": {map[string]struct{}{"value1": {}}, redis.DefaultExpire},
+				"key2": {map[string]struct{}{"value2": {}}, 0},
+				"key3": {map[string]struct{}{"value3": {}}, 0},
+				"key4": {map[string]struct{}{"value4": {}}, redis.DefaultExpire},
 			},
 		},
 		{
@@ -88,7 +90,7 @@ func TestRedisStore(t *testing.T) {
 }
 
 type redisValue struct {
-	data    string
+	data    map[string]struct{}
 	expires time.Duration
 }
 
@@ -96,6 +98,7 @@ type MockRedis struct {
 	data             map[string]*redisValue
 	errGet           error
 	errSet           error
+	errAdd           error
 	errSetExpiration error
 }
 
@@ -155,7 +158,10 @@ func (m *MockRedis) Get(ctx context.Context, key string) *goredis.StringCmd {
 	if !ok {
 		cmd.SetErr(goredis.Nil)
 	} else {
-		cmd.SetVal(val.data)
+		for k := range val.data {
+			cmd.SetVal(k)
+			break
+		}
 	}
 	return cmd
 }
@@ -182,6 +188,45 @@ func (m *MockRedis) Set(ctx context.Context, key string, value interface{}, expi
 		cmd.SetErr(m.errSet)
 		return cmd
 	}
-	m.data[key] = &redisValue{value.(string), expiration}
+	data := map[string]struct{}{value.(string): {}}
+	m.data[key] = &redisValue{data, expiration}
+	return cmd
+}
+
+// SAdd implements redis.RedisClient.
+func (m *MockRedis) SAdd(ctx context.Context, key string, values ...interface{}) *goredis.IntCmd {
+	cmd := goredis.NewIntCmd(ctx, nil)
+	if m.errAdd != nil {
+		cmd.SetErr(m.errAdd)
+		return cmd
+	}
+	data := map[string]struct{}{}
+	val, ok := m.data[key]
+	if ok {
+		data = val.data
+	}
+	written := uint64(0)
+	for _, v := range values {
+		_, ok := data[v.(string)]
+		if !ok {
+			data[v.(string)] = struct{}{}
+			written++
+		}
+	}
+	m.data[key] = &redisValue{data, 0}
+	cmd.SetVal(int64(written))
+	return cmd
+}
+
+// SMembers implements redis.RedisClient.
+func (m *MockRedis) SMembers(ctx context.Context, key string) *goredis.StringSliceCmd {
+	cmd := goredis.NewStringSliceCmd(ctx, nil)
+	val, ok := m.data[key]
+	if !ok {
+		cmd.SetErr(goredis.Nil)
+	} else {
+		values := slices.Collect(maps.Keys(val.data))
+		cmd.SetVal(values)
+	}
 	return cmd
 }

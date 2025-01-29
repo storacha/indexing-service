@@ -19,8 +19,10 @@ func TestProviderStore(t *testing.T) {
 	mh2, results2 := testutil.Must2(randomProviderResults(4))(t)
 
 	ctx := context.Background()
-	require.NoError(t, providerStore.Set(ctx, mh1, results1, false))
-	require.NoError(t, providerStore.Set(ctx, mh2, results2, true))
+	_, err := providerStore.Add(ctx, mh1, results1...)
+	require.NoError(t, err)
+	_, err = providerStore.Add(ctx, mh2, results2...)
+	require.NoError(t, err)
 
 	returnedResults1 := testutil.Must(providerStore.Get(ctx, mh1))(t)
 	returnedResults2 := testutil.Must(providerStore.Get(ctx, mh2))(t)
