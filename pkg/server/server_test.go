@@ -9,12 +9,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal/signer"
+	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/indexing-service/pkg/bytemap"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
+	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
+	"github.com/storacha/indexing-service/pkg/service/queryresult"
+	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -88,5 +97,196 @@ func TestGetClaimHandler(t *testing.T) {
 		res, err := http.Get(fmt.Sprintf("%s/claim/invalid", svr.URL))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+}
+
+func TestGetClaimsHandler(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash()
+		query := types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{randomHash},
+			Match: types.Match{
+				Subject: []did.DID{},
+			},
+		}
+
+		locationClaim := testutil.RandomLocationDelegation()
+		indexClaim := testutil.RandomIndexDelegation()
+		equalsClaim := testutil.RandomEqualsDelegation()
+		claims := map[cid.Cid]delegation.Delegation{
+			link.ToCID(locationClaim.Link()): locationClaim,
+			link.ToCID(indexClaim.Link()):    indexClaim,
+			link.ToCID(equalsClaim.Link()):   equalsClaim,
+		}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](1)
+		indexHash, index := testutil.RandomShardedDagIndexView(32)
+		indexContextID := testutil.Must(types.ContextID{
+			Hash: indexHash,
+		}.ToEncoded())(t)
+		indexes.Set(indexContextID, index)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s", svr.URL, digestutil.Format(randomHash)))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		result, err := queryresult.Extract(res.Body)
+		require.NoError(t, err)
+
+		require.ElementsMatch(t, queryResult.Claims(), result.Claims())
+		require.ElementsMatch(t, queryResult.Indexes(), result.Indexes())
+	})
+
+	t.Run("empty results are ok", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash()
+		query := types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{randomHash},
+			Match: types.Match{
+				Subject: []did.DID{},
+			},
+		}
+
+		claims := map[cid.Cid]delegation.Delegation{}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s", svr.URL, digestutil.Format(randomHash)))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		result, err := queryresult.Extract(res.Body)
+		require.NoError(t, err)
+
+		require.Empty(t, result.Claims())
+		require.Empty(t, result.Indexes())
+	})
+
+	t.Run("invalid hash", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=invalid", svr.URL))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+
+	t.Run("honors spaces parameter", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash()
+		randomSubject := testutil.RandomPrincipal().DID()
+		query := types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{randomHash},
+			Match: types.Match{
+				Subject: []did.DID{randomSubject},
+			},
+		}
+
+		claims := map[cid.Cid]delegation.Delegation{}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&spaces=%s", svr.URL, digestutil.Format(randomHash), randomSubject.String()))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+	})
+
+	t.Run("invalid space", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&spaces=invalid", svr.URL, digestutil.Format(testutil.RandomMultihash())))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+
+	t.Run("validates query kind properly", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		randomHash := testutil.RandomMultihash()
+
+		claims := map[cid.Cid]delegation.Delegation{}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+
+		t.Run("standard", func(t *testing.T) {
+			query := types.Query{
+				Type:   types.QueryTypeStandard,
+				Hashes: []multihash.Multihash{randomHash},
+				Match: types.Match{
+					Subject: []did.DID{},
+				},
+			}
+
+			mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=standard", svr.URL, digestutil.Format(randomHash)))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, res.StatusCode)
+		})
+
+		t.Run("location", func(t *testing.T) {
+			query := types.Query{
+				Type:   types.QueryTypeLocation,
+				Hashes: []multihash.Multihash{randomHash},
+				Match: types.Match{
+					Subject: []did.DID{},
+				},
+			}
+
+			mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=location", svr.URL, digestutil.Format(randomHash)))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, res.StatusCode)
+		})
+
+		t.Run("index_or_location", func(t *testing.T) {
+			query := types.Query{
+				Type:   types.QueryTypeIndexOrLocation,
+				Hashes: []multihash.Multihash{randomHash},
+				Match: types.Match{
+					Subject: []did.DID{},
+				},
+			}
+
+			mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=index_or_location", svr.URL, digestutil.Format(randomHash)))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, res.StatusCode)
+		})
+
+		t.Run("invalid", func(t *testing.T) {
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=invalid", svr.URL, digestutil.Format(randomHash)))
+			require.NoError(t, err)
+			require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		})
 	})
 }

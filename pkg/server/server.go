@@ -163,6 +163,23 @@ func PostClaimsHandler(id principal.Signer, service types.Publisher, options ...
 // "/claims?multihash={multihash}".
 func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		queryTypeParam := r.URL.Query()["kind"]
+		var queryType types.QueryType
+		switch len(queryTypeParam) {
+		case 0:
+			queryType = types.QueryTypeStandard
+		case 1:
+			var err error
+			queryType, err = types.ParseQueryType(queryTypeParam[0])
+			if err != nil {
+				http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
+				return
+			}
+		default:
+			http.Error(w, fmt.Sprintf("only one 'kind' parameter is allowed, but got %d", len(queryTypeParam)), http.StatusBadRequest)
+			return
+		}
+
 		mhStrings := r.URL.Query()["multihash"]
 		hashes := make([]multihash.Multihash, 0, len(mhStrings))
 		for _, mhString := range mhStrings {
@@ -190,6 +207,7 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 		}
 
 		qr, err := service.Query(r.Context(), types.Query{
+			Type:   queryType,
 			Hashes: hashes,
 			Match: types.Match{
 				Subject: spaces,

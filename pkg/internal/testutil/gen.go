@@ -161,6 +161,21 @@ func RandomIndexDelegation() delegation.Delegation {
 	return delegation
 }
 
+func RandomEqualsClaim() ucan.Capability[cassert.EqualsCaveats] {
+	return cassert.Equals.New(Service.DID().String(), cassert.EqualsCaveats{
+		Content: ctypes.FromHash(RandomMultihash()),
+		Equals:  RandomCID(),
+	})
+}
+
+func RandomEqualsDelegation() delegation.Delegation {
+	delegation, err := delegation.Delegate(Service, Service, []ucan.Capability[cassert.EqualsCaveats]{RandomEqualsClaim()})
+	if err != nil {
+		panic(err)
+	}
+	return delegation
+}
+
 func RandomProviderResult() model.ProviderResult {
 	return model.ProviderResult{
 		ContextID: RandomBytes(10),
