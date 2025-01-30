@@ -96,12 +96,12 @@ func (_c *MockProviderStore_Add_Call) RunAndReturn(run func(context.Context, mul
 	return _c
 }
 
-// Get provides a mock function with given fields: ctx, key
-func (_m *MockProviderStore) Get(ctx context.Context, key multihash.Multihash) ([]model.ProviderResult, error) {
+// Members provides a mock function with given fields: ctx, key
+func (_m *MockProviderStore) Members(ctx context.Context, key multihash.Multihash) ([]model.ProviderResult, error) {
 	ret := _m.Called(ctx, key)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Get")
+		panic("no return value specified for Members")
 	}
 
 	var r0 []model.ProviderResult
@@ -126,31 +126,31 @@ func (_m *MockProviderStore) Get(ctx context.Context, key multihash.Multihash) (
 	return r0, r1
 }
 
-// MockProviderStore_Get_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Get'
-type MockProviderStore_Get_Call struct {
+// MockProviderStore_Members_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Members'
+type MockProviderStore_Members_Call struct {
 	*mock.Call
 }
 
-// Get is a helper method to define mock.On call
+// Members is a helper method to define mock.On call
 //   - ctx context.Context
 //   - key multihash.Multihash
-func (_e *MockProviderStore_Expecter) Get(ctx interface{}, key interface{}) *MockProviderStore_Get_Call {
-	return &MockProviderStore_Get_Call{Call: _e.mock.On("Get", ctx, key)}
+func (_e *MockProviderStore_Expecter) Members(ctx interface{}, key interface{}) *MockProviderStore_Members_Call {
+	return &MockProviderStore_Members_Call{Call: _e.mock.On("Members", ctx, key)}
 }
 
-func (_c *MockProviderStore_Get_Call) Run(run func(ctx context.Context, key multihash.Multihash)) *MockProviderStore_Get_Call {
+func (_c *MockProviderStore_Members_Call) Run(run func(ctx context.Context, key multihash.Multihash)) *MockProviderStore_Members_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(multihash.Multihash))
 	})
 	return _c
 }
 
-func (_c *MockProviderStore_Get_Call) Return(_a0 []model.ProviderResult, _a1 error) *MockProviderStore_Get_Call {
+func (_c *MockProviderStore_Members_Call) Return(_a0 []model.ProviderResult, _a1 error) *MockProviderStore_Members_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockProviderStore_Get_Call) RunAndReturn(run func(context.Context, multihash.Multihash) ([]model.ProviderResult, error)) *MockProviderStore_Get_Call {
+func (_c *MockProviderStore_Members_Call) RunAndReturn(run func(context.Context, multihash.Multihash) ([]model.ProviderResult, error)) *MockProviderStore_Members_Call {
 	_c.Call.Return(run)
 	return _c
 }

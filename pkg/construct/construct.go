@@ -75,7 +75,7 @@ type config struct {
 	startIPNIServer    bool
 	publisherStore     store.PublisherStore
 	claimsStore        types.ContentClaimsStore
-	providersClient    redis.SetsClient
+	providersClient    redis.Client
 	claimsClient       redis.Client
 	indexesClient      redis.Client
 	legacyClaimsMapper providerindex.ContentToClaimsMapper
@@ -159,7 +159,7 @@ func WithDatastore(ds datastore.Batching) Option {
 }
 
 // WithProvidersClient configures the redis client used for caching providers.
-func WithProvidersClient(client redis.SetsClient) Option {
+func WithProvidersClient(client redis.Client) Option {
 	return func(cfg *config) error {
 		cfg.providersClient = client
 		return nil

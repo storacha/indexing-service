@@ -24,8 +24,8 @@ func TestProviderStore(t *testing.T) {
 	_, err = providerStore.Add(ctx, mh2, results2...)
 	require.NoError(t, err)
 
-	returnedResults1 := testutil.Must(providerStore.Get(ctx, mh1))(t)
-	returnedResults2 := testutil.Must(providerStore.Get(ctx, mh2))(t)
+	returnedResults1 := testutil.Must(providerStore.Members(ctx, mh1))(t)
+	returnedResults2 := testutil.Must(providerStore.Members(ctx, mh2))(t)
 
 	require.ElementsMatch(t, results1, returnedResults1)
 	require.ElementsMatch(t, results2, returnedResults2)

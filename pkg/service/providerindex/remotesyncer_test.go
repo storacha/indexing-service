@@ -130,7 +130,7 @@ type mockProviderStore struct {
 	data bytemap.ByteMap[multihash.Multihash, *valueExpirable[[]model.ProviderResult]]
 }
 
-func (m *mockProviderStore) Get(ctx context.Context, key multihash.Multihash) ([]model.ProviderResult, error) {
+func (m *mockProviderStore) Members(ctx context.Context, key multihash.Multihash) ([]model.ProviderResult, error) {
 	val := m.data.Get(key)
 	if val == nil {
 		return nil, types.ErrKeyNotFound

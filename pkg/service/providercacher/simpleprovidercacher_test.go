@@ -148,7 +148,7 @@ type MockProviderStore struct {
 
 var _ types.ProviderStore = &MockProviderStore{}
 
-func (m *MockProviderStore) Get(ctx context.Context, hash multihash.Multihash) ([]model.ProviderResult, error) {
+func (m *MockProviderStore) Members(ctx context.Context, hash multihash.Multihash) ([]model.ProviderResult, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}

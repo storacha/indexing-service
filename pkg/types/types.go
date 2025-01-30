@@ -60,15 +60,15 @@ type Cache[Key, Value any] interface {
 	Get(ctx context.Context, key Key) (Value, error)
 }
 
-// SetsCache describes a cache interface whose values are sets
-type SetsCache[Key, Value any] interface {
+// ValueSetCache describes a cache interface whose values are sets
+type ValueSetCache[Key, Value any] interface {
 	Add(ctx context.Context, key Key, values ...Value) (uint64, error)
 	SetExpirable(ctx context.Context, key Key, expires bool) error
-	Get(ctx context.Context, key Key) ([]Value, error)
+	Members(ctx context.Context, key Key) ([]Value, error)
 }
 
 // ProviderStore caches queries to IPNI
-type ProviderStore SetsCache[mh.Multihash, model.ProviderResult]
+type ProviderStore ValueSetCache[mh.Multihash, model.ProviderResult]
 
 // ContentClaimsStore stores published content claims
 type ContentClaimsStore Store[ipld.Link, delegation.Delegation]

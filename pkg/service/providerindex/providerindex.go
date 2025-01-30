@@ -67,7 +67,7 @@ func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.
 }
 
 func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
-	res, err := pi.providerStore.Get(ctx, mh)
+	res, err := pi.providerStore.Members(ctx, mh)
 	if err == nil {
 		return res, nil
 	}

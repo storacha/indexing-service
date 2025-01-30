@@ -94,12 +94,12 @@ func TestRedisSetsStore(t *testing.T) {
 	testCases := []struct {
 		name       string
 		opts       []MockOption
-		behavior   func(t *testing.T, store *redis.SetsStore[string, string])
+		behavior   func(t *testing.T, store *redis.Store[string, string])
 		finalState map[string]*redisValue
 	}{
 		{
 			name: "normal behavior",
-			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
 				n, err := store.Add(ctx, "key1", "value1", "value2")
 				require.NoError(t, err)
 				require.Equal(t, uint64(2), n)
@@ -133,11 +133,11 @@ func TestRedisSetsStore(t *testing.T) {
 				err = store.SetExpirable(ctx, "key4", true)
 				require.NoError(t, err)
 
-				require.ElementsMatch(t, []string{"value1", "value2", "value3"}, testutil.Must(store.Get(ctx, "key1"))(t))
-				require.ElementsMatch(t, []string{"value4"}, testutil.Must(store.Get(ctx, "key2"))(t))
-				require.ElementsMatch(t, []string{"value5"}, testutil.Must(store.Get(ctx, "key3"))(t))
-				require.ElementsMatch(t, []string{"value6"}, testutil.Must(store.Get(ctx, "key4"))(t))
-				_, err = store.Get(ctx, "key5")
+				require.ElementsMatch(t, []string{"value1", "value2", "value3"}, testutil.Must(store.Members(ctx, "key1"))(t))
+				require.ElementsMatch(t, []string{"value4"}, testutil.Must(store.Members(ctx, "key2"))(t))
+				require.ElementsMatch(t, []string{"value5"}, testutil.Must(store.Members(ctx, "key3"))(t))
+				require.ElementsMatch(t, []string{"value6"}, testutil.Must(store.Members(ctx, "key4"))(t))
+				_, err = store.Members(ctx, "key5")
 				require.ErrorIs(t, err, types.ErrKeyNotFound)
 			},
 			finalState: map[string]*redisValue{
@@ -148,17 +148,17 @@ func TestRedisSetsStore(t *testing.T) {
 			},
 		},
 		{
-			name: "get errors",
+			name: "members errors",
 			opts: []MockOption{WithErrorOnGet(errors.New("something went wrong"))},
-			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
-				_, err := store.Get(ctx, "key1")
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
+				_, err := store.Members(ctx, "key1")
 				require.EqualError(t, err, "getting set members: something went wrong")
 			},
 		},
 		{
 			name: "add errors",
 			opts: []MockOption{WithErrorOnAdd(errors.New("something went wrong"))},
-			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
 				_, err := store.Add(ctx, "key1", "value1")
 				require.EqualError(t, err, "adding set member: something went wrong")
 			},
@@ -166,16 +166,16 @@ func TestRedisSetsStore(t *testing.T) {
 		{
 			name: "set expiration errors",
 			opts: []MockOption{WithErrorOnSetExpiration(errors.New("something went wrong"))},
-			behavior: func(t *testing.T, store *redis.SetsStore[string, string]) {
+			behavior: func(t *testing.T, store *redis.Store[string, string]) {
 				err := store.SetExpirable(ctx, "key1", true)
-				require.EqualError(t, err, "setting expire: something went wrong")
+				require.EqualError(t, err, "error accessing redis: something went wrong")
 			},
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			mockRedis := NewMockRedis(testCase.opts...)
-			redisStore := redis.NewSetsStore(
+			redisStore := redis.NewStore(
 				func(s string) (string, error) { return s, nil },
 				func(s string) (string, error) { return s, nil },
 				func(s string) string { return s },
