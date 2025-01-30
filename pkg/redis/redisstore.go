@@ -90,7 +90,7 @@ func (rs *Store[Key, Value]) SetExpirable(ctx context.Context, key Key, expires 
 	return nil
 }
 
-// Get returns all deserialized set values from redis.
+// Members returns all deserialized set values from redis.
 func (rs *Store[Key, Value]) Members(ctx context.Context, key Key) ([]Value, error) {
 	data, err := rs.client.SMembers(ctx, rs.keyString(key)).Result()
 	if err != nil {
