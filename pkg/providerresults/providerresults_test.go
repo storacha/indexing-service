@@ -82,9 +82,9 @@ func TestSerialization(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			marshalled := testutil.Must(providerresults.MarshalCBOR([]model.ProviderResult{tc.testResult}))(t)
+			marshalled := testutil.Must(providerresults.MarshalCBOR(tc.testResult))(t)
 			unmarshalled := testutil.Must(providerresults.UnmarshalCBOR(marshalled))(t)
-			require.Equal(t, tc.testResult, unmarshalled[0])
+			require.Equal(t, tc.testResult, unmarshalled)
 		})
 	}
 }
