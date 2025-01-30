@@ -34,6 +34,12 @@ var queryCmd = &cli.Command{
 			Aliases: []string{"s"},
 			Usage:   "DID of a space to filter results by.",
 		},
+		&cli.StringFlag{
+			Name:    "type",
+			Aliases: []string{"t"},
+			Usage:   "type of query to perform ['standard' | 'location' | 'index_or_location']",
+			Value:   "standard",
+		},
 	},
 	Action: func(cCtx *cli.Context) error {
 		serviceURL, err := url.Parse(cCtx.String("url"))
@@ -77,7 +83,16 @@ var queryCmd = &cli.Command{
 			spaces = append(spaces, space)
 		}
 
+		queryType := types.QueryTypeStandard
+		if cCtx.IsSet("type") {
+			queryType, err = types.ParseQueryType(cCtx.String("type"))
+			if err != nil {
+				return fmt.Errorf("error in query type: %w", err)
+			}
+		}
+
 		qr, err := c.QueryClaims(cCtx.Context, types.Query{
+			Type:   queryType,
 			Hashes: digests,
 			Match:  types.Match{Subject: spaces},
 		})

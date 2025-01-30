@@ -209,6 +209,46 @@ func TestClient(t *testing.T) {
 		require.Equal(t, 1, len(res.Indexes()))
 		require.Equal(t, indexLink.String(), res.Indexes()[0].String())
 	})
+
+	t.Run("query requests the right type", func(t *testing.T) {
+		indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
+		indexingQueryServer := mockQueryServer(indexingQueryResults)
+		t.Cleanup(indexingQueryServer.Close)
+
+		c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
+		require.NoError(t, err)
+
+		claims := map[cid.Cid]delegation.Delegation{}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+
+		indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
+
+		t.Run("standard", func(t *testing.T) {
+			_, err := c.QueryClaims(context.Background(), types.Query{
+				Hashes: []multihash.Multihash{rootDigest},
+			})
+			require.NoError(t, err)
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "kind=standard")
+		})
+
+		t.Run("location", func(t *testing.T) {
+			_, err := c.QueryClaims(context.Background(), types.Query{
+				Type:   types.QueryTypeLocation,
+				Hashes: []multihash.Multihash{rootDigest},
+			})
+			require.NoError(t, err)
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "kind=location")
+		})
+
+		t.Run("index_or_location", func(t *testing.T) {
+			_, err := c.QueryClaims(context.Background(), types.Query{
+				Type:   types.QueryTypeIndexOrLocation,
+				Hashes: []multihash.Multihash{rootDigest},
+			})
+			require.NoError(t, err)
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "kind=index_or_location")
+		})
+	})
 }
 
 func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(inv invocation.Invocation)) ucanserver.ServerView {
@@ -249,8 +289,17 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 	return s
 }
 
-func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryResult]) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+type mockServer struct {
+	*httptest.Server
+	lastRequestedURL string
+}
+
+func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryResult]) *mockServer {
+	ms := &mockServer{}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ms.lastRequestedURL = r.URL.String()
+
 		mhStrings := r.URL.Query()["multihash"]
 		if len(mhStrings) != 1 {
 			http.Error(w, "mock query service supports only single hash", http.StatusNotImplemented)
@@ -274,7 +323,11 @@ func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryRes
 		body := car.Encode([]datamodel.Link{qr.Root().Link()}, qr.Blocks())
 		w.WriteHeader(http.StatusOK)
 		io.Copy(w, body)
-	}))
+	})
+
+	ms.Server = httptest.NewServer(handler)
+
+	return ms
 }
 
 func randomLocalURL(t *testing.T) url.URL {

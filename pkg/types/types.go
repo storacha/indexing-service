@@ -88,13 +88,26 @@ const (
 	QueryTypeIndexOrLocation
 )
 
+func (qt QueryType) String() string {
+	switch qt {
+	case QueryTypeStandard:
+		return "standard"
+	case QueryTypeLocation:
+		return "location"
+	case QueryTypeIndexOrLocation:
+		return "index_or_location"
+	default:
+		return "invalid"
+	}
+}
+
 func ParseQueryType(queryTypeStr string) (QueryType, error) {
 	switch queryTypeStr {
-	case "standard":
+	case QueryTypeStandard.String():
 		return QueryTypeStandard, nil
-	case "location":
+	case QueryTypeLocation.String():
 		return QueryTypeLocation, nil
-	case "index_or_location":
+	case QueryTypeIndexOrLocation.String():
 		return QueryTypeIndexOrLocation, nil
 	default:
 		return 0, fmt.Errorf("invalid query type: %s", queryTypeStr)

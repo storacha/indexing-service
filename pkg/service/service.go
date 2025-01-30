@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -67,7 +66,7 @@ type job struct {
 type jobKey string
 
 func (j job) key() jobKey {
-	k := jobKey(j.mh) + jobKey(strconv.Itoa(int(j.queryType)))
+	k := jobKey(j.mh) + jobKey(j.queryType.String())
 	if j.indexForMh != nil {
 		k += jobKey(*j.indexForMh)
 	}
