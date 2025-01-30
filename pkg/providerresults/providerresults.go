@@ -60,7 +60,7 @@ func UnmarshalCBOR(data []byte) (model.ProviderResult, error) {
 	var pr model.ProviderResult
 	_, err := ipld.Unmarshal([]byte(data), dagcbor.Decode, &pr, providerResultType, peerIDConverter, multiaddrConverter)
 	if err != nil {
-		return pr, err
+		return model.ProviderResult{}, err
 	}
 	return pr, nil
 }
