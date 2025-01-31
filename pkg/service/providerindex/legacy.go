@@ -38,9 +38,9 @@ type LegacyClaimsFinder interface {
 
 // LegacyClaimsStore allows finding claims on a legacy store
 type LegacyClaimsStore struct {
-	contentToClaims []ContentToClaimsMapper
-	claimsStore     contentclaims.Finder
-	claimsAddr      ma.Multiaddr
+	mappers     []ContentToClaimsMapper
+	claimsStore contentclaims.Finder
+	claimsAddr  ma.Multiaddr
 }
 
 // ContentToClaimsMapper maps content hashes to claim cids
@@ -48,6 +48,11 @@ type ContentToClaimsMapper interface {
 	GetClaims(ctx context.Context, contentHash multihash.Multihash) (claimsCids []cid.Cid, err error)
 }
 
+// NewLegacyClaimsStore builds a new store able to find claims in legacy services.
+//
+// It uses a series of mappers to fetch claims from. Mappers will be consulted in order, so their positions in the list
+// define their priority, with the first position being the top priority. This is important because the claims returned
+// by Find will be the ones coming from the first mapper that returns relevant claims.
 func NewLegacyClaimsStore(contentToClaimsMappers []ContentToClaimsMapper, claimStore contentclaims.Finder, claimsUrl string) (LegacyClaimsStore, error) {
 	legacyClaimsUrl, err := url.Parse(claimsUrl)
 	if err != nil {
@@ -59,17 +64,20 @@ func NewLegacyClaimsStore(contentToClaimsMappers []ContentToClaimsMapper, claimS
 	}
 
 	return LegacyClaimsStore{
-		contentToClaims: contentToClaimsMappers,
-		claimsStore:     claimStore,
-		claimsAddr:      claimsAddr,
+		mappers:     contentToClaimsMappers,
+		claimsStore: claimStore,
+		claimsAddr:  claimsAddr,
 	}, nil
 }
 
 // Find looks for the corresponding claims for a given content hash in the mapper and then fetches the claims from the
-// claims store
+// claims store.
+// Find will look for relevant claims (as indicated by targetClaims) in content-to-claims mappers in the order they
+// were specified when this LegacyClaimsStore was created (see NewLegacyClaimsStore). As soon as a mapper returns
+// relevant claims, these will be returned and no more mappers will be checked.
 func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
-	for _, mapper := range ls.contentToClaims {
-		claims, err := ls.findOne(ctx, contentHash, targetClaims, mapper)
+	for _, mapper := range ls.mappers {
+		claims, err := ls.findInMapper(ctx, contentHash, targetClaims, mapper)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +88,7 @@ func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Mult
 	return []model.ProviderResult{}, nil
 }
 
-func (ls LegacyClaimsStore) findOne(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code, mapper ContentToClaimsMapper) ([]model.ProviderResult, error) {
+func (ls LegacyClaimsStore) findInMapper(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code, mapper ContentToClaimsMapper) ([]model.ProviderResult, error) {
 	claimsCids, err := mapper.GetClaims(ctx, contentHash)
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotFound) {
