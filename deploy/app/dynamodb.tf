@@ -18,6 +18,12 @@ resource "aws_dynamodb_table" "metadata" {
   tags = {
     Name = "${terraform.workspace}-${var.app}-metadata"
   }
+
+  point_in_time_recovery {
+    enabled = terraform.workspace == "prod"
+  }
+
+  deletion_protection_enabled = terraform.workspace == "prod"
 }
 
 resource "aws_dynamodb_table" "chunk_links" {
@@ -40,4 +46,10 @@ resource "aws_dynamodb_table" "chunk_links" {
   tags = {
     Name = "${terraform.workspace}-${var.app}-chunk-links"
   }
+
+  point_in_time_recovery {
+    enabled = terraform.workspace == "prod"
+  }
+
+  deletion_protection_enabled = terraform.workspace == "prod"
 }
