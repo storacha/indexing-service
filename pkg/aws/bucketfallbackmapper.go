@@ -18,10 +18,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-type ContentToClaimsMapper interface {
-	GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error)
-}
-
 type BucketFallbackMapper struct {
 	id        principal.Signer
 	bucketURL *url.URL
