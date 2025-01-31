@@ -49,6 +49,12 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 
 	resp, err := cfm.httpClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
 	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		fmt.Printf("*************** REQUESTED: %s\n", cfm.bucketURL.JoinPath(toBlobKey(contentHash)))
+		if err != nil {
+			fmt.Printf("*************** ERR: %s\n", err)
+		} else {
+			fmt.Printf("*************** STATUS: %d\n", resp.StatusCode)
+		}
 		return nil, types.ErrKeyNotFound
 	}
 	size := uint64(resp.ContentLength)
