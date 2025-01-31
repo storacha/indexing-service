@@ -23,6 +23,7 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-capabilities/pkg/assert"
+	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld/block"
@@ -65,7 +66,7 @@ func main() {
 		storageID.DID().String(),
 		assert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(carDigest),
+			Content:  capabilitytypes.FromHash(carDigest),
 			Location: []url.URL{*carLocationURL},
 		},
 	))
@@ -77,7 +78,7 @@ func main() {
 		storageID.DID().String(),
 		assert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(indexDigest),
+			Content:  capabilitytypes.FromHash(indexDigest),
 			Location: []url.URL{*indexLocationURL},
 		},
 	))
