@@ -26,6 +26,7 @@ packages:
       ContentClaimsCache:
       ContentClaimsStore:
       ProviderStore:
+      Service:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
     interfaces:
       QueryAPIClient:
