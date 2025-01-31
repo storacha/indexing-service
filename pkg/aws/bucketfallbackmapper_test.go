@@ -156,8 +156,3 @@ func (m mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Length", strconv.FormatInt(resp.contentLength, 10))
 	w.WriteHeader(resp.status)
 }
-
-type cidsAndError struct {
-	cids []cid.Cid
-	err  error
-}
