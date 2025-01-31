@@ -163,7 +163,7 @@ func PostClaimsHandler(id principal.Signer, service types.Publisher, options ...
 // "/claims?multihash={multihash}".
 func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryTypeParam := r.URL.Query()["kind"]
+		queryTypeParam := r.URL.Query()["type"]
 		var queryType types.QueryType
 		switch len(queryTypeParam) {
 		case 0:
@@ -176,7 +176,7 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 				return
 			}
 		default:
-			http.Error(w, fmt.Sprintf("only one 'kind' parameter is allowed, but got %d", len(queryTypeParam)), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("only one 'type' parameter is allowed, but got %d", len(queryTypeParam)), http.StatusBadRequest)
 			return
 		}
 

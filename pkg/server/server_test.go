@@ -223,7 +223,7 @@ func TestGetClaimsHandler(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 
-	t.Run("validates query kind properly", func(t *testing.T) {
+	t.Run("validates query type properly", func(t *testing.T) {
 		mockService := types.NewMockService(t)
 
 		svr := httptest.NewServer(GetClaimsHandler(mockService))
@@ -246,7 +246,7 @@ func TestGetClaimsHandler(t *testing.T) {
 
 			mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
 
-			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=standard", svr.URL, digestutil.Format(randomHash)))
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&type=standard", svr.URL, digestutil.Format(randomHash)))
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, res.StatusCode)
 		})
@@ -262,7 +262,7 @@ func TestGetClaimsHandler(t *testing.T) {
 
 			mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
 
-			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=location", svr.URL, digestutil.Format(randomHash)))
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&type=location", svr.URL, digestutil.Format(randomHash)))
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, res.StatusCode)
 		})
@@ -278,13 +278,13 @@ func TestGetClaimsHandler(t *testing.T) {
 
 			mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
 
-			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=index_or_location", svr.URL, digestutil.Format(randomHash)))
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&type=index_or_location", svr.URL, digestutil.Format(randomHash)))
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, res.StatusCode)
 		})
 
 		t.Run("invalid", func(t *testing.T) {
-			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&kind=invalid", svr.URL, digestutil.Format(randomHash)))
+			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&type=invalid", svr.URL, digestutil.Format(randomHash)))
 			require.NoError(t, err)
 			require.Equal(t, http.StatusBadRequest, res.StatusCode)
 		})

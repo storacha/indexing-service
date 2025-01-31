@@ -122,7 +122,7 @@ func (c *Client) CacheClaim(ctx context.Context, issuer principal.Signer, cacheC
 func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.QueryResult, error) {
 	url := c.serviceURL.JoinPath(claimsPath)
 	q := url.Query()
-	q.Add("kind", query.Type.String())
+	q.Add("type", query.Type.String())
 	for _, mh := range query.Hashes {
 		q.Add("multihash", digestutil.Format(mh))
 	}

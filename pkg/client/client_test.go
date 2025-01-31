@@ -228,7 +228,7 @@ func TestClient(t *testing.T) {
 				Hashes: []multihash.Multihash{rootDigest},
 			})
 			require.NoError(t, err)
-			require.Contains(t, indexingQueryServer.lastRequestedURL, "kind=standard")
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=standard")
 		})
 
 		t.Run("location", func(t *testing.T) {
@@ -237,7 +237,7 @@ func TestClient(t *testing.T) {
 				Hashes: []multihash.Multihash{rootDigest},
 			})
 			require.NoError(t, err)
-			require.Contains(t, indexingQueryServer.lastRequestedURL, "kind=location")
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=location")
 		})
 
 		t.Run("index_or_location", func(t *testing.T) {
@@ -246,7 +246,7 @@ func TestClient(t *testing.T) {
 				Hashes: []multihash.Multihash{rootDigest},
 			})
 			require.NoError(t, err)
-			require.Contains(t, indexingQueryServer.lastRequestedURL, "kind=index_or_location")
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=index_or_location")
 		})
 	})
 }
