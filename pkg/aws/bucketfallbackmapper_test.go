@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
@@ -31,7 +32,13 @@ func TestBucketFallbackMapper(t *testing.T) {
 	baseMap := bytemap.NewByteMap[multihash.Multihash, cidsAndError](-1)
 	responses := bytemap.NewByteMap[multihash.Multihash, resp](-1)
 	signer := testutil.RandomSigner()
-	serverURL := testutil.Must(url.Parse("http://localhost:8888"))(t)
+
+	// set up test server
+	mux := http.NewServeMux()
+	mux.Handle("/{multihash1}/{multihash2}", mockServer{responses})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	serverURL := testutil.Must(url.Parse(server.URL))(t)
 
 	hasBaseResultsHash := testutil.RandomMultihash()
 	hasBaseResultCids := []cid.Cid{testutil.RandomCID().(cidlink.Link).Cid}
@@ -104,17 +111,6 @@ func TestBucketFallbackMapper(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			doneErr := make(chan error, 1)
-			mux := http.NewServeMux()
-			mux.Handle("/{multihash1}/{multihash2}", mockServer{responses})
-			server := &http.Server{
-				Addr:    serverURL.Host,
-				Handler: mux,
-			}
-			go func() {
-				doneErr <- server.ListenAndServe()
-			}()
-
 			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, http.DefaultClient, serverURL, mockMapper{baseMap}, func() []delegation.Option {
 				return []delegation.Option{delegation.WithNoExpiration()}
 			})
@@ -132,13 +128,6 @@ func TestBucketFallbackMapper(t *testing.T) {
 					claim := testutil.Must(delegation.Extract(decoded.Digest))(t)
 					testutil.RequireEqualDelegation(t, testCase.expectedClaim, claim)
 				}
-			}
-			require.NoError(t, server.Shutdown(ctx))
-			select {
-			case <-ctx.Done():
-				t.Fatal("did not complete shutdown")
-			case err := <-doneErr:
-				require.ErrorIs(t, err, http.ErrServerClosed)
 			}
 		})
 	}
