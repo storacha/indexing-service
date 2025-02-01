@@ -48,9 +48,13 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 	}
 
 	resp, err := cfm.httpClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
-	if err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, types.ErrKeyNotFound
 	}
+
 	size := uint64(resp.ContentLength)
 	delegation, err := cassert.Location.Delegate(
 		cfm.id,
