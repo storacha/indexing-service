@@ -19,8 +19,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
-	"github.com/storacha/go-capabilities/pkg/types"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -127,9 +127,9 @@ func RandomMultihashes(count int) []mh.Multihash {
 	return mhs
 }
 
-func RandomLocationClaim() ucan.Capability[assert.LocationCaveats] {
-	return assert.Location.New(Service.DID().String(), assert.LocationCaveats{
-		Content:  types.FromHash(RandomMultihash()),
+func RandomLocationClaim() ucan.Capability[cassert.LocationCaveats] {
+	return cassert.Location.New(Service.DID().String(), cassert.LocationCaveats{
+		Content:  ctypes.FromHash(RandomMultihash()),
 		Location: []url.URL{*TestURL},
 	})
 }
@@ -139,22 +139,22 @@ func RandomLocationDelegation() delegation.Delegation {
 	if err != nil {
 		panic(err)
 	}
-	delegation, err := delegation.Delegate(Service, did, []ucan.Capability[assert.LocationCaveats]{RandomLocationClaim()})
+	delegation, err := delegation.Delegate(Service, did, []ucan.Capability[cassert.LocationCaveats]{RandomLocationClaim()})
 	if err != nil {
 		panic(err)
 	}
 	return delegation
 }
 
-func RandomIndexClaim() ucan.Capability[assert.IndexCaveats] {
-	return assert.Index.New(Service.DID().String(), assert.IndexCaveats{
+func RandomIndexClaim() ucan.Capability[cassert.IndexCaveats] {
+	return cassert.Index.New(Service.DID().String(), cassert.IndexCaveats{
 		Content: RandomCID(),
 		Index:   RandomCID(),
 	})
 }
 
 func RandomIndexDelegation() delegation.Delegation {
-	delegation, err := delegation.Delegate(Service, Service, []ucan.Capability[assert.IndexCaveats]{RandomIndexClaim()})
+	delegation, err := delegation.Delegate(Service, Service, []ucan.Capability[cassert.IndexCaveats]{RandomIndexClaim()})
 	if err != nil {
 		panic(err)
 	}

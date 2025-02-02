@@ -9,7 +9,9 @@ LAMBDA_GOARCH=arm64
 LAMBDA_GOCC?=go
 LAMBDA_GOFLAGS=-tags=lambda.norpc
 LAMBDA_CGO_ENABLED=0
-LAMBDAS=build/getclaim/bootstrap build/getclaims/bootstrap build/getroot/bootstrap build/notifier/bootstrap build/postclaims/bootstrap build/providercache/bootstrap build/remotesync/bootstrap
+LAMBDADIRS=build/getclaim build/getclaims build/getroot build/notifier build/postclaims build/providercache build/remotesync
+LAMBDAS=$(foreach dir, $(LAMBDADIRS), $(dir)/bootstrap)
+OTELCOL_CONFIG=otel-collector-config.yaml
 
 indexer:
 	go build -o ./indexer ./cmd
@@ -18,6 +20,16 @@ indexer:
 
 clean-indexer:
 	rm -f ./indexer
+
+.PHONY: test
+
+test:
+	go test -race -v ./...
+
+.PHONY: test-nocache
+
+test-nocache:
+	go clean -testcache && make test
 
 ucangen:
 	go build -o ./ucangen cmd/ucangen/main.go
@@ -41,12 +53,15 @@ clean-terraform:
 
 clean: clean-terraform clean-lambda clean-indexer
 
-lambdas: $(LAMBDAS)
+lambdas: $(LAMBDAS) otel-config
 
 .PHONY: $(LAMBDAS)
 
 $(LAMBDAS): build/%/bootstrap:
 	GOOS=$(LAMBDA_GOOS) GOARCH=$(LAMBDA_GOARCH) CGO_ENABLED=$(LAMBDA_CGO_ENABLED) $(LAMBDA_GOCC) build $(LAMBDA_GOFLAGS) -o $@ cmd/lambda/$*/main.go
+
+otel-config: otel-collector-config.yaml
+	echo $(LAMBDADIRS) | xargs -n 1 cp $(OTELCOL_CONFIG)
 
 deploy/app/.terraform:
 	tofu -chdir=deploy/app init
@@ -66,10 +81,15 @@ validate: deploy/app/.terraform .tfworkspace
 
 .PHONY: plan
 
-plan: deploy/app/.terraform .tfworkspace $(LAMBDAS)
+plan: deploy/app/.terraform .tfworkspace lambdas
 	tofu -chdir=deploy/app plan
 
 .PHONY: apply
 
-apply: deploy/app/.terraform .tfworkspace $(LAMBDAS)
+apply: deploy/app/.terraform .tfworkspace lambdas
 	tofu -chdir=deploy/app apply
+
+.PHONY: mockery
+
+mockery:
+	mockery --config=.mockery.yaml

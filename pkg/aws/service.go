@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/legacy"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
 )
@@ -45,20 +47,23 @@ func mustGetEnv(envVar string) string {
 type Config struct {
 	construct.ServiceConfig
 	aws.Config
-	SQSCachingQueueURL        string
-	CachingBucket             string
-	ChunkLinksTableName       string
-	MetadataTableName         string
-	IPNIStoreBucket           string
-	IPNIStorePrefix           string
-	NotifierHeadBucket        string
-	NotifierTopicArn          string
-	ClaimStoreBucket          string
-	ClaimStorePrefix          string
-	LegacyClaimsTableName     string
-	LegacyClaimsBucket        string
-	LegacyBlockIndexTableName string
-	LegacyDataBucketURL       string
+	SQSCachingQueueURL          string
+	CachingBucket               string
+	ChunkLinksTableName         string
+	MetadataTableName           string
+	IPNIStoreBucket             string
+	IPNIStorePrefix             string
+	NotifierHeadBucket          string
+	NotifierTopicArn            string
+	ClaimStoreBucket            string
+	ClaimStorePrefix            string
+	LegacyClaimsTableName       string
+	LegacyClaimsTableRegion     string
+	LegacyClaimsBucket          string
+	LegacyBlockIndexTableName   string
+	LegacyBlockIndexTableRegion string
+	LegacyDataBucketURL         string
+	HoneycombAPIKey             string
 	principal.Signer
 }
 
@@ -137,25 +142,44 @@ func FromEnv(ctx context.Context) Config {
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
 			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
 		},
-		SQSCachingQueueURL:        mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
-		CachingBucket:             mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
-		ChunkLinksTableName:       mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
-		MetadataTableName:         mustGetEnv("METADATA_TABLE_NAME"),
-		IPNIStoreBucket:           mustGetEnv("IPNI_STORE_BUCKET_NAME"),
-		IPNIStorePrefix:           ipniStoreKeyPrefix,
-		NotifierHeadBucket:        mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
-		NotifierTopicArn:          mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
-		ClaimStoreBucket:          mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
-		ClaimStorePrefix:          os.Getenv("CLAIM_STORE_KEY_REFIX"),
-		LegacyClaimsTableName:     mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
-		LegacyClaimsBucket:        mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
-		LegacyBlockIndexTableName: mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
-		LegacyDataBucketURL:       mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		SQSCachingQueueURL:          mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
+		CachingBucket:               mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
+		ChunkLinksTableName:         mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
+		MetadataTableName:           mustGetEnv("METADATA_TABLE_NAME"),
+		IPNIStoreBucket:             mustGetEnv("IPNI_STORE_BUCKET_NAME"),
+		IPNIStorePrefix:             ipniStoreKeyPrefix,
+		NotifierHeadBucket:          mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
+		NotifierTopicArn:            mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
+		ClaimStoreBucket:            mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
+		ClaimStorePrefix:            os.Getenv("CLAIM_STORE_KEY_REFIX"),
+		LegacyClaimsTableName:       mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
+		LegacyClaimsTableRegion:     mustGetEnv("LEGACY_CLAIMS_TABLE_REGION"),
+		LegacyClaimsBucket:          mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
+		LegacyBlockIndexTableName:   mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
+		LegacyBlockIndexTableRegion: mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
+		LegacyDataBucketURL:         mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		HoneycombAPIKey:             mustGetEnv("HONEYCOMB_API_KEY"),
 	}
 }
 
 // Construct constructs types.Service from AWS deps for Lamda functions
 func Construct(cfg Config) (types.Service, error) {
+	var httpClient *http.Client
+	var providersClient, claimsClient, indexesClient *redis.Client
+
+	// instrument HTTP and redis clients if telemetry is enabled
+	if cfg.HoneycombAPIKey != "" {
+		httpClient = telemetry.GetInstrumentedHTTPClient()
+		providersClient = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
+		claimsClient = telemetry.GetInstrumentedRedisClient(&cfg.ClaimsRedis)
+		indexesClient = telemetry.GetInstrumentedRedisClient(&cfg.IndexesRedis)
+	} else {
+		httpClient = construct.DefaultHTTPClient()
+		providersClient = redis.NewClient(&cfg.ProvidersRedis)
+		claimsClient = redis.NewClient(&cfg.ClaimsRedis)
+		indexesClient = redis.NewClient(&cfg.IndexesRedis)
+	}
+
 	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
@@ -166,16 +190,18 @@ func Construct(cfg Config) (types.Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing carpark url: %s", err)
 	}
-	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyClaimsTableName)
-
+	legacyClaimsCfg := cfg.Config.Copy()
+	legacyClaimsCfg.Region = cfg.LegacyClaimsTableRegion
+	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName)
 	bucketFallbackMapper := NewBucketFallbackMapper(
 		cfg.Signer,
+		httpClient,
 		legacyDataBucketURL,
 		func() []delegation.Option {
 			return []delegation.Option{delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix()))}
 		},
 	)
-	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.LegacyClaimsBucket, ""))
+	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(legacyClaimsCfg, cfg.LegacyClaimsBucket, ""))
 	legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
 
 	service, err := construct.Construct(
@@ -186,10 +212,16 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
 		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper}, legacyClaimsBucket, legacyClaimsURL),
+		construct.WithHTTPClient(httpClient),
+		construct.WithProvidersClient(providersClient),
+		construct.WithClaimsClient(claimsClient),
+		construct.WithIndexesClient(indexesClient),
 	)
 	if err != nil {
 		return nil, err
 	}
-	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(cfg.Config), cfg.LegacyBlockIndexTableName)
+	blockIndexCfg := cfg.Config.Copy()
+	blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
+	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
 	return legacy.NewService(cfg.Signer, service, legacyBlockIndexStore, cfg.LegacyDataBucketURL)
 }

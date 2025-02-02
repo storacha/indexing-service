@@ -16,6 +16,8 @@ const DefaultExpire = time.Hour
 type Client interface {
 	Get(context.Context, string) *redis.StringCmd
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	SAdd(ctx context.Context, key string, members ...interface{}) *redis.IntCmd
+	SMembers(ctx context.Context, key string) *redis.StringSliceCmd
 	Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd
 	Persist(ctx context.Context, key string) *redis.BoolCmd
 }
@@ -86,4 +88,41 @@ func (rs *Store[Key, Value]) SetExpirable(ctx context.Context, key Key, expires 
 		return fmt.Errorf("error accessing redis: %w", err)
 	}
 	return nil
+}
+
+// Members returns all deserialized set values from redis.
+func (rs *Store[Key, Value]) Members(ctx context.Context, key Key) ([]Value, error) {
+	data, err := rs.client.SMembers(ctx, rs.keyString(key)).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, types.ErrKeyNotFound
+		}
+		return nil, fmt.Errorf("getting set members: %w", err)
+	}
+	var values []Value
+	for _, d := range data {
+		v, err := rs.fromRedis(d)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, v)
+	}
+	return values, nil
+}
+
+// Add another value to the set of values for the given key.
+func (rs *Store[Key, Value]) Add(ctx context.Context, key Key, values ...Value) (uint64, error) {
+	var data []any
+	for _, v := range values {
+		d, err := rs.toRedis(v)
+		if err != nil {
+			return 0, err
+		}
+		data = append(data, d)
+	}
+	n, err := rs.client.SAdd(ctx, rs.keyString(key), data...).Result()
+	if err != nil {
+		return 0, fmt.Errorf("adding set member: %w", err)
+	}
+	return uint64(n), nil
 }

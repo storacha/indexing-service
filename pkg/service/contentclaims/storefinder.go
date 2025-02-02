@@ -24,7 +24,7 @@ func WithStore(finder Finder, store types.ContentClaimsStore) Finder {
 }
 
 // Find attempts to fetch a claim from either the permenant storage or via the provided URL
-func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL url.URL) (delegation.Delegation, error) {
+func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL) (delegation.Delegation, error) {
 	// attempt to read claim from store and return it if succesful
 	claim, err := sf.store.Get(ctx, id)
 	if err == nil {

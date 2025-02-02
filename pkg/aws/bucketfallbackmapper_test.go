@@ -13,9 +13,8 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
-	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
-
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/bytemap"
@@ -37,16 +36,16 @@ func TestBucketFallbackMapper(t *testing.T) {
 	hasSuccessHash := testutil.RandomMultihash()
 	hasSuccessContentLength := uint64(500)
 	responses.Set(hasSuccessHash, resp{int64(hasSuccessContentLength), http.StatusOK})
-	hasSuccessClaim := testutil.Must(assert.Location.Delegate(
+	hasSuccessClaim := testutil.Must(cassert.Location.Delegate(
 		signer,
 		signer,
 		signer.DID().String(),
-		assert.LocationCaveats{
-			Content: capabilitytypes.FromHash(hasSuccessHash),
+		cassert.LocationCaveats{
+			Content: ctypes.FromHash(hasSuccessHash),
 			Location: []url.URL{
 				*serverURL.JoinPath(digestutil.Format(hasSuccessHash), fmt.Sprintf("%s.blob", digestutil.Format(hasSuccessHash))),
 			},
-			Range: &assert.Range{
+			Range: &cassert.Range{
 				Offset: 0,
 				Length: &hasSuccessContentLength,
 			},
@@ -94,7 +93,8 @@ func TestBucketFallbackMapper(t *testing.T) {
 			go func() {
 				doneErr <- server.ListenAndServe()
 			}()
-			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, serverURL, func() []delegation.Option {
+
+			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, http.DefaultClient, serverURL, func() []delegation.Option {
 				return []delegation.Option{delegation.WithNoExpiration()}
 			})
 			cids, err := bucketFallbackMapper.GetClaims(ctx, testCase.hash)

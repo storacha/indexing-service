@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"iter"
 	"math/rand/v2"
+	"slices"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestHandleRemoteSync(t *testing.T) {
 		for range rand.IntN(100) {
 			digest := testutil.RandomMultihash()
 			ec.Entries = append(ec.Entries, digest)
-			err := providerStore.Set(context.Background(), digest, []model.ProviderResult{}, false)
+			_, err := providerStore.Add(context.Background(), digest, model.ProviderResult{})
 			require.NoError(t, err)
 		}
 		n := testutil.Must(ec.ToNode())(t)
@@ -111,7 +112,9 @@ func (i *mockIpniStore) Entries(ctx context.Context, root datamodel.Link) iter.S
 	return func(yield func(multihash.Multihash, error) bool) {
 		ent := i.ents[root.String()]
 		for _, digest := range ent.Entries {
-			yield(digest, nil)
+			if !yield(digest, nil) {
+				return
+			}
 		}
 	}
 }
@@ -127,7 +130,7 @@ type mockProviderStore struct {
 	data bytemap.ByteMap[multihash.Multihash, *valueExpirable[[]model.ProviderResult]]
 }
 
-func (m *mockProviderStore) Get(ctx context.Context, key multihash.Multihash) ([]model.ProviderResult, error) {
+func (m *mockProviderStore) Members(ctx context.Context, key multihash.Multihash) ([]model.ProviderResult, error) {
 	val := m.data.Get(key)
 	if val == nil {
 		return nil, types.ErrKeyNotFound
@@ -138,14 +141,24 @@ func (m *mockProviderStore) Get(ctx context.Context, key multihash.Multihash) ([
 	return val.val, nil
 }
 
-func (m *mockProviderStore) Set(ctx context.Context, key multihash.Multihash, value []model.ProviderResult, expires bool) error {
-	var exp time.Time
-	if expires {
-		exp = exp.Add(time.Second * 30)
+func (m *mockProviderStore) Add(ctx context.Context, digest multihash.Multihash, newProviders ...model.ProviderResult) (uint64, error) {
+	var providers []model.ProviderResult
+	var expires time.Time
+	existing := m.data.Get(digest)
+	if existing != nil {
+		providers = append(providers, existing.val...)
+		expires = existing.exp
 	}
-	v := valueExpirable[[]model.ProviderResult]{value, exp}
-	m.data.Set(key, &v)
-	return nil
+	written := uint64(0)
+	for _, provider := range newProviders {
+		if !slices.ContainsFunc(providers, func(p model.ProviderResult) bool { return p.Equal(provider) }) {
+			providers = append(providers, provider)
+			written++
+		}
+	}
+	v := valueExpirable[[]model.ProviderResult]{providers, expires}
+	m.data.Set(digest, &v)
+	return written, nil
 }
 
 func (m *mockProviderStore) GetExpiration(ctx context.Context, key multihash.Multihash) (time.Time, error) {

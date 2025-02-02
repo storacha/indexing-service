@@ -1,31 +1,42 @@
 name: Terraform
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "*"
-    paths:
-      - ".github/workflows/terraform.yml"
-      - "cmd/**"
-      - "deploy/**"
-      - "pkg/**"
-  pull_request:
-    branches: ["main"]
-  workflow_run:
-    workflows: [Releaser]
-    types: [completed]
-    branches: ["main"]
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+      workspace:
+        required: true
+        type: string
+      did:
+        required: true
+        type: string
+      apply:
+        required: true
+        type: boolean
+    secrets:
+      aws-account-id:
+        required: true
+      aws-region:
+        required: true
+      private-key:
+        required: true
+      honeycomb-api-key:
+        required: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.workspace }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
-  AWS_ACCOUNT_ID: ${{ secrets.PROD_AWS_ACCOUNT_NUMBER }}
-  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: ${{ secrets.aws-account-id }}
+  AWS_REGION: ${{ secrets.aws-region }}
+  ENV: ${{ inputs.env }}
+  TF_WORKSPACE: ${{ inputs.workspace }}
+  TF_VAR_private_key: ${{ secrets.private-key }}
+  TF_VAR_did: ${{ inputs.did }}
+  TF_VAR_honeycomb_api_key: ${{ secrets.honeycomb-api-key }}
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -41,18 +52,10 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ secrets.PROD_AWS_ACCOUNT_NUMBER }}:role/terraform-ci
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/terraform-ci
 
       - uses: opentofu/setup-opentofu@v1
       - uses: actions/setup-go@v5
-
-      # always deploy to staging
-      - name: Set Staging Environment Variables
-        run: |
-          echo "ENV=staging" >> $GITHUB_ENV
-          echo "TF_WORKSPACE=staging" >> $GITHUB_ENV
-          echo "TF_VAR_private_key=${{ secrets.STAGING_PRIVATE_KEY }}" >> $GITHUB_ENV
-          echo "TF_VAR_did=did:web:staging.indexer.storacha.network" >> $GITHUB_ENV
 
       - name: Tofu Init
         run: |
@@ -64,25 +67,11 @@ jobs:
           make lambdas
 
       - name: Terraform Plan
-        if: github.event_name == 'pull_request'
+        if: ${{ !inputs.apply }}
         run: |
           tofu -chdir="deploy/app" plan
 
       - name: Terraform Apply
-        if: github.event_name != 'pull_request'
-        run: |
-          tofu -chdir="deploy/app" apply -input=false --auto-approve
-
-      # deploy to prod on new releases
-      - name: Set Production Environment Variables
-        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
-        run: |
-          echo "ENV=production" >> $GITHUB_ENV
-          echo "TF_WORKSPACE=prod" >> $GITHUB_ENV
-          echo "TF_VAR_private_key=${{ secrets.PROD_PRIVATE_KEY }}" >> $GITHUB_ENV
-          echo "TF_VAR_did=did:web:indexer.storacha.network" >> $GITHUB_ENV
-
-      - name: Deploy to prod
-        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+        if: ${{ inputs.apply }}
         run: |
           tofu -chdir="deploy/app" apply -input=false --auto-approve

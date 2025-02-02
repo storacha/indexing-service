@@ -60,8 +60,15 @@ type Cache[Key, Value any] interface {
 	Get(ctx context.Context, key Key) (Value, error)
 }
 
+// ValueSetCache describes a cache interface whose values are sets
+type ValueSetCache[Key, Value any] interface {
+	Add(ctx context.Context, key Key, values ...Value) (uint64, error)
+	SetExpirable(ctx context.Context, key Key, expires bool) error
+	Members(ctx context.Context, key Key) ([]Value, error)
+}
+
 // ProviderStore caches queries to IPNI
-type ProviderStore Cache[mh.Multihash, []model.ProviderResult]
+type ProviderStore ValueSetCache[mh.Multihash, model.ProviderResult]
 
 // ContentClaimsStore stores published content claims
 type ContentClaimsStore Store[ipld.Link, delegation.Delegation]
@@ -86,7 +93,7 @@ type Query struct {
 // QueryResult is an encodable result of a query
 type QueryResult interface {
 	ipld.View
-	// Claims is a list of links to the root bock of claims that can be found in this message
+	// Claims is a list of links to the root block of claims that can be found in this message
 	Claims() []ipld.Link
 	// Indexes is a list of links to the CID hash of archived sharded dag indexes that can be found in this
 	// message

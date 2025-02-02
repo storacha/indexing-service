@@ -21,7 +21,7 @@ var (
 	providerResultsBytes []byte
 	peerIDConverter      = bindnode.NamedBytesConverter("PeerID", bytesToPeerID, peerIDtoBytes)
 	multiaddrConverter   = bindnode.NamedBytesConverter("Multiaddr", bytesToMultiaddr, multiaddrToBytes)
-	providerResultsType  schema.Type
+	providerResultType   schema.Type
 )
 
 func init() {
@@ -29,7 +29,7 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("failed to load schema: %w", err))
 	}
-	providerResultsType = typeSystem.TypeByName("ProviderResults")
+	providerResultType = typeSystem.TypeByName("ProviderResult")
 }
 
 func bytesToPeerID(data []byte) (interface{}, error) {
@@ -55,19 +55,19 @@ func multiaddrToBytes(ma interface{}) ([]byte, error) {
 	return (*ma.(*multiaddr.Multiaddr)).Bytes(), nil
 }
 
-// UnmarshalCBOR decodes a list provider results from CBOR-encoded bytes
-func UnmarshalCBOR(data []byte) ([]model.ProviderResult, error) {
-	var records []model.ProviderResult
-	_, err := ipld.Unmarshal([]byte(data), dagcbor.Decode, &records, providerResultsType, peerIDConverter, multiaddrConverter)
+// UnmarshalCBOR decodes a provider result from CBOR-encoded bytes
+func UnmarshalCBOR(data []byte) (model.ProviderResult, error) {
+	var pr model.ProviderResult
+	_, err := ipld.Unmarshal([]byte(data), dagcbor.Decode, &pr, providerResultType, peerIDConverter, multiaddrConverter)
 	if err != nil {
-		return nil, err
+		return model.ProviderResult{}, err
 	}
-	return records, nil
+	return pr, nil
 }
 
-// MarshalCBOR encodes a list provider results in CBOR
-func MarshalCBOR(records []model.ProviderResult) ([]byte, error) {
-	return ipld.Marshal(dagcbor.Encode, &records, providerResultsType, peerIDConverter, multiaddrConverter)
+// MarshalCBOR encodes a provider result in CBOR
+func MarshalCBOR(providerResult model.ProviderResult) ([]byte, error) {
+	return ipld.Marshal(dagcbor.Encode, &providerResult, providerResultType, peerIDConverter, multiaddrConverter)
 }
 
 func equalProvider(a, b *peer.AddrInfo) bool {

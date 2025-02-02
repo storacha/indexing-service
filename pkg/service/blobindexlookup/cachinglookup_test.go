@@ -124,7 +124,7 @@ func TestWithCache__Find(t *testing.T) {
 			// Create ClaimLookup instance
 			cl := blobindexlookup.WithCache(lookup, mockStore, providerCacher)
 
-			index, err := cl.Find(context.Background(), tc.contextID, provider, *testutil.TestURL, nil)
+			index, err := cl.Find(context.Background(), tc.contextID, provider, testutil.TestURL, nil)
 			if tc.expectedErr != nil {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			} else {
@@ -181,7 +181,7 @@ type mockBlobIndexLookup struct {
 	err   error
 }
 
-func (m *mockBlobIndexLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error) {
+func (m *mockBlobIndexLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL *url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error) {
 	return m.index, m.err
 }
 

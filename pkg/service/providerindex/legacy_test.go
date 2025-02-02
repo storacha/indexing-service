@@ -11,15 +11,14 @@ import (
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil/mocks"
+	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/maurl"
-	"github.com/storacha/go-capabilities/pkg/assert"
-	capabilitytypes "github.com/storacha/go-capabilities/pkg/types"
-
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/stretchr/testify/mock"
@@ -29,19 +28,19 @@ import (
 func TestFind(t *testing.T) {
 	allTargetClaims := []multicodec.Code{metadata.LocationCommitmentID, metadata.IndexClaimID, metadata.EqualsClaimID}
 	t.Run("happy path, unsupported claims are filtered out", func(t *testing.T) {
-		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockContentClaimsFinder(t)
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
 
-		partitionClaim := assert.Partition.New(testutil.Service.DID().String(), assert.PartitionCaveats{
-			Content: capabilitytypes.FromHash(contentHash),
+		partitionClaim := cassert.Partition.New(testutil.Service.DID().String(), cassert.PartitionCaveats{
+			Content: ctypes.FromHash(contentHash),
 			Blocks:  nil,
 			Parts:   nil,
 		})
-		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.PartitionCaveats]{partitionClaim}))(t)
+		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.PartitionCaveats]{partitionClaim}))(t)
 		partitionDelegationCid := link.ToCID(testutil.RandomCID())
 		locationDelegation := testutil.RandomLocationDelegation()
 		locationDelegationCid := link.ToCID(testutil.RandomCID())
@@ -49,9 +48,9 @@ func TestFind(t *testing.T) {
 		indexDelegationCid := link.ToCID(testutil.RandomCID())
 
 		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{partitionDelegationCid, locationDelegationCid, indexDelegationCid}, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: partitionDelegationCid}, url.URL{}).Return(partitionDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, url.URL{}).Return(locationDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, url.URL{}).Return(indexDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: partitionDelegationCid}, &url.URL{}).Return(partitionDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
 
 		results, err := legacyClaims.Find(ctx, contentHash, allTargetClaims)
 
@@ -60,8 +59,8 @@ func TestFind(t *testing.T) {
 	})
 
 	t.Run("returns no error, but empty results, when the content hash is not found in the mapper", func(t *testing.T) {
-		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockContentClaimsFinder(t)
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		mockMapper.EXPECT().GetClaims(mock.Anything, mock.Anything).Return(nil, types.ErrKeyNotFound)
@@ -73,8 +72,8 @@ func TestFind(t *testing.T) {
 	})
 
 	t.Run("returns no error, but empty results, when claims are not found in the store", func(t *testing.T) {
-		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockContentClaimsFinder(t)
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		testCID := link.ToCID(testutil.RandomCID())
@@ -93,8 +92,8 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	allTargetClaims := []multicodec.Code{metadata.LocationCommitmentID, metadata.IndexClaimID, metadata.EqualsClaimID}
 
 	t.Run("location claim", func(t *testing.T) {
-		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockContentClaimsFinder(t)
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		contentLink := testutil.RandomCID()
@@ -102,12 +101,12 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		contentHash := contentCid.Hash()
 		spaceDID := testutil.RandomPrincipal().DID()
 
-		locationClaim := assert.Location.New(testutil.Service.DID().String(), assert.LocationCaveats{
-			Content:  capabilitytypes.FromHash(contentHash),
+		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+			Content:  ctypes.FromHash(contentHash),
 			Location: []url.URL{*testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(contentHash))))(t)},
 			Space:    spaceDID,
 		})
-		locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[assert.LocationCaveats]{locationClaim}))(t)
+		locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[cassert.LocationCaveats]{locationClaim}))(t)
 
 		result, err := legacyClaims.synthetizeProviderResult(link.ToCID(locationDelegation.Link()), locationDelegation, allTargetClaims)
 
@@ -133,19 +132,19 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	})
 
 	t.Run("index claim", func(t *testing.T) {
-		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockContentClaimsFinder(t)
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		contentLink := testutil.RandomCID()
 		indexLink := testutil.RandomCID()
 		indexCid := link.ToCID(indexLink)
 
-		indexClaim := assert.Index.New(testutil.Service.DID().String(), assert.IndexCaveats{
+		indexClaim := cassert.Index.New(testutil.Service.DID().String(), cassert.IndexCaveats{
 			Content: contentLink,
 			Index:   indexLink,
 		})
-		indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.IndexCaveats]{indexClaim}))(t)
+		indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.IndexCaveats]{indexClaim}))(t)
 
 		result, err := legacyClaims.synthetizeProviderResult(link.ToCID(indexDelegation.Link()), indexDelegation, allTargetClaims)
 
@@ -167,20 +166,20 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	})
 
 	t.Run("equals claim", func(t *testing.T) {
-		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockContentClaimsFinder(t)
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		contentHash := link.ToCID(testutil.RandomCID()).Hash()
 		equalsLink := testutil.RandomCID()
 		equalsCid := link.ToCID(equalsLink)
 
-		equalsClaim := assert.Equals.New(testutil.Service.DID().String(), assert.EqualsCaveats{
-			Content: capabilitytypes.FromHash(contentHash),
+		equalsClaim := cassert.Equals.New(testutil.Service.DID().String(), cassert.EqualsCaveats{
+			Content: ctypes.FromHash(contentHash),
 			Equals:  equalsLink,
 		})
 
-		equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.EqualsCaveats]{equalsClaim}))(t)
+		equalsDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.EqualsCaveats]{equalsClaim}))(t)
 
 		result, err := legacyClaims.synthetizeProviderResult(link.ToCID(equalsDelegation.Link()), equalsDelegation, allTargetClaims)
 
@@ -202,19 +201,19 @@ func TestSynthetizeProviderResult(t *testing.T) {
 	})
 
 	t.Run("unsupported claim", func(t *testing.T) {
-		mockMapper := mocks.NewMockContentToClaimsMapper(t)
-		mockStore := mocks.NewMockContentClaimsFinder(t)
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
 		contentHash := link.ToCID(testutil.RandomCID()).Hash()
 
-		partitionClaim := assert.Partition.New(testutil.Service.DID().String(), assert.PartitionCaveats{
-			Content: capabilitytypes.FromHash(contentHash),
+		partitionClaim := cassert.Partition.New(testutil.Service.DID().String(), cassert.PartitionCaveats{
+			Content: ctypes.FromHash(contentHash),
 			Blocks:  nil,
 			Parts:   nil,
 		})
 
-		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[assert.PartitionCaveats]{partitionClaim}))(t)
+		partitionDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.PartitionCaveats]{partitionClaim}))(t)
 
 		_, err := legacyClaims.synthetizeProviderResult(link.ToCID(partitionDelegation.Link()), partitionDelegation, allTargetClaims)
 

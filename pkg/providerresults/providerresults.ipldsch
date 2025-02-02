@@ -14,5 +14,3 @@ type ProviderResult struct {
 	# Provider is the peer ID and addresses of the provider.
 	Provider Provider
 } representation tuple
-
-type ProviderResults [ProviderResult]

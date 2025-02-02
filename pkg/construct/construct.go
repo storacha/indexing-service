@@ -3,9 +3,11 @@ package construct
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -81,6 +83,20 @@ type config struct {
 	legacyClaimsMappers []providerindex.ContentToClaimsMapper
 	legacyClaimsBucket  types.ContentClaimsStore
 	legacyClaimsUrl     string
+	httpClient          *http.Client
+}
+
+// DefaultHTTPClient creates a HTTP client with sensible defaults
+func DefaultHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: 5 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 5 * time.Second,
+		},
+	}
 }
 
 // Option configures how the node is construct
@@ -192,6 +208,14 @@ func WithLegacyClaims(legacyClaimsMappers []providerindex.ContentToClaimsMapper,
 	}
 }
 
+// WithHTTPClient configures the HTTP client used when consuming HTTP APIs
+func WithHTTPClient(httpClient *http.Client) Option {
+	return func(cfg *config) error {
+		cfg.httpClient = httpClient
+		return nil
+	}
+}
+
 // Service is the core methods of the indexing service but with additional
 // lifecycle methods.
 type Service interface {
@@ -273,9 +297,14 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		cachingQueue = jq
 	}
 
+	httpClient := DefaultHTTPClient()
+	if cfg.httpClient != nil {
+		httpClient = cfg.httpClient
+	}
+
 	// setup IPNI
 	// TODO: switch to double hashed client for reader privacy?
-	findClient, err := ipnifind.New(sc.IndexerURL)
+	findClient, err := ipnifind.New(sc.IndexerURL, ipnifind.WithClient(httpClient))
 	if err != nil {
 		return nil, err
 	}
@@ -362,13 +391,13 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		claimsStore = contentclaims.NewStoreFromDatastore(namespace.Wrap(ds, contentClaimsNamespace))
 	}
 
-	finder := contentclaims.NewSimpleFinder(http.DefaultClient)
+	finder := contentclaims.NewSimpleFinder(httpClient)
 	if cfg.legacyClaimsBucket != nil {
 		finder = contentclaims.WithStore(finder, cfg.legacyClaimsBucket)
 	}
 	claims := contentclaims.New(claimsStore, claimsCache, finder)
 	blobIndexLookup := blobindexlookup.WithCache(
-		blobindexlookup.NewBlobIndexLookup(http.DefaultClient),
+		blobindexlookup.NewBlobIndexLookup(httpClient),
 		shardDagIndexesCache,
 		cachingQueue,
 	)

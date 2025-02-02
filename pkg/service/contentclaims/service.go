@@ -23,7 +23,7 @@ func (cs *ClaimService) Cache(ctx context.Context, claim delegation.Delegation) 
 	return cs.cache.Set(ctx, link.ToCID(claim.Link()), claim, true)
 }
 
-func (cs *ClaimService) Find(ctx context.Context, claim ipld.Link, url url.URL) (delegation.Delegation, error) {
+func (cs *ClaimService) Find(ctx context.Context, claim ipld.Link, url *url.URL) (delegation.Delegation, error) {
 	return cs.finder.Find(ctx, claim, url)
 }
 
