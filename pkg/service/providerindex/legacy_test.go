@@ -189,6 +189,19 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		require.Equal(t, blobProviderAddr, result.Provider.Addrs[0])
 	})
 
+	t.Run("filters out location claims", func(t *testing.T) {
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
+
+		locationClaimCid := link.ToCID(testutil.RandomCID())
+		locationClaim := testutil.RandomLocationDelegation()
+		targetClaims := []multicodec.Code{metadata.IndexClaimID, metadata.EqualsClaimID}
+		_, err := legacyClaims.synthetizeProviderResult(locationClaimCid, locationClaim, targetClaims)
+
+		require.ErrorIs(t, err, ErrIgnoreFiltered)
+	})
+
 	t.Run("index claim", func(t *testing.T) {
 		mockMapper := NewMockContentToClaimsMapper(t)
 		mockStore := contentclaims.NewMockContentClaimsFinder(t)
@@ -221,6 +234,19 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)
 		require.Equal(t, claimsProviderAddr, result.Provider.Addrs[0])
+	})
+
+	t.Run("filters out index claims", func(t *testing.T) {
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
+
+		indexClaimCid := link.ToCID(testutil.RandomCID())
+		indexClaim := testutil.RandomIndexDelegation()
+		targetClaims := []multicodec.Code{metadata.LocationCommitmentID, metadata.EqualsClaimID}
+		_, err := legacyClaims.synthetizeProviderResult(indexClaimCid, indexClaim, targetClaims)
+
+		require.ErrorIs(t, err, ErrIgnoreFiltered)
 	})
 
 	t.Run("equals claim", func(t *testing.T) {
@@ -256,6 +282,19 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)
 		require.Equal(t, claimsProviderAddr, result.Provider.Addrs[0])
+	})
+
+	t.Run("filters out equals claims", func(t *testing.T) {
+		mockMapper := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
+
+		equalsClaimCid := link.ToCID(testutil.RandomCID())
+		equalsClaim := testutil.RandomEqualsDelegation()
+		targetClaims := []multicodec.Code{metadata.LocationCommitmentID, metadata.IndexClaimID}
+		_, err := legacyClaims.synthetizeProviderResult(equalsClaimCid, equalsClaim, targetClaims)
+
+		require.ErrorIs(t, err, ErrIgnoreFiltered)
 	})
 
 	t.Run("unsupported claim", func(t *testing.T) {
