@@ -58,6 +58,64 @@ func TestFind(t *testing.T) {
 		require.Len(t, results, 2)
 	})
 
+	t.Run("second mapper is not checked if first mapper returns the claims we are interested in, other claims are filtered", func(t *testing.T) {
+		mockMapper1 := NewMockContentToClaimsMapper(t)
+		mockMapper2 := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper1, mockMapper2}, mockStore, "https://storacha.network/claims/{claim}"))(t)
+
+		ctx := context.Background()
+		contentHash := testutil.RandomMultihash()
+
+		locationDelegation := testutil.RandomLocationDelegation()
+		locationDelegationCid := link.ToCID(testutil.RandomCID())
+		indexDelegation := testutil.RandomIndexDelegation()
+		indexDelegationCid := link.ToCID(testutil.RandomCID())
+		equalsDelegation := testutil.RandomEqualsDelegation()
+		equalsDelegationCid := link.ToCID(testutil.RandomCID())
+
+		mockMapper1.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid, equalsDelegationCid}, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: equalsDelegationCid}, &url.URL{}).Return(equalsDelegation, nil)
+
+		results, err := legacyClaims.Find(ctx, contentHash, []multicodec.Code{metadata.LocationCommitmentID})
+
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+	})
+
+	t.Run("second mapper is checked when first mapper returns claims, but not the type we are interested in", func(t *testing.T) {
+		mockMapper1 := NewMockContentToClaimsMapper(t)
+		mockMapper2 := NewMockContentToClaimsMapper(t)
+		mockStore := contentclaims.NewMockContentClaimsFinder(t)
+		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper1, mockMapper2}, mockStore, "https://storacha.network/claims/{claim}"))(t)
+
+		ctx := context.Background()
+		contentHash := testutil.RandomMultihash()
+
+		locationDelegation := testutil.RandomLocationDelegation()
+		locationDelegationCid := link.ToCID(testutil.RandomCID())
+		indexDelegation := testutil.RandomIndexDelegation()
+		indexDelegationCid := link.ToCID(testutil.RandomCID())
+		equalsDelegation := testutil.RandomEqualsDelegation()
+		equalsDelegationCid := link.ToCID(testutil.RandomCID())
+
+		// mapper1 returns an equals claim, but we are looking for location and index
+		mockMapper1.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{equalsDelegationCid}, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: equalsDelegationCid}, &url.URL{}).Return(equalsDelegation, nil)
+
+		// GetClaims is called on mapper2
+		mockMapper2.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
+
+		results, err := legacyClaims.Find(ctx, contentHash, []multicodec.Code{metadata.LocationCommitmentID, metadata.IndexClaimID})
+
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+	})
+
 	t.Run("returns no error, but empty results, when the content hash is not found in the mapper", func(t *testing.T) {
 		mockMapper := NewMockContentToClaimsMapper(t)
 		mockStore := contentclaims.NewMockContentClaimsFinder(t)
