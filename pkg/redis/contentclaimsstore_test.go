@@ -21,7 +21,7 @@ func TestContentClaimsStore(t *testing.T) {
 	mockRedis := NewMockRedis()
 	contentClaimsStore := redis.NewContentClaimsStore(mockRedis)
 	claim1 := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
-		Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: testutil.RandomMultihash()}))(t),
+		Content:  ctypes.FromHash(testutil.RandomMultihash()),
 		Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 	})
 	delegation1 := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[cassert.LocationCaveats]{claim1}))(t)

@@ -83,7 +83,7 @@ func TestGetProviderResults(t *testing.T) {
 
 		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(&model.FindResponse{}, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash).Return([]model.ProviderResult{expectedResult}, nil)
+		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
 		mockStore.EXPECT().Add(ctx, someHash, expectedResult).Return(1, nil)
 		mockStore.EXPECT().SetExpirable(ctx, someHash, true).Return(nil)
 
@@ -117,7 +117,7 @@ func TestGetProviderResults(t *testing.T) {
 
 		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(ipniFinderResponse, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash).Return([]model.ProviderResult{expectedResult}, nil)
+		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
 		mockStore.EXPECT().Add(ctx, someHash, expectedResult).Return(1, nil)
 		mockStore.EXPECT().SetExpirable(ctx, someHash, true).Return(nil)
 
@@ -141,7 +141,7 @@ func TestGetProviderResults(t *testing.T) {
 
 		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(&model.FindResponse{}, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash).Return([]model.ProviderResult{}, nil)
+		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{0}).Return([]model.ProviderResult{}, nil)
 
 		results, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{0})
 
@@ -199,7 +199,7 @@ func TestGetProviderResults(t *testing.T) {
 		ctx := context.Background()
 		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(&model.FindResponse{}, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash).Return(nil, errors.New("some error"))
+		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{0}).Return(nil, errors.New("some error"))
 
 		_, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{0})
 

@@ -241,7 +241,7 @@ func TestQuery(t *testing.T) {
 
 func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
 	locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
-		Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: contentLink.Hash()}))(t),
+		Content:  ctypes.FromHash(contentLink.Hash()),
 		Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 	})
 
@@ -302,7 +302,7 @@ func buildTestIndexClaim(t *testing.T, contentLink cidlink.Link, providerAddr *p
 func buildTestEqualsClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult, cidlink.Link) {
 	equivalentCid := testutil.RandomCID()
 	equalsClaim := cassert.Equals.New(testutil.Service.DID().String(), cassert.EqualsCaveats{
-		Content: testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: contentLink.Hash()}))(t),
+		Content: ctypes.FromHash(contentLink.Hash()),
 		Equals:  equivalentCid,
 	})
 
@@ -1022,7 +1022,7 @@ func TestCacheClaim(t *testing.T) {
 		ctx := context.Background()
 
 		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
-			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Content:  ctypes.FromHash([]byte{1, 2, 3}),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(
@@ -1056,7 +1056,7 @@ func TestCacheClaim(t *testing.T) {
 		ctx := context.Background()
 
 		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
-			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Content:  ctypes.FromHash([]byte{1, 2, 3}),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 			// set the range
 			Range: &cassert.Range{Offset: 0, Length: &[]uint64{3}[0]},
@@ -1091,7 +1091,7 @@ func TestCacheClaim(t *testing.T) {
 		ctx := context.Background()
 
 		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
-			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Content:  ctypes.FromHash([]byte{1, 2, 3}),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(
@@ -1123,7 +1123,7 @@ func TestCacheClaim(t *testing.T) {
 		ctx := context.Background()
 
 		locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
-			Content:  testutil.Must(ctypes.Digest(ctypes.DigestModel{Digest: []byte{1, 2, 3}}))(t),
+			Content:  ctypes.FromHash([]byte{1, 2, 3}),
 			Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 		})
 		locationDelegation := testutil.Must(delegation.Delegate(

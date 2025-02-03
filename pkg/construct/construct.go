@@ -70,20 +70,20 @@ type ServiceConfig struct {
 }
 
 type config struct {
-	cachingQueue       blobindexlookup.CachingQueue
-	opts               []service.Option
-	ds                 datastore.Batching
-	skipNotification   bool
-	startIPNIServer    bool
-	publisherStore     store.PublisherStore
-	claimsStore        types.ContentClaimsStore
-	providersClient    redis.Client
-	claimsClient       redis.Client
-	indexesClient      redis.Client
-	legacyClaimsMapper providerindex.ContentToClaimsMapper
-	legacyClaimsBucket types.ContentClaimsStore
-	legacyClaimsUrl    string
-	httpClient         *http.Client
+	cachingQueue        blobindexlookup.CachingQueue
+	opts                []service.Option
+	ds                  datastore.Batching
+	skipNotification    bool
+	startIPNIServer     bool
+	publisherStore      store.PublisherStore
+	claimsStore         types.ContentClaimsStore
+	providersClient     redis.Client
+	claimsClient        redis.Client
+	indexesClient       redis.Client
+	legacyClaimsMappers []providerindex.ContentToClaimsMapper
+	legacyClaimsBucket  types.ContentClaimsStore
+	legacyClaimsUrl     string
+	httpClient          *http.Client
 }
 
 // DefaultHTTPClient creates a HTTP client with sensible defaults
@@ -198,10 +198,10 @@ func WithIndexesClient(client redis.Client) Option {
 	}
 }
 
-// WithLegacyClaims uses the given LegacyClaimsFinder to find claims on legacy systems and storage
-func WithLegacyClaims(legacyClaimsMapper providerindex.ContentToClaimsMapper, legacyClaimsBucket types.ContentClaimsStore, legacyClaimsUrl string) Option {
+// WithLegacyClaims configures the service to find claims on legacy systems and storage
+func WithLegacyClaims(legacyClaimsMappers []providerindex.ContentToClaimsMapper, legacyClaimsBucket types.ContentClaimsStore, legacyClaimsUrl string) Option {
 	return func(cfg *config) error {
-		cfg.legacyClaimsMapper = legacyClaimsMapper
+		cfg.legacyClaimsMappers = legacyClaimsMappers
 		cfg.legacyClaimsBucket = legacyClaimsBucket
 		cfg.legacyClaimsUrl = legacyClaimsUrl
 		return nil
@@ -368,12 +368,12 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	// build read through fetchers
 	// TODO: add sender / publisher / linksystem
 	var legacyClaims providerindex.LegacyClaimsFinder
-	if cfg.legacyClaimsMapper != nil && cfg.legacyClaimsBucket != nil {
+	if len(cfg.legacyClaimsMappers) > 0 && cfg.legacyClaimsBucket != nil {
 		if !strings.Contains(cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder) {
 			return nil, fmt.Errorf("legacy claims url %s must contain the claim placeholder %s", cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder)
 		}
 		legacyFinder := contentclaims.WithIdentityCids(contentclaims.WithCache(contentclaims.WithStore(contentclaims.NewNotFoundFinder(), cfg.legacyClaimsBucket), claimsCache))
-		legacyClaims, err = providerindex.NewLegacyClaimsStore(cfg.legacyClaimsMapper, legacyFinder, cfg.legacyClaimsUrl)
+		legacyClaims, err = providerindex.NewLegacyClaimsStore(cfg.legacyClaimsMappers, legacyFinder, cfg.legacyClaimsUrl)
 		if err != nil {
 			return nil, fmt.Errorf("creating legacy claims store: %w", err)
 		}

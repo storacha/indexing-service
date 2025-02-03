@@ -26,6 +26,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/legacy"
+	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/store"
@@ -189,14 +190,13 @@ func Construct(cfg Config) (types.Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing carpark url: %s", err)
 	}
-
 	legacyClaimsCfg := cfg.Config.Copy()
 	legacyClaimsCfg.Region = cfg.LegacyClaimsTableRegion
-	legacyClaimsMapper := NewBucketFallbackMapper(
+	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName)
+	bucketFallbackMapper := NewBucketFallbackMapper(
 		cfg.Signer,
 		httpClient,
 		legacyDataBucketURL,
-		NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName),
 		func() []delegation.Option {
 			return []delegation.Option{delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix()))}
 		},
@@ -211,7 +211,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims(legacyClaimsMapper, legacyClaimsBucket, legacyClaimsURL),
+		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper}, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
 		construct.WithProvidersClient(providersClient),
 		construct.WithClaimsClient(claimsClient),

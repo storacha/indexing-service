@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,34 +18,23 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-type ContentToClaimsMapper interface {
-	GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error)
-}
-
 type BucketFallbackMapper struct {
 	id         principal.Signer
 	httpClient *http.Client
 	bucketURL  *url.URL
-	baseMapper ContentToClaimsMapper
 	getOpts    func() []delegation.Option
 }
 
-func NewBucketFallbackMapper(id principal.Signer, httpClient *http.Client, bucketURL *url.URL, baseMapper ContentToClaimsMapper, getOpts func() []delegation.Option) BucketFallbackMapper {
+func NewBucketFallbackMapper(id principal.Signer, httpClient *http.Client, bucketURL *url.URL, getOpts func() []delegation.Option) BucketFallbackMapper {
 	return BucketFallbackMapper{
 		id:         id,
 		httpClient: httpClient,
 		bucketURL:  bucketURL,
-		baseMapper: baseMapper,
 		getOpts:    getOpts,
 	}
 }
 
 func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
-	claims, err := cfm.baseMapper.GetClaims(ctx, contentHash)
-	if err == nil || !errors.Is(err, types.ErrKeyNotFound) {
-		return claims, err
-	}
-
 	resp, err := cfm.httpClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
 	if err != nil {
 		return nil, err
@@ -83,7 +71,7 @@ func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multi
 	if err != nil {
 		return nil, fmt.Errorf("generating identity cid: %w", err)
 	}
-	return []cid.Cid{c}, err
+	return []cid.Cid{c}, nil
 }
 
 func toBlobKey(contentHash multihash.Multihash) string {

@@ -82,7 +82,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 
 	// if nothing was found on IPNI, try legacy claims storage
 	if len(results) == 0 {
-		legacyResults, err := pi.fetchFromLegacy(ctx, mh, targetClaims)
+		legacyResults, err := pi.legacyClaims.Find(ctx, mh, targetClaims)
 		if err != nil {
 			return nil, err
 		}
@@ -115,20 +115,6 @@ func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, mh mh.Multiha
 
 	for _, mhres := range findRes.MultihashResults {
 		results = append(results, mhres.ProviderResults...)
-	}
-
-	results, err = filterCodecs(results, targetClaims)
-	if err != nil {
-		return nil, err
-	}
-
-	return results, nil
-}
-
-func (pi *ProviderIndexService) fetchFromLegacy(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
-	results, err := pi.legacyClaims.Find(ctx, mh)
-	if err != nil {
-		return nil, err
 	}
 
 	results, err = filterCodecs(results, targetClaims)
