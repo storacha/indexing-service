@@ -25,7 +25,7 @@ func NewBlobIndexLookup(httpClient *http.Client) BlobIndexLookup {
 }
 
 // Find fetches the blob index from the given fetchURL
-func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, _ model.ProviderResult, fetchURL url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error) {
+func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, _ model.ProviderResult, fetchURL *url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error) {
 	// attempt to fetch the index from provided url
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL.String(), nil)
 	if err != nil {

@@ -3,8 +3,4 @@ resource "aws_ssm_parameter" "private_key" {
   description = "private key for the deployed environment"
   type        = "SecureString"
   value       = var.private_key
-
-  tags = {
-    environment = "production"
-  }
 }

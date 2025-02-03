@@ -60,29 +60,23 @@ type job struct {
 	mh                  multihash.Multihash
 	indexForMh          *multihash.Multihash
 	indexProviderRecord *model.ProviderResult
-	jobType             jobType
+	queryType           types.QueryType
 }
 
 type jobKey string
 
 func (j job) key() jobKey {
-	k := jobKey(j.mh) + jobKey(j.jobType)
+	k := jobKey(j.mh) + jobKey(j.queryType.String())
 	if j.indexForMh != nil {
 		k += jobKey(*j.indexForMh)
 	}
 	return k
 }
 
-type jobType string
-
-const standardJobType jobType = "standard"
-const locationJobType jobType = "location"
-const indexOrLocationJobType jobType = "index_or_location"
-
-var targetClaims = map[jobType][]multicodec.Code{
-	standardJobType:        {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
-	locationJobType:        {metadata.LocationCommitmentID},
-	indexOrLocationJobType: {metadata.IndexClaimID, metadata.LocationCommitmentID},
+var targetClaims = map[types.QueryType][]multicodec.Code{
+	types.QueryTypeStandard:        {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+	types.QueryTypeLocation:        {metadata.LocationCommitmentID},
+	types.QueryTypeIndexOrLocation: {metadata.IndexClaimID, metadata.LocationCommitmentID},
 }
 
 type queryResult struct {
@@ -113,7 +107,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 	results, err := is.providerIndex.Find(mhCtx, providerindex.QueryKey{
 		Hash:         j.mh,
 		Spaces:       state.Access().q.Match.Subject,
-		TargetClaims: targetClaims[j.jobType],
+		TargetClaims: targetClaims[j.queryType],
 	})
 	if err != nil {
 		return err
@@ -140,7 +134,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			if err != nil {
 				return err
 			}
-			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, *url)
+			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, url)
 			if err != nil {
 				return err
 			}
@@ -162,19 +156,19 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 				// we follow with a query for location claim on the OTHER side of the multihash
 				if string(typedProtocol.Equals.Hash()) != string(j.mh) {
 					// lookup was the content hash, queue the equals hash
-					if err := spawn(job{typedProtocol.Equals.Hash(), nil, nil, locationJobType}); err != nil {
+					if err := spawn(job{typedProtocol.Equals.Hash(), nil, nil, types.QueryTypeLocation}); err != nil {
 						return err
 					}
 				} else {
 					// lookup was the equals hash, queue the content hash
-					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, locationJobType}); err != nil {
+					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, types.QueryTypeLocation}); err != nil {
 						return err
 					}
 				}
 			case *metadata.IndexClaimMetadata:
 				// for an index claim, we follow by looking for a location claim for the index, and fetching the index
 				mh := j.mh
-				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, indexOrLocationJobType}); err != nil {
+				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, types.QueryTypeIndexOrLocation}); err != nil {
 					return err
 				}
 			case *metadata.LocationCommitmentMetadata:
@@ -190,7 +184,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					if err != nil {
 						return err
 					}
-					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, *url, typedProtocol.Range)
+					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
 					if err != nil {
 						return err
 					}
@@ -208,7 +202,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					shards := index.Shards().Iterator()
 					for shard, index := range shards {
 						if index.Has(*j.indexForMh) {
-							if err := spawn(job{shard, nil, nil, indexOrLocationJobType}); err != nil {
+							if err := spawn(job{shard, nil, nil, types.QueryTypeIndexOrLocation}); err != nil {
 								return err
 							}
 						}
@@ -222,16 +216,15 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 
 // Query returns back relevant content claims for the given query using the following steps
 // 1. Query the ProviderIndex for all matching records
-// 2. For any index records, query the ProviderIndex for any location claims for that index cid
-// 3. For any index claims, query the ProviderIndex for location claims for the index cid
-// 4. Query the BlobIndexLookup to get the full ShardedDagIndex for any index claims
-// 5. Query ProviderIndex for any location claims for any shards that contain the multihash based on the ShardedDagIndex
-// 6. Read the requisite claims from the ClaimLookup
-// 7. Return all discovered claims and sharded dag indexes
+// 2. For any index claims, query the ProviderIndex for location claims for the index cid
+// 3. Query the BlobIndexLookup to get the full ShardedDagIndex for any index claims
+// 4. Query ProviderIndex for any location claims for any shards that contain the multihash based on the ShardedDagIndex
+// 5. Read the requisite claims from the ClaimLookup
+// 6. Return all discovered claims and sharded dag indexes
 func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.QueryResult, error) {
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
-		initialJobs = append(initialJobs, job{mh, nil, nil, standardJobType})
+		initialJobs = append(initialJobs, job{mh, nil, nil, q.Type})
 	}
 	qs, err := is.jobWalker(ctx, initialJobs, queryState{
 		q: &q,
@@ -333,6 +326,10 @@ func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claims 
 
 func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
+	if len(caps) == 0 {
+		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	}
+
 	switch caps[0].Can() {
 	case assert.LocationAbility:
 		return cacheLocationCommitment(ctx, claims, provIndex, provider, claim)
@@ -342,16 +339,12 @@ func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claim
 }
 
 func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
-	caps := claim.Capabilities()
-	if len(caps) == 0 {
-		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	capability := claim.Capabilities()[0]
+	if capability.Can() != assert.LocationAbility {
+		return fmt.Errorf("unsupported claim: %s", capability.Can())
 	}
 
-	if caps[0].Can() != assert.LocationAbility {
-		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
-	}
-
-	nb, rerr := assert.LocationCaveatsReader.Read(caps[0].Nb())
+	nb, rerr := assert.LocationCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
@@ -395,6 +388,9 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 
 func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	caps := claim.Capabilities()
+	if len(caps) == 0 {
+		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
+	}
 	switch caps[0].Can() {
 	case assert.EqualsAbility:
 		return publishEqualsClaim(ctx, claims, provIndex, provider, claim)
@@ -406,23 +402,15 @@ func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, cla
 }
 
 func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
-	caps := claim.Capabilities()
-	if len(caps) == 0 {
-		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
-	}
-
-	if caps[0].Can() != assert.EqualsAbility {
-		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
-	}
-
-	nb, rerr := assert.EqualsCaveatsReader.Read(caps[0].Nb())
+	capability := claim.Capabilities()[0]
+	nb, rerr := assert.EqualsCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
-		return fmt.Errorf("reading index claim data: %w", rerr)
+		return fmt.Errorf("reading equals claim data: %w", rerr)
 	}
 
 	err := claims.Publish(ctx, claim)
 	if err != nil {
-		return fmt.Errorf("caching claim with claim service: %w", err)
+		return fmt.Errorf("caching equals claim with claim service: %w", err)
 	}
 
 	var exp int
@@ -444,30 +432,22 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	contextID := nb.Equals.Binary()
 	err = provIndex.Publish(ctx, provider, contextID, slices.Values(digests), meta)
 	if err != nil {
-		return fmt.Errorf("publishing claim: %w", err)
+		return fmt.Errorf("publishing equals claim: %w", err)
 	}
 
 	return nil
 }
 
 func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
-	caps := claim.Capabilities()
-	if len(caps) == 0 {
-		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
-	}
-
-	if caps[0].Can() != assert.IndexAbility {
-		return fmt.Errorf("unsupported claim: %s", caps[0].Can())
-	}
-
-	nb, rerr := assert.IndexCaveatsReader.Read(caps[0].Nb())
+	capability := claim.Capabilities()[0]
+	nb, rerr := assert.IndexCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
 		return fmt.Errorf("reading index claim data: %w", rerr)
 	}
 
 	err := claims.Publish(ctx, claim)
 	if err != nil {
-		return fmt.Errorf("caching claim with claim lookup: %w", err)
+		return fmt.Errorf("caching index claim with claim lookup: %w", err)
 	}
 
 	results, err := provIndex.Find(ctx, providerindex.QueryKey{
@@ -517,7 +497,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	contextID := nb.Index.Binary()
 	err = provIndex.Publish(ctx, provider, contextID, digests.Keys(), meta)
 	if err != nil {
-		return fmt.Errorf("publishing claim: %w", err)
+		return fmt.Errorf("publishing index claim: %w", err)
 	}
 
 	return nil
@@ -557,7 +537,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 			return
 		}
 
-		dlg, err := claims.Find(ctx, cidlink.Link{Cid: lcmeta.Claim}, *claimURL)
+		dlg, err := claims.Find(ctx, cidlink.Link{Cid: lcmeta.Claim}, claimURL)
 		if err != nil {
 			validateErr = err
 			return
@@ -571,14 +551,14 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 	}()
 
 	// Note: the ContextID here is of a location commitment provider
-	idx, err := blobIndex.Find(ctx, result.ContextID, result, *blobURL, lcmeta.Range)
+	idx, err := blobIndex.Find(ctx, result.ContextID, result, blobURL, lcmeta.Range)
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
 	}
 
 	wg.Wait()
 	if validateErr != nil {
-		return nil, fmt.Errorf("verifying claim: %w", err)
+		return nil, fmt.Errorf("verifying claim: %w", validateErr)
 	}
 
 	return idx, nil

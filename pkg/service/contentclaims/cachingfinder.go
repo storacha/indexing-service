@@ -25,7 +25,7 @@ func WithCache(finder Finder, cache types.ContentClaimsCache) Finder {
 }
 
 // Find attempts to fetch a claim from either the local cache or via the provided URL (caching the result if its fetched)
-func (cl *cachingFinder) Find(ctx context.Context, id ipld.Link, fetchURL url.URL) (delegation.Delegation, error) {
+func (cl *cachingFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL) (delegation.Delegation, error) {
 	// attempt to read claim from cache and return it if succesful
 	claim, err := cl.cache.Get(ctx, link.ToCID(id))
 	if err == nil {

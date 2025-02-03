@@ -18,8 +18,9 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/go-capabilities/pkg/assert"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-capabilities/pkg/claim"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -69,12 +70,12 @@ func TestClient(t *testing.T) {
 				alice,
 				[]ucan.Capability[ucan.NoCaveats]{
 					ucan.NewCapability(
-						assert.EqualsAbility,
+						cassert.EqualsAbility,
 						indexingID.DID().String(),
 						ucan.NoCaveats{},
 					),
 					ucan.NewCapability(
-						assert.IndexAbility,
+						cassert.IndexAbility,
 						indexingID.DID().String(),
 						ucan.NoCaveats{},
 					),
@@ -89,13 +90,13 @@ func TestClient(t *testing.T) {
 	index, err := blobindex.FromShardArchives(root, [][]byte{bytes})
 	require.NoError(t, err)
 
-	locationClaim, err := assert.Location.Delegate(
+	locationClaim, err := cassert.Location.Delegate(
 		storageID,
 		space,
 		storageID.DID().String(),
-		assert.LocationCaveats{
+		cassert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(digest),
+			Content:  ctypes.FromHash(digest),
 			Location: []url.URL{*storageURL.JoinPath("/blob/%s", digestutil.Format(digest))},
 		},
 	)
@@ -114,13 +115,13 @@ func TestClient(t *testing.T) {
 	require.NoError(t, err)
 	indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), indexDigest)}
 
-	indexLocationClaim, err := assert.Location.Delegate(
+	indexLocationClaim, err := cassert.Location.Delegate(
 		storageID,
 		space,
 		storageID.DID().String(),
-		assert.LocationCaveats{
+		cassert.LocationCaveats{
 			Space:    space.DID(),
-			Content:  assert.FromHash(indexDigest),
+			Content:  ctypes.FromHash(indexDigest),
 			Location: []url.URL{*storageURL.JoinPath("/blob/%s", digestutil.Format(indexDigest))},
 		},
 	)
@@ -161,7 +162,7 @@ func TestClient(t *testing.T) {
 		err = c.PublishIndexClaim(
 			context.Background(),
 			alice,
-			assert.IndexCaveats{
+			cassert.IndexCaveats{
 				Content: root,
 				Index:   indexLink,
 			},
@@ -171,7 +172,7 @@ func TestClient(t *testing.T) {
 
 		assertIndexInvocation := indexingUCANInvocations[len(indexingUCANInvocations)-1]
 		require.NotNil(t, assertIndexInvocation)
-		require.Equal(t, assert.IndexAbility, assertIndexInvocation.Capabilities()[0].Can())
+		require.Equal(t, cassert.IndexAbility, assertIndexInvocation.Capabilities()[0].Can())
 	})
 
 	t.Run("query", func(t *testing.T) {
@@ -208,26 +209,66 @@ func TestClient(t *testing.T) {
 		require.Equal(t, 1, len(res.Indexes()))
 		require.Equal(t, indexLink.String(), res.Indexes()[0].String())
 	})
+
+	t.Run("query requests the right type", func(t *testing.T) {
+		indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
+		indexingQueryServer := mockQueryServer(indexingQueryResults)
+		t.Cleanup(indexingQueryServer.Close)
+
+		c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
+		require.NoError(t, err)
+
+		claims := map[cid.Cid]delegation.Delegation{}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+
+		indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
+
+		t.Run("standard", func(t *testing.T) {
+			_, err := c.QueryClaims(context.Background(), types.Query{
+				Hashes: []multihash.Multihash{rootDigest},
+			})
+			require.NoError(t, err)
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=standard")
+		})
+
+		t.Run("location", func(t *testing.T) {
+			_, err := c.QueryClaims(context.Background(), types.Query{
+				Type:   types.QueryTypeLocation,
+				Hashes: []multihash.Multihash{rootDigest},
+			})
+			require.NoError(t, err)
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=location")
+		})
+
+		t.Run("index_or_location", func(t *testing.T) {
+			_, err := c.QueryClaims(context.Background(), types.Query{
+				Type:   types.QueryTypeIndexOrLocation,
+				Hashes: []multihash.Multihash{rootDigest},
+			})
+			require.NoError(t, err)
+			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=index_or_location")
+		})
+	})
 }
 
 func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(inv invocation.Invocation)) ucanserver.ServerView {
 	s, err := ucanserver.NewServer(
 		id,
 		ucanserver.WithServiceMethod(
-			assert.EqualsAbility,
+			cassert.EqualsAbility,
 			ucanserver.Provide(
-				assert.Equals,
-				func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				cassert.Equals,
+				func(cap ucan.Capability[cassert.EqualsCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
 					notifyInvocation(inv)
 					return ok.Unit{}, nil, nil
 				},
 			),
 		),
 		ucanserver.WithServiceMethod(
-			assert.IndexAbility,
+			cassert.IndexAbility,
 			ucanserver.Provide(
-				assert.Index,
-				func(cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				cassert.Index,
+				func(cap ucan.Capability[cassert.IndexCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
 					notifyInvocation(inv)
 					return ok.Unit{}, nil, nil
 				},
@@ -248,8 +289,17 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 	return s
 }
 
-func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryResult]) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+type mockServer struct {
+	*httptest.Server
+	lastRequestedURL string
+}
+
+func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryResult]) *mockServer {
+	ms := &mockServer{}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ms.lastRequestedURL = r.URL.String()
+
 		mhStrings := r.URL.Query()["multihash"]
 		if len(mhStrings) != 1 {
 			http.Error(w, "mock query service supports only single hash", http.StatusNotImplemented)
@@ -273,7 +323,11 @@ func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryRes
 		body := car.Encode([]datamodel.Link{qr.Root().Link()}, qr.Blocks())
 		w.WriteHeader(http.StatusOK)
 		io.Copy(w, body)
-	}))
+	})
+
+	ms.Server = httptest.NewServer(handler)
+
+	return ms
 }
 
 func randomLocalURL(t *testing.T) url.URL {

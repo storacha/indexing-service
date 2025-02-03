@@ -11,8 +11,9 @@ import (
 	"github.com/ipld/go-ipld-prime/printer"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/storacha/go-capabilities/pkg/assert"
+	cassert "github.com/storacha/go-capabilities/pkg/assert"
 	"github.com/storacha/go-capabilities/pkg/claim"
+	ctypes "github.com/storacha/go-capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
@@ -46,11 +47,11 @@ func TestServer(t *testing.T) {
 	conn, err := client.NewConnection(testutil.Service, server)
 	require.NoError(t, err)
 
-	locationCommitment := testutil.Must(assert.Location.Delegate(testutil.Alice,
+	locationCommitment := testutil.Must(cassert.Location.Delegate(testutil.Alice,
 		testutil.Alice,
 		testutil.Alice.DID().String(),
-		assert.LocationCaveats{
-			Content:  assert.FromHash(testutil.RandomMultihash()),
+		cassert.LocationCaveats{
+			Content:  ctypes.FromHash(testutil.RandomMultihash()),
 			Location: []url.URL{*testutil.Must(url.Parse("https://www.yahoo.com"))(t)},
 			Space:    testutil.Bob.DID(),
 		}))(t)
@@ -71,20 +72,20 @@ func TestServer(t *testing.T) {
 		require.NoError(t, cacheInvocation.Attach(b))
 	}
 	invs := []invocation.Invocation{
-		testutil.Must(assert.Equals.Invoke(
+		testutil.Must(cassert.Equals.Invoke(
 			testutil.Service,
 			testutil.Service,
 			testutil.Service.DID().String(),
-			assert.EqualsCaveats{
-				Content: assert.FromHash(testutil.RandomMultihash()),
+			cassert.EqualsCaveats{
+				Content: ctypes.FromHash(testutil.RandomMultihash()),
 				Equals:  testutil.RandomCID(),
 			},
 		))(t),
-		testutil.Must(assert.Index.Invoke(
+		testutil.Must(cassert.Index.Invoke(
 			testutil.Service,
 			testutil.Service,
 			testutil.Service.DID().String(),
-			assert.IndexCaveats{
+			cassert.IndexCaveats{
 				Content: testutil.RandomCID(),
 				Index:   testutil.RandomCID(),
 			},
@@ -138,18 +139,18 @@ func TestPrincipalResolver(t *testing.T) {
 				testutil.Service,
 				uploadIDWeb,
 				[]ucan.Capability[ucan.NoCaveats]{
-					ucan.NewCapability(assert.EqualsAbility, testutil.Service.DID().String(), ucan.NoCaveats{}),
+					ucan.NewCapability(cassert.EqualsAbility, testutil.Service.DID().String(), ucan.NoCaveats{}),
 				},
 			),
 		)(t),
 	)
 
-	inv := testutil.Must(assert.Equals.Invoke(
+	inv := testutil.Must(cassert.Equals.Invoke(
 		uploadIDWeb,
 		testutil.Service,
 		testutil.Service.DID().String(),
-		assert.EqualsCaveats{
-			Content: assert.FromHash(testutil.RandomMultihash()),
+		cassert.EqualsCaveats{
+			Content: ctypes.FromHash(testutil.RandomMultihash()),
 			Equals:  testutil.RandomCID(),
 		},
 		delegation.WithProof(proof),

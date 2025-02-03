@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
@@ -60,8 +61,15 @@ type Cache[Key, Value any] interface {
 	Get(ctx context.Context, key Key) (Value, error)
 }
 
+// ValueSetCache describes a cache interface whose values are sets
+type ValueSetCache[Key, Value any] interface {
+	Add(ctx context.Context, key Key, values ...Value) (uint64, error)
+	SetExpirable(ctx context.Context, key Key, expires bool) error
+	Members(ctx context.Context, key Key) ([]Value, error)
+}
+
 // ProviderStore caches queries to IPNI
-type ProviderStore Cache[mh.Multihash, []model.ProviderResult]
+type ProviderStore ValueSetCache[mh.Multihash, model.ProviderResult]
 
 // ContentClaimsStore stores published content claims
 type ContentClaimsStore Store[ipld.Link, delegation.Delegation]
@@ -77,8 +85,45 @@ type Match struct {
 	Subject []did.DID
 }
 
+// QueryType allows defining which claims a query is targeting. QueryTypeStandard targets all claims,
+// i.e. Location, Index and Equals
+type QueryType int
+
+const (
+	QueryTypeStandard QueryType = iota
+	QueryTypeLocation
+	QueryTypeIndexOrLocation
+)
+
+func (qt QueryType) String() string {
+	switch qt {
+	case QueryTypeStandard:
+		return "standard"
+	case QueryTypeLocation:
+		return "location"
+	case QueryTypeIndexOrLocation:
+		return "index_or_location"
+	default:
+		return "invalid"
+	}
+}
+
+func ParseQueryType(queryTypeStr string) (QueryType, error) {
+	switch queryTypeStr {
+	case QueryTypeStandard.String():
+		return QueryTypeStandard, nil
+	case QueryTypeLocation.String():
+		return QueryTypeLocation, nil
+	case QueryTypeIndexOrLocation.String():
+		return QueryTypeIndexOrLocation, nil
+	default:
+		return 0, fmt.Errorf("invalid query type: %s", queryTypeStr)
+	}
+}
+
 // Query is a query for several multihashes
 type Query struct {
+	Type   QueryType
 	Hashes []mh.Multihash
 	Match  Match
 }
@@ -86,7 +131,7 @@ type Query struct {
 // QueryResult is an encodable result of a query
 type QueryResult interface {
 	ipld.View
-	// Claims is a list of links to the root bock of claims that can be found in this message
+	// Claims is a list of links to the root block of claims that can be found in this message
 	Claims() []ipld.Link
 	// Indexes is a list of links to the CID hash of archived sharded dag indexes that can be found in this
 	// message

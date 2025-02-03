@@ -21,6 +21,6 @@ func NewNotFoundFinder() Finder {
 }
 
 // Find implements Finder.
-func (n notFoundFinder) Find(ctx context.Context, claim datamodel.Link, fetchURL url.URL) (delegation.Delegation, error) {
+func (n notFoundFinder) Find(ctx context.Context, claim datamodel.Link, fetchURL *url.URL) (delegation.Delegation, error) {
 	return nil, types.ErrKeyNotFound
 }

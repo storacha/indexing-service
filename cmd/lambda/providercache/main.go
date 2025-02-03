@@ -6,29 +6,32 @@ import (
 	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
 	logging "github.com/ipfs/go-log/v2"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 )
 
 var log = logging.Logger("lambda/providercache")
 
-func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher providercacher.ProviderCacher, msg events.SQSMessage) error {
-	job, err := sqsCachingDecoder.DecodeMessage(ctx, msg.Body)
-	if err != nil {
-		return err
-	}
-	_, err = providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
-	if err != nil {
-		return err
-	}
-	return nil
+func main() {
+	lambda.Start(makeHandler)
 }
 
-func makeHandler(sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher providercacher.ProviderCacher) func(ctx context.Context, sqsEvent events.SQSEvent) error {
+func makeHandler(cfg aws.Config) any {
+	var providersRedis *goredis.Client
+	if cfg.HoneycombAPIKey != "" {
+		providersRedis = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
+	} else {
+		providersRedis = goredis.NewClient(&cfg.ProvidersRedis)
+	}
+	providerStore := redis.NewProviderStore(providersRedis)
+	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
+	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
+
 	return func(ctx context.Context, sqsEvent events.SQSEvent) error {
 		// process messages in parallel
 		results := make(chan error, len(sqsEvent.Records))
@@ -62,11 +65,14 @@ func makeHandler(sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher provid
 	}
 }
 
-func main() {
-	config := aws.FromEnv(context.Background())
-	providerRedis := goredis.NewClient(&config.ProvidersRedis)
-	providerStore := redis.NewProviderStore(providerRedis)
-	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
-	sqsCachingDecoder := aws.NewSQSCachingDecoder(config.Config, config.CachingBucket)
-	lambda.Start(makeHandler(sqsCachingDecoder, providerCacher))
+func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher providercacher.ProviderCacher, msg events.SQSMessage) error {
+	job, err := sqsCachingDecoder.DecodeMessage(ctx, msg.Body)
+	if err != nil {
+		return err
+	}
+	_, err = providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
+	if err != nil {
+		return err
+	}
+	return nil
 }

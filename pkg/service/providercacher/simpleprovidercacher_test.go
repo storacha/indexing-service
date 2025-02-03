@@ -2,6 +2,7 @@ package providercacher_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/ipni/go-libipni/find/model"
@@ -147,7 +148,7 @@ type MockProviderStore struct {
 
 var _ types.ProviderStore = &MockProviderStore{}
 
-func (m *MockProviderStore) Get(ctx context.Context, hash multihash.Multihash) ([]model.ProviderResult, error) {
+func (m *MockProviderStore) Members(ctx context.Context, hash multihash.Multihash) ([]model.ProviderResult, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
@@ -158,15 +159,19 @@ func (m *MockProviderStore) Get(ctx context.Context, hash multihash.Multihash) (
 	return results, nil
 }
 
-func (m *MockProviderStore) Set(ctx context.Context, hash multihash.Multihash, providers []model.ProviderResult, expires bool) error {
-	if m.setErr != nil {
-		return m.setErr
+func (m *MockProviderStore) Add(ctx context.Context, hash multihash.Multihash, providers ...model.ProviderResult) (uint64, error) {
+	written := uint64(0)
+	for _, provider := range providers {
+		providers := m.store[hash.String()]
+		if !slices.ContainsFunc(providers, func(p model.ProviderResult) bool { return p.Equal(provider) }) {
+			m.store[hash.String()] = append(providers, provider)
+			written++
+		}
 	}
-	m.store[hash.String()] = providers
-	return nil
+	return written, nil
 }
 
 // SetExpirable implements types.ProviderStore.
 func (m *MockProviderStore) SetExpirable(ctx context.Context, key multihash.Multihash, expires bool) error {
-	panic("unimplemented")
+	return nil
 }

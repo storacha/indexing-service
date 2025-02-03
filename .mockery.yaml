@@ -1,32 +1,56 @@
 issue-845-fix: True
 resolve-type-alias: False
 with-expecter: True
-filename: 'mock_{{.InterfaceName}}.go'
-dir: 'pkg/internal/testutil/mocks'
-mockname: 'Mock{{.InterfaceName}}'
-outpkg: 'mocks'
+inpackage: True
+filename: "mock_{{.InterfaceName}}.go"
+dir: "{{.InterfaceDir}}"
+mockname: "Mock{{.InterfaceName}}"
 packages:
+  github.com/storacha/indexing-service/pkg/service/blobindexlookup:
+    interfaces:
+      BlobIndexLookup:
+  github.com/storacha/indexing-service/pkg/service/contentclaims:
+    config:
+      filename: "mock_ContentClaims{{.InterfaceName}}.go"
+      mockname: "MockContentClaims{{.InterfaceName}}"
+    interfaces:
+      Finder:
+      Service:
   github.com/storacha/indexing-service/pkg/service/providerindex:
     interfaces:
       ContentToClaimsMapper:
       LegacyClaimsFinder:
-  github.com/storacha/indexing-service/pkg/service/contentclaims:
-    interfaces:
-      Finder:
-        config:
-          filename: 'mock_ContentClaimsFinder.go'
-          mockname: MockContentClaimsFinder
+      ProviderIndex:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
       ContentClaimsCache:
       ContentClaimsStore:
       ProviderStore:
+      Service:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
     interfaces:
       QueryAPIClient:
+        config:
+          inpackage: False
+          dir: "pkg/internal/testutil/extmocks"
+          outpkg: "extmocks"
+          filename: mock_DynamoDBQueryClient.go
+          mockname: MockDynamoDBQueryClient
   github.com/ipni/go-libipni/find/client:
     interfaces:
       Finder:
+        config:
+          inpackage: False
+          dir: "pkg/internal/testutil/extmocks"
+          outpkg: "extmocks"
+          filename: mock_IpniFinder.go
+          mockname: MockIpniFinder
   github.com/storacha/ipni-publisher/pkg/publisher:
     interfaces:
       Publisher:
+        config:
+          inpackage: False
+          dir: "pkg/internal/testutil/extmocks"
+          outpkg: "extmocks"
+          filename: mock_IpniPublisher.go
+          mockname: MockIpniPublisher

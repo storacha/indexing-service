@@ -24,17 +24,26 @@ locals {
   }
 }
 
-// zip the binary, as we can use only zip files to AWS lambda
+// zip the binary along with the config file for the otel collector
 data "archive_file" "function_archive" {
   for_each = local.functions
 
   type        = "zip"
-  source_file = "${path.root}/../../build/${each.key}/bootstrap"
+  source_dir = "${path.root}/../../build/${each.key}"
   output_path = "${path.root}/../../build/${each.key}/${each.key}.zip"
 }
 
-# Define functions
+data "aws_region" "current" {}
 
+data "aws_region" "legacy_claims" {
+  provider = aws.legacy_claims
+}
+
+data "aws_region" "block_index" {
+  provider = aws.block_index
+}
+
+# Define functions
 resource "aws_lambda_function" "lambda" {
   depends_on = [ aws_cloudwatch_log_group.lambda_log_group ]
   for_each = local.functions
@@ -49,6 +58,13 @@ resource "aws_lambda_function" "lambda" {
   reserved_concurrent_executions = try(each.value.concurrency, -1)
   source_code_hash = data.archive_file.function_archive[each.key].output_base64sha256
   filename      = data.archive_file.function_archive[each.key].output_path # Path to your Lambda zip files
+  layers = [
+      "arn:aws:lambda:${data.aws_region.current.name}:901920570463:layer:aws-otel-collector-arm64-ver-0-115-0:2"
+    ]
+
+  tracing_config {
+    mode = "PassThrough"
+  }
 
   environment {
     variables = {
@@ -73,10 +89,17 @@ resource "aws_lambda_function" "lambda" {
         IPNI_STORE_BUCKET_REGIONAL_DOMAIN = aws_s3_bucket.ipni_store_bucket.bucket_regional_domain_name
         CLAIM_STORE_BUCKET_NAME = aws_s3_bucket.claim_store_bucket.bucket
         LEGACY_CLAIMS_TABLE_NAME = data.aws_dynamodb_table.legacy_claims_table.id
+        LEGACY_CLAIMS_TABLE_REGION = data.aws_region.legacy_claims.name
         LEGACY_CLAIMS_BUCKET_NAME = data.aws_s3_bucket.legacy_claims_bucket.id
         LEGACY_BLOCK_INDEX_TABLE_NAME = data.aws_dynamodb_table.legacy_block_index_table.id
+        LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
         LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
+        OTEL_PROPAGATORS = "tracecontext"
+        OTEL_SERVICE_NAME = "${terraform.workspace}-${var.app}"
+        OPENTELEMETRY_COLLECTOR_CONFIG_URI = "/var/task/otel-collector-config.yaml"
+        HONEYCOMB_OTLP_ENDPOINT = "api.honeycomb.io:443"
+        HONEYCOMB_API_KEY = "${var.honeycomb_api_key}"
     }
   }
 
@@ -144,10 +167,10 @@ data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
     ]
 
     resources = [
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["providers"].id}",
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["indexes"].id}",
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:serverlesscache:${aws_elasticache_serverless_cache.cache["claims"].id}",
-      "arn:aws:elasticache:${var.region}:${var.allowed_account_ids[0]}:user:${aws_elasticache_user.cache_iam_user.user_id}"
+      "${aws_elasticache_serverless_cache.cache["providers"].arn}",
+      "${aws_elasticache_serverless_cache.cache["indexes"].arn}",
+      "${aws_elasticache_serverless_cache.cache["claims"].arn}",
+      "${aws_elasticache_user.cache_iam_user.arn}"
     ]
   }
 }

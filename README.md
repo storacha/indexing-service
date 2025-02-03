@@ -4,11 +4,12 @@
 
 ## Table of Contents
 
-* [Overview](#overview)
-* [Installation](#installation)
-* [Deployment](#deployment)
-* [Contribute](#contribute)
-* [License](#license)
+- [Overview](#overview)
+- [Installation](#installation)
+- [Deployment](#deployment)
+- [CLI](#cli)
+- [Contribute](#contribute)
+- [License](#license)
 
 ## Overview
 
@@ -26,6 +27,9 @@ $ go install github.com/storacha/indexing-service/cmd@latest
 
 ## Deployment
 
+> [!TIP]
+> Take a look at the [infrastructure diagram](docs/infra.md) for an overview of what gets deployed.
+
 Deployment of this service to AWS is managed by terraform which you can invoke with `make`.
 
 First, install OpenTofu e.g.
@@ -33,6 +37,22 @@ First, install OpenTofu e.g.
 ```sh
 brew install opentofu
 ```
+
+or for Linux distributions that support Snap:
+
+```sh
+snap install --classic opentofu
+```
+
+for other Operating Systems see: https://opentofu.org/docs/intro/install
+
+### AWS settings
+
+The terraform configuration will fetch AWS settings (such as credentials and the region to deploy resources to) from your local AWS configuration. Although an installation of the AWS CLI is not strictly required, it can be a convenient way to manage these settings.
+
+OpenTofu will go to the same places as the AWS CLI to find settings, which means it will read environment variables such as `AWS_REGION` and `AWS_PROFILE` and the `~/.aws/config` and `~/.aws/credentials` files.
+
+Make sure you are using the correct AWS profile and region before invoking `make` targets.
 
 ### `.env`
 
@@ -62,6 +82,10 @@ This is the public URL of the peer for this deployment. e.g.
 TF_VAR_public_url='https://yourname.indexer.storacha.network'
 ```
 
+#### `TF_VAR_honeycomb_api_key`
+
+Setting this variable enables tracing for lambdas based on HTTP handlers. Currently, only Honeycomb is supported as the tracing backend. You can create a Honeycomb account and get an API key from the [Honeycomb website](https://www.honeycomb.io/).
+
 ### Deployment commands
 
 Note that these commands will call needed prerequisites -- `make apply` will essentially do all of these start to finish.
@@ -74,6 +98,8 @@ This will simply compile the lambdas locally and put then in the `build` directo
 
 You should only need to run this once -- initializes your terraform deployment and workspace. Make sure you've set `TF_WORKSPACE` first!
 
+If the `make init` fails you will need to execute `tofu init` directly from the `deploy/app` folder to install the required dependencies, and it will update the `.terraform.lock.hcl` file if needed.
+
 #### `make validate`
 
 This will validate your terraform configuration -- good to run to check errors in any changes you make to terraform configs.
@@ -85,6 +111,23 @@ This will plan a deployment, but not execute it -- useful to see ahead what chan
 #### `make apply`
 
 The big kahuna! This will deploy all of your changes, including redeploying lambdas if any of code changes.
+
+## CLI
+
+The command line interface can be used to query an indexer node. You'll need to compile the binary first:
+
+```sh
+make indexer
+```
+
+#### `./indexer query <CID>`
+Attempts to find the given CID in the Indexer node. The result can be multiple Location Claims, as there may be several storage nodes that store copies of the content, as well as potential indexes and the indexes themselves. If you want to query a specific node, you can use the following command:
+
+```sh
+./indexer query -u https://<INDEXING_SERVICE_URL> <CID>
+```
+
+If you don't specify a node it will query the Storacha Production node at https://indexer.storacha.network .
 
 ## Releasing a new version
 

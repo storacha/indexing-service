@@ -2,12 +2,9 @@ package providercacher
 
 import (
 	"context"
-	"errors"
-	"slices"
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/providerresults"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -23,21 +20,16 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 	written := uint64(0)
 	for _, shardIndex := range index.Shards().Iterator() {
 		for hash := range shardIndex.Iterator() {
-			existing, err := s.providerStore.Get(ctx, hash)
-			if err != nil && !errors.Is(err, types.ErrKeyNotFound) {
+			n, err := s.providerStore.Add(ctx, hash, provider)
+			written += n
+			if err != nil {
 				return written, err
 			}
-
-			inList := slices.ContainsFunc(existing, func(matchProvider model.ProviderResult) bool {
-				return providerresults.Equals(provider, matchProvider)
-			})
-			if !inList {
-				newResults := append(existing, provider)
-				err = s.providerStore.Set(ctx, hash, newResults, true)
+			if n > 0 {
+				err = s.providerStore.SetExpirable(ctx, hash, true)
 				if err != nil {
 					return written, err
 				}
-				written++
 			}
 		}
 	}
