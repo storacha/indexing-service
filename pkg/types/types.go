@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
@@ -84,8 +85,45 @@ type Match struct {
 	Subject []did.DID
 }
 
+// QueryType allows defining which claims a query is targeting. QueryTypeStandard targets all claims,
+// i.e. Location, Index and Equals
+type QueryType int
+
+const (
+	QueryTypeStandard QueryType = iota
+	QueryTypeLocation
+	QueryTypeIndexOrLocation
+)
+
+func (qt QueryType) String() string {
+	switch qt {
+	case QueryTypeStandard:
+		return "standard"
+	case QueryTypeLocation:
+		return "location"
+	case QueryTypeIndexOrLocation:
+		return "index_or_location"
+	default:
+		return "invalid"
+	}
+}
+
+func ParseQueryType(queryTypeStr string) (QueryType, error) {
+	switch queryTypeStr {
+	case QueryTypeStandard.String():
+		return QueryTypeStandard, nil
+	case QueryTypeLocation.String():
+		return QueryTypeLocation, nil
+	case QueryTypeIndexOrLocation.String():
+		return QueryTypeIndexOrLocation, nil
+	default:
+		return 0, fmt.Errorf("invalid query type: %s", queryTypeStr)
+	}
+}
+
 // Query is a query for several multihashes
 type Query struct {
+	Type   QueryType
 	Hashes []mh.Multihash
 	Match  Match
 }

@@ -60,29 +60,23 @@ type job struct {
 	mh                  multihash.Multihash
 	indexForMh          *multihash.Multihash
 	indexProviderRecord *model.ProviderResult
-	jobType             jobType
+	queryType           types.QueryType
 }
 
 type jobKey string
 
 func (j job) key() jobKey {
-	k := jobKey(j.mh) + jobKey(j.jobType)
+	k := jobKey(j.mh) + jobKey(j.queryType.String())
 	if j.indexForMh != nil {
 		k += jobKey(*j.indexForMh)
 	}
 	return k
 }
 
-type jobType string
-
-const standardJobType jobType = "standard"
-const locationJobType jobType = "location"
-const indexOrLocationJobType jobType = "index_or_location"
-
-var targetClaims = map[jobType][]multicodec.Code{
-	standardJobType:        {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
-	locationJobType:        {metadata.LocationCommitmentID},
-	indexOrLocationJobType: {metadata.IndexClaimID, metadata.LocationCommitmentID},
+var targetClaims = map[types.QueryType][]multicodec.Code{
+	types.QueryTypeStandard:        {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+	types.QueryTypeLocation:        {metadata.LocationCommitmentID},
+	types.QueryTypeIndexOrLocation: {metadata.IndexClaimID, metadata.LocationCommitmentID},
 }
 
 type queryResult struct {
@@ -113,7 +107,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 	results, err := is.providerIndex.Find(mhCtx, providerindex.QueryKey{
 		Hash:         j.mh,
 		Spaces:       state.Access().q.Match.Subject,
-		TargetClaims: targetClaims[j.jobType],
+		TargetClaims: targetClaims[j.queryType],
 	})
 	if err != nil {
 		return err
@@ -162,19 +156,19 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 				// we follow with a query for location claim on the OTHER side of the multihash
 				if string(typedProtocol.Equals.Hash()) != string(j.mh) {
 					// lookup was the content hash, queue the equals hash
-					if err := spawn(job{typedProtocol.Equals.Hash(), nil, nil, locationJobType}); err != nil {
+					if err := spawn(job{typedProtocol.Equals.Hash(), nil, nil, types.QueryTypeLocation}); err != nil {
 						return err
 					}
 				} else {
 					// lookup was the equals hash, queue the content hash
-					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, locationJobType}); err != nil {
+					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, types.QueryTypeLocation}); err != nil {
 						return err
 					}
 				}
 			case *metadata.IndexClaimMetadata:
 				// for an index claim, we follow by looking for a location claim for the index, and fetching the index
 				mh := j.mh
-				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, indexOrLocationJobType}); err != nil {
+				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, types.QueryTypeIndexOrLocation}); err != nil {
 					return err
 				}
 			case *metadata.LocationCommitmentMetadata:
@@ -208,7 +202,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					shards := index.Shards().Iterator()
 					for shard, index := range shards {
 						if index.Has(*j.indexForMh) {
-							if err := spawn(job{shard, nil, nil, indexOrLocationJobType}); err != nil {
+							if err := spawn(job{shard, nil, nil, types.QueryTypeIndexOrLocation}); err != nil {
 								return err
 							}
 						}
@@ -230,7 +224,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.QueryResult, error) {
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
-		initialJobs = append(initialJobs, job{mh, nil, nil, standardJobType})
+		initialJobs = append(initialJobs, job{mh, nil, nil, q.Type})
 	}
 	qs, err := is.jobWalker(ctx, initialJobs, queryState{
 		q: &q,

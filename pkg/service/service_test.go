@@ -122,6 +122,68 @@ func TestQuery(t *testing.T) {
 		require.ElementsMatch(t, expectedResult.Indexes(), result.Indexes())
 	})
 
+	t.Run("targets the right claims depending on query type", func(t *testing.T) {
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+
+		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer()}, mockProviderIndex)
+
+		contentHash := testutil.RandomMultihash()
+		ctx := context.Background()
+
+		t.Run("standard query: location, index and equals", func(t *testing.T) {
+			query := types.Query{
+				Type:   types.QueryTypeStandard,
+				Hashes: []mh.Multihash{contentHash},
+			}
+
+			expectedQueryKey := providerindex.QueryKey{
+				Hash:         contentHash,
+				TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+			}
+
+			mockProviderIndex.EXPECT().Find(ctx, expectedQueryKey).Return([]model.ProviderResult{}, nil)
+
+			_, err := service.Query(ctx, query)
+			require.NoError(t, err)
+		})
+
+		t.Run("location query: location only", func(t *testing.T) {
+			query := types.Query{
+				Type:   types.QueryTypeLocation,
+				Hashes: []mh.Multihash{contentHash},
+			}
+
+			expectedQueryKey := providerindex.QueryKey{
+				Hash:         contentHash,
+				TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+			}
+
+			mockProviderIndex.EXPECT().Find(ctx, expectedQueryKey).Return([]model.ProviderResult{}, nil)
+
+			_, err := service.Query(ctx, query)
+			require.NoError(t, err)
+		})
+
+		t.Run("index_or_location query: location and index", func(t *testing.T) {
+			query := types.Query{
+				Type:   types.QueryTypeIndexOrLocation,
+				Hashes: []mh.Multihash{contentHash},
+			}
+
+			expectedQueryKey := providerindex.QueryKey{
+				Hash:         contentHash,
+				TargetClaims: []multicodec.Code{metadata.IndexClaimID, metadata.LocationCommitmentID},
+			}
+
+			mockProviderIndex.EXPECT().Find(ctx, expectedQueryKey).Return([]model.ProviderResult{}, nil)
+
+			_, err := service.Query(ctx, query)
+			require.NoError(t, err)
+		})
+	})
+
 	t.Run("returns error when ProviderIndex service errors", func(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
