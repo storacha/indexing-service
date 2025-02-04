@@ -22,11 +22,9 @@ func main() {
 }
 
 func makeHandler(cfg aws.Config) any {
-	var providersRedis *goredis.Client
+	providersRedis := goredis.NewClient(&cfg.ProvidersRedis)
 	if cfg.HoneycombAPIKey != "" {
-		providersRedis = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
-	} else {
-		providersRedis = goredis.NewClient(&cfg.ProvidersRedis)
+		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
 	}
 	providerStore := redis.NewProviderStore(providersRedis)
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)

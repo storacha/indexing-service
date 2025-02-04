@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -164,20 +163,17 @@ func FromEnv(ctx context.Context) Config {
 
 // Construct constructs types.Service from AWS deps for Lamda functions
 func Construct(cfg Config) (types.Service, error) {
-	var httpClient *http.Client
-	var providersClient, claimsClient, indexesClient *redis.Client
+	httpClient := construct.DefaultHTTPClient()
+	providersClient := redis.NewClient(&cfg.ProvidersRedis)
+	claimsClient := redis.NewClient(&cfg.ClaimsRedis)
+	indexesClient := redis.NewClient(&cfg.IndexesRedis)
 
 	// instrument HTTP and redis clients if telemetry is enabled
 	if cfg.HoneycombAPIKey != "" {
-		httpClient = telemetry.GetInstrumentedHTTPClient()
-		providersClient = telemetry.GetInstrumentedRedisClient(&cfg.ProvidersRedis)
-		claimsClient = telemetry.GetInstrumentedRedisClient(&cfg.ClaimsRedis)
-		indexesClient = telemetry.GetInstrumentedRedisClient(&cfg.IndexesRedis)
-	} else {
-		httpClient = construct.DefaultHTTPClient()
-		providersClient = redis.NewClient(&cfg.ProvidersRedis)
-		claimsClient = redis.NewClient(&cfg.ClaimsRedis)
-		indexesClient = redis.NewClient(&cfg.IndexesRedis)
+		httpClient = telemetry.InstrumentHTTPClient(construct.DefaultHTTPClient())
+		providersClient = telemetry.InstrumentRedisClient(providersClient)
+		claimsClient = telemetry.InstrumentRedisClient(claimsClient)
+		indexesClient = telemetry.InstrumentRedisClient(indexesClient)
 	}
 
 	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)

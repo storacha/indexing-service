@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
-	"github.com/storacha/indexing-service/pkg/construct"
 	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
@@ -58,7 +57,7 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context)
 	return shutdownFunc, nil
 }
 
-func GetInstrumentedLambdaHandler(handlerFunc interface{}) interface{} {
+func InstrumentLambdaHandler(handlerFunc interface{}) interface{} {
 	tp := otel.GetTracerProvider()
 	asFlusher := tp.(otellambda.Flusher)
 
@@ -69,16 +68,14 @@ func GetInstrumentedLambdaHandler(handlerFunc interface{}) interface{} {
 	)
 }
 
-func GetInstrumentedHTTPClient() *http.Client {
-	httpClient := construct.DefaultHTTPClient()
-	instrumentedTransport := otelhttp.NewTransport(httpClient.Transport)
-	httpClient.Transport = instrumentedTransport
+func InstrumentHTTPClient(client *http.Client) *http.Client {
+	instrumentedTransport := otelhttp.NewTransport(client.Transport)
+	client.Transport = instrumentedTransport
 
-	return httpClient
+	return client
 }
 
-func GetInstrumentedRedisClient(opts *redis.Options) *redis.Client {
-	client := redis.NewClient(opts)
+func InstrumentRedisClient(client *redis.Client) *redis.Client {
 	redisotel.InstrumentTracing(client)
 	return client
 }
