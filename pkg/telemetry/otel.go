@@ -13,8 +13,10 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/sdk/trace"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // SetupTelemetry configures the OpenTelemetry SDK by setting up a global tracer provider.
@@ -35,9 +37,9 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context)
 		return nil, err
 	}
 
-	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exp),
-		trace.WithResource(resource),
+	tp := tracesdk.NewTracerProvider(
+		tracesdk.WithBatcher(exp),
+		tracesdk.WithResource(resource),
 	)
 
 	shutdownFunc := func(ctx context.Context) {
@@ -78,4 +80,14 @@ func InstrumentHTTPClient(client *http.Client) *http.Client {
 func InstrumentRedisClient(client *redis.Client) *redis.Client {
 	redisotel.InstrumentTracing(client)
 	return client
+}
+
+func StartSpan(ctx context.Context, name string) (context.Context, trace.Span) {
+	t := otel.Tracer("")
+	return t.Start(ctx, name)
+}
+
+func Error(span trace.Span, err error, msg string) {
+	span.SetStatus(codes.Error, msg)
+	span.RecordError(err)
 }
