@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -115,14 +116,18 @@ func FromEnv(ctx context.Context) Config {
 
 	ipniPublisherAnnounceAddress := fmt.Sprintf("/dns/%s/https", mustGetEnv("IPNI_STORE_BUCKET_REGIONAL_DOMAIN"))
 
-	principalMapping := presets.PrincipalMapping
+	var principalMapping map[string]string
 	if os.Getenv("PRINCIPAL_MAPPING") != "" {
+		principalMapping = map[string]string{}
+		maps.Copy(principalMapping, presets.PrincipalMapping)
 		var pm map[string]string
 		err := json.Unmarshal([]byte(os.Getenv("PRINCIPAL_MAPPING")), &pm)
 		if err != nil {
 			panic(fmt.Errorf("parsing principal mapping: %w", err))
 		}
-		principalMapping = pm
+		maps.Copy(principalMapping, pm)
+	} else {
+		principalMapping = presets.PrincipalMapping
 	}
 
 	return Config{
