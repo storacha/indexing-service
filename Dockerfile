@@ -1,4 +1,4 @@
-FROM golang:1.23-bullseye as build
+FROM golang:1.23-bullseye AS build
 
 WORKDIR /go/src/indexing-service
 
