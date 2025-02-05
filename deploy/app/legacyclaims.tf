@@ -37,6 +37,7 @@ locals {
 }
 
 data "aws_s3_bucket" "legacy_claims_bucket" {
+  provider = aws.legacy_claims
   bucket = local.inferred_legacy_claims_bucket_name
 }
 
