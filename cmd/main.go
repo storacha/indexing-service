@@ -12,8 +12,8 @@ import (
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
 	ucanserver "github.com/storacha/go-ucanto/server"
-	"github.com/storacha/indexing-service/cmd/config"
 	"github.com/storacha/indexing-service/pkg/construct"
+	"github.com/storacha/indexing-service/pkg/presets"
 	"github.com/storacha/indexing-service/pkg/principalresolver"
 	"github.com/storacha/indexing-service/pkg/server"
 	"github.com/urfave/cli/v2"
@@ -120,7 +120,7 @@ func main() {
 
 							opts = append(opts, server.WithIdentity(id))
 
-							presolv, err := principalresolver.New(config.PrincipalMapping)
+							presolv, err := principalresolver.New(presets.PrincipalMapping)
 							if err != nil {
 								return fmt.Errorf("creating principal resolver: %w", err)
 							}

@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,6 +25,7 @@ import (
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/indexing-service/pkg/construct"
+	"github.com/storacha/indexing-service/pkg/presets"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/legacy"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
@@ -64,6 +66,7 @@ type Config struct {
 	LegacyBlockIndexTableRegion string
 	LegacyDataBucketURL         string
 	HoneycombAPIKey             string
+	PrincipalMapping            map[string]string
 	principal.Signer
 }
 
@@ -112,6 +115,16 @@ func FromEnv(ctx context.Context) Config {
 
 	ipniPublisherAnnounceAddress := fmt.Sprintf("/dns/%s/https", mustGetEnv("IPNI_STORE_BUCKET_REGIONAL_DOMAIN"))
 
+	principalMapping := presets.PrincipalMapping
+	if os.Getenv("PRINCIPAL_MAPPING") != "" {
+		var pm map[string]string
+		err := json.Unmarshal([]byte(os.Getenv("PRINCIPAL_MAPPING")), &pm)
+		if err != nil {
+			panic(fmt.Errorf("parsing principal mapping: %w", err))
+		}
+		principalMapping = pm
+	}
+
 	return Config{
 		Config: awsConfig,
 		Signer: id,
@@ -159,6 +172,7 @@ func FromEnv(ctx context.Context) Config {
 		LegacyBlockIndexTableRegion: mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
 		LegacyDataBucketURL:         mustGetEnv("LEGACY_DATA_BUCKET_URL"),
 		HoneycombAPIKey:             os.Getenv("HONEYCOMB_API_KEY"),
+		PrincipalMapping:            principalMapping,
 	}
 }
 
