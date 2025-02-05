@@ -334,10 +334,25 @@ func (m *MockRedis) SMembers(ctx context.Context, key string) *goredis.StringSli
 	}
 	val, ok := m.data[key]
 	if !ok {
-		cmd.SetErr(goredis.Nil)
+		cmd.SetVal([]string{})
 	} else {
 		values := slices.Collect(maps.Keys(val.data))
 		cmd.SetVal(values)
 	}
+	return cmd
+}
+
+// Exists implements redis.RedisClient.
+func (m *MockRedis) Exists(ctx context.Context, keys ...string) *goredis.IntCmd {
+	cmd := goredis.NewIntCmd(ctx, nil)
+
+	numExisting := int64(0)
+	for _, key := range keys {
+		if _, ok := m.data[key]; ok {
+			numExisting++
+		}
+	}
+	cmd.SetVal(numExisting)
+
 	return cmd
 }
