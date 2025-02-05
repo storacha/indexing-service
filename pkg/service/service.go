@@ -34,7 +34,9 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -91,6 +93,9 @@ type queryState struct {
 }
 
 func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(job) error, state jobwalker.WrappedState[queryState]) error {
+	mhCtx, s := telemetry.StartSpan(mhCtx, "IndexingService.jobHandler")
+	defer s.End()
+	s.SetAttributes(attribute.String("multihash", digestutil.Format(j.mh)))
 
 	// check if node has already been visited and ignore if that is the case
 	if !state.CmpSwap(func(qs queryState) bool {
@@ -104,21 +109,27 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 	}
 
 	// find provider records related to this multihash
+	s.AddEvent("finding relevant ProviderResults")
 	results, err := is.providerIndex.Find(mhCtx, providerindex.QueryKey{
 		Hash:         j.mh,
 		Spaces:       state.Access().q.Match.Subject,
 		TargetClaims: targetClaims[j.queryType],
 	})
 	if err != nil {
+		telemetry.Error(s, err, "finding ProviderResults")
 		return err
 	}
+
+	s.AddEvent(fmt.Sprintf("processing %d results", len(results)))
 	for _, result := range results {
 		// unmarshall metadata for this provider
 		md := metadata.MetadataContext.New()
 		err = md.UnmarshalBinary(result.Metadata)
 		if err != nil {
+			telemetry.Error(s, err, "unmarshaling metadata")
 			return err
 		}
+
 		// the provider may list one or more protocols for this CID
 		// in our case, the protocols are just differnt types of content claims
 		for _, code := range md.Protocols() {
@@ -128,14 +139,19 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			if !ok {
 				continue
 			}
+
 			// fetch (from cache or url) the actual content claim
 			claimCid := hasClaimCid.GetClaim()
 			url, err := fetchClaimURL(*result.Provider, claimCid)
 			if err != nil {
+				telemetry.Error(s, err, "building claim URL")
 				return err
 			}
+
+			s.AddEvent("fetching claims")
 			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, url)
 			if err != nil {
+				telemetry.Error(s, err, "fetching claims")
 				return err
 			}
 			// add the fetched claim to the results, if we don't already have it
@@ -152,26 +168,35 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			// handle each type of protocol
 			switch typedProtocol := protocol.(type) {
 			case *metadata.EqualsClaimMetadata:
+				s.AddEvent("processing equals claim")
+
 				// for an equals claim, it's published on both the content and equals multihashes
 				// we follow with a query for location claim on the OTHER side of the multihash
 				if string(typedProtocol.Equals.Hash()) != string(j.mh) {
 					// lookup was the content hash, queue the equals hash
 					if err := spawn(job{typedProtocol.Equals.Hash(), nil, nil, types.QueryTypeLocation}); err != nil {
+						telemetry.Error(s, err, "queing job for equals hash")
 						return err
 					}
 				} else {
 					// lookup was the equals hash, queue the content hash
 					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, types.QueryTypeLocation}); err != nil {
+						telemetry.Error(s, err, "queuing job for content hash")
 						return err
 					}
 				}
 			case *metadata.IndexClaimMetadata:
+				s.AddEvent("processing index claim")
+
 				// for an index claim, we follow by looking for a location claim for the index, and fetching the index
 				mh := j.mh
 				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, types.QueryTypeIndexOrLocation}); err != nil {
+					telemetry.Error(s, err, "queuing job for the index's location claim")
 					return err
 				}
 			case *metadata.LocationCommitmentMetadata:
+				s.AddEvent("processing location claim")
+
 				// for a location claim, we just store it, unless its for an index CID, in which case get the full idnex
 				if j.indexForMh != nil {
 					// fetch (from URL or cache) the full index
@@ -182,12 +207,17 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					}
 					url, err := fetchRetrievalURL(*result.Provider, *shard)
 					if err != nil {
+						telemetry.Error(s, err, "fetching index retrieval URL")
 						return err
 					}
+
+					s.AddEvent("fetching index")
 					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
 					if err != nil {
+						telemetry.Error(s, err, "fetching index blob")
 						return err
 					}
+
 					// Add the index to the query results, if we don't already have it
 					state.CmpSwap(
 						func(qs queryState) bool {
@@ -199,10 +229,12 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 						})
 
 					// add location queries for all shards containing the original CID we're seeing an index for
+					s.AddEvent("adding location queries for indexed shards")
 					shards := index.Shards().Iterator()
 					for shard, index := range shards {
 						if index.Has(*j.indexForMh) {
 							if err := spawn(job{shard, nil, nil, types.QueryTypeIndexOrLocation}); err != nil {
+								telemetry.Error(s, err, "queuing location job for shard")
 								return err
 							}
 						}
@@ -222,6 +254,9 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 // 5. Read the requisite claims from the ClaimLookup
 // 6. Return all discovered claims and sharded dag indexes
 func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.QueryResult, error) {
+	ctx, s := telemetry.StartSpan(ctx, "IndexingService.Query")
+	defer s.End()
+
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
 		initialJobs = append(initialJobs, job{mh, nil, nil, q.Type})
