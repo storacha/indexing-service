@@ -36,13 +36,14 @@ locals {
     inferred_legacy_block_index_table_name = var.legacy_block_index_table_name != "" ? var.legacy_block_index_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
 }
 
-data "aws_s3_bucket" "legacy_claims_bucket" {
-  bucket = local.inferred_legacy_claims_bucket_name
-}
-
 provider "aws" {
   alias = "legacy_claims"
   region = local.inferred_legacy_claims_table_region
+}
+
+data "aws_s3_bucket" "legacy_claims_bucket" {
+  provider = aws.legacy_claims
+  bucket = local.inferred_legacy_claims_bucket_name
 }
 
 data "aws_dynamodb_table" "legacy_claims_table" {
