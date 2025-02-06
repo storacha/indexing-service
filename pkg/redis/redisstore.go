@@ -91,14 +91,19 @@ func (rs *Store[Key, Value]) SetExpirable(ctx context.Context, key Key, expires 
 }
 
 // Members returns all deserialized set values from redis.
+// If the key does not exist, it returns ErrKeyNotFound.
 func (rs *Store[Key, Value]) Members(ctx context.Context, key Key) ([]Value, error) {
 	data, err := rs.client.SMembers(ctx, rs.keyString(key)).Result()
 	if err != nil {
-		if err == redis.Nil {
-			return nil, types.ErrKeyNotFound
-		}
 		return nil, fmt.Errorf("getting set members: %w", err)
 	}
+
+	// as opposed to other commands, SMembers doesn't return redis.Nil when the key doesn't exist, but an empty set
+	// this implementation assumes there is no need to differentiate between a non-existing key and an empty set
+	if len(data) == 0 {
+		return nil, types.ErrKeyNotFound
+	}
+
 	var values []Value
 	for _, d := range data {
 		v, err := rs.fromRedis(d)
