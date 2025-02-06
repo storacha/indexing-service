@@ -20,7 +20,6 @@ type Client interface {
 	SMembers(ctx context.Context, key string) *redis.StringSliceCmd
 	Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd
 	Persist(ctx context.Context, key string) *redis.BoolCmd
-	Exists(ctx context.Context, keys ...string) *redis.IntCmd
 }
 
 // Store wraps the go redis client to implement our general purpose cache interface,
@@ -100,16 +99,9 @@ func (rs *Store[Key, Value]) Members(ctx context.Context, key Key) ([]Value, err
 	}
 
 	// as opposed to other commands, SMembers doesn't return redis.Nil when the key doesn't exist, but an empty set
-	// we need to check if the key exists explicitly
+	// this implementation assumes there is no need to differentiate between a non-existing key and an empty set
 	if len(data) == 0 {
-		exists, err := rs.client.Exists(ctx, rs.keyString(key)).Result()
-		if err != nil {
-			return nil, fmt.Errorf("checking if key exists: %w", err)
-		}
-
-		if exists == 0 {
-			return nil, types.ErrKeyNotFound
-		}
+		return nil, types.ErrKeyNotFound
 	}
 
 	var values []Value
