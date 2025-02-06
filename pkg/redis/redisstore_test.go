@@ -334,7 +334,8 @@ func (m *MockRedis) SMembers(ctx context.Context, key string) *goredis.StringSli
 	}
 	val, ok := m.data[key]
 	if !ok {
-		cmd.SetErr(goredis.Nil)
+		// SMembers returns an empty set for non-existing keys
+		cmd.SetVal([]string{})
 	} else {
 		values := slices.Collect(maps.Keys(val.data))
 		cmd.SetVal(values)

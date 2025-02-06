@@ -5,7 +5,6 @@ import (
 
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	ucanserver "github.com/storacha/go-ucanto/server"
-	idxconf "github.com/storacha/indexing-service/cmd/config"
 	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/principalresolver"
@@ -22,7 +21,7 @@ func makeHandler(cfg aws.Config) any {
 		panic(err)
 	}
 
-	presolv, err := principalresolver.New(idxconf.PrincipalMapping)
+	presolv, err := principalresolver.New(cfg.PrincipalMapping)
 	if err != nil {
 		panic(fmt.Errorf("creating principal resolver: %w", err))
 	}
