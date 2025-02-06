@@ -26,11 +26,9 @@ func TestGetProviderResults(t *testing.T) {
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomProviderResult()
 
-		ctx := context.Background()
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return([]model.ProviderResult{expectedResult}, nil)
 
-		mockStore.EXPECT().Members(ctx, someHash).Return([]model.ProviderResult{expectedResult}, nil)
-
-		results, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{0})
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
 		require.NoError(t, err)
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
@@ -55,14 +53,12 @@ func TestGetProviderResults(t *testing.T) {
 			},
 		}
 
-		ctx := context.Background()
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniFinderResponse, nil)
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
 
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
-		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(ipniFinderResponse, nil)
-		mockStore.EXPECT().Add(ctx, someHash, expectedResult).Return(1, nil)
-		mockStore.EXPECT().SetExpirable(ctx, someHash, true).Return(nil)
-
-		results, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID})
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{metadata.LocationCommitmentID})
 
 		require.NoError(t, err)
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
@@ -79,15 +75,13 @@ func TestGetProviderResults(t *testing.T) {
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 
-		ctx := context.Background()
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
 
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
-		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(&model.FindResponse{}, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
-		mockStore.EXPECT().Add(ctx, someHash, expectedResult).Return(1, nil)
-		mockStore.EXPECT().SetExpirable(ctx, someHash, true).Return(nil)
-
-		results, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID})
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{metadata.LocationCommitmentID})
 
 		require.NoError(t, err)
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
@@ -113,15 +107,13 @@ func TestGetProviderResults(t *testing.T) {
 		}
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 
-		ctx := context.Background()
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniFinderResponse, nil)
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
 
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
-		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(ipniFinderResponse, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
-		mockStore.EXPECT().Add(ctx, someHash, expectedResult).Return(1, nil)
-		mockStore.EXPECT().SetExpirable(ctx, someHash, true).Return(nil)
-
-		results, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID})
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{metadata.LocationCommitmentID})
 
 		require.NoError(t, err)
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
@@ -137,13 +129,11 @@ func TestGetProviderResults(t *testing.T) {
 
 		someHash := testutil.RandomMultihash()
 
-		ctx := context.Background()
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{0}).Return([]model.ProviderResult{}, nil)
 
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
-		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(&model.FindResponse{}, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{0}).Return([]model.ProviderResult{}, nil)
-
-		results, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{0})
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
 		require.NoError(t, err)
 		require.Empty(t, results)
@@ -159,10 +149,9 @@ func TestGetProviderResults(t *testing.T) {
 
 		someHash := testutil.RandomMultihash()
 
-		ctx := context.Background()
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, errors.New("some error"))
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, errors.New("some error"))
 
-		_, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{0})
+		_, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
 		require.Error(t, err)
 	})
@@ -177,11 +166,10 @@ func TestGetProviderResults(t *testing.T) {
 
 		someHash := testutil.RandomMultihash()
 
-		ctx := context.Background()
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
-		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(nil, errors.New("some error"))
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(nil, errors.New("some error"))
 
-		_, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{0})
+		_, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
 		require.Error(t, err)
 	})
@@ -196,12 +184,11 @@ func TestGetProviderResults(t *testing.T) {
 
 		someHash := testutil.RandomMultihash()
 
-		ctx := context.Background()
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
-		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(&model.FindResponse{}, nil)
-		mockLegacyClaims.EXPECT().Find(ctx, someHash, []multicodec.Code{0}).Return(nil, errors.New("some error"))
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{0}).Return(nil, errors.New("some error"))
 
-		_, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{0})
+		_, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
 		require.Error(t, err)
 	})
@@ -225,12 +212,11 @@ func TestGetProviderResults(t *testing.T) {
 			},
 		}
 
-		ctx := context.Background()
-		mockStore.EXPECT().Members(ctx, someHash).Return(nil, types.ErrKeyNotFound)
-		mockIpniFinder.EXPECT().Find(ctx, someHash).Return(ipniFinderResponse, nil)
-		mockStore.EXPECT().Add(ctx, someHash, expectedResult).Return(0, errors.New("some error"))
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniFinderResponse, nil)
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(0, errors.New("some error"))
 
-		_, err := providerIndex.getProviderResults(ctx, someHash, []multicodec.Code{metadata.LocationCommitmentID})
+		_, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{metadata.LocationCommitmentID})
 
 		require.Error(t, err)
 	})
