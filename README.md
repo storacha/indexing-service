@@ -86,6 +86,14 @@ TF_VAR_public_url='https://yourname.indexer.storacha.network'
 
 Setting this variable enables tracing for lambdas based on HTTP handlers. Currently, only Honeycomb is supported as the tracing backend. You can create a Honeycomb account and get an API key from the [Honeycomb website](https://www.honeycomb.io/).
 
+#### `TF_VAR_principal_mapping`
+
+Optional. JSON encoded mapping of did:web to did:key. e.g.
+
+```sh
+TF_VAR_principal_mapping={"did:web:example.com":"did:key:z6MktkCXwNmpqejQxYd7JHPcw7d4Srjct7sX74VLfKqsPyAw"}
+```
+
 ### Deployment commands
 
 Note that these commands will call needed prerequisites -- `make apply` will essentially do all of these start to finish.

@@ -25,3 +25,9 @@ variable "honeycomb_api_key" {
   type = string
   default = ""
 }
+
+variable "principal_mapping" {
+  type        = string
+  description = "JSON encoded mapping of did:web to did:key"
+  default     = ""
+}
