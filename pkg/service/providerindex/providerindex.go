@@ -17,6 +17,7 @@ import (
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/publisher"
 )
@@ -58,32 +59,47 @@ func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publishe
 //     encodedcontextid's by hashing space DID and Hash, and filter for a matching context id
 //     Future TODO: kick off a conversion task to update the records
 func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.ProviderResult, error) {
+	ctx, s := telemetry.StartSpan(ctx, "ProviderIndexService.Find")
+	defer s.End()
+
+	s.AddEvent("finding ProviderResults")
 	results, err := pi.getProviderResults(ctx, qk.Hash, qk.TargetClaims)
 	if err != nil {
+		telemetry.Error(s, err, "finding ProviderResults")
 		return nil, err
 	}
 
+	s.AddEvent("filtering results by space")
 	return filterBySpace(results, qk.Hash, qk.Spaces)
 }
 
 func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
+	ctx, s := telemetry.StartSpan(ctx, "ProviderIndexService.getProviderResults")
+	defer s.End()
+
+	s.AddEvent("searching in cache")
 	res, err := pi.providerStore.Members(ctx, mh)
 	if err == nil {
 		return res, nil
 	}
 	if err != types.ErrKeyNotFound {
+		telemetry.Error(s, err, "fetching from cache")
 		return nil, err
 	}
 
+	s.AddEvent("fetching from IPNI")
 	results, err := pi.fetchFromIPNI(ctx, mh, targetClaims)
 	if err != nil {
+		telemetry.Error(s, err, "fetching from IPNI")
 		return nil, err
 	}
 
 	// if nothing was found on IPNI, try legacy claims storage
+	s.AddEvent("fetching from legacy services")
 	if len(results) == 0 {
 		legacyResults, err := pi.legacyClaims.Find(ctx, mh, targetClaims)
 		if err != nil {
+			telemetry.Error(s, err, "fetching from legacy services")
 			return nil, err
 		}
 
@@ -92,12 +108,15 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 
 	// cache results if there are results to cache
 	if len(results) > 0 {
+		s.AddEvent("caching results")
 		n, err := pi.providerStore.Add(ctx, mh, results...)
 		if err != nil {
+			telemetry.Error(s, err, "caching results")
 			return nil, err
 		}
 		if n > 0 {
 			if err := pi.providerStore.SetExpirable(ctx, mh, true); err != nil {
+				telemetry.Error(s, err, "setting cache entry expiration")
 				return nil, err
 			}
 		}

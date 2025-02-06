@@ -32,7 +32,6 @@ func TestFind(t *testing.T) {
 		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
-		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
 
 		partitionClaim := cassert.Partition.New(testutil.Service.DID().String(), cassert.PartitionCaveats{
@@ -47,12 +46,12 @@ func TestFind(t *testing.T) {
 		indexDelegation := testutil.RandomIndexDelegation()
 		indexDelegationCid := link.ToCID(testutil.RandomCID())
 
-		mockMapper.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{partitionDelegationCid, locationDelegationCid, indexDelegationCid}, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: partitionDelegationCid}, &url.URL{}).Return(partitionDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
+		mockMapper.EXPECT().GetClaims(testutil.AnyContext, contentHash).Return([]cid.Cid{partitionDelegationCid, locationDelegationCid, indexDelegationCid}, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: partitionDelegationCid}, &url.URL{}).Return(partitionDelegation, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
 
-		results, err := legacyClaims.Find(ctx, contentHash, allTargetClaims)
+		results, err := legacyClaims.Find(context.Background(), contentHash, allTargetClaims)
 
 		require.NoError(t, err)
 		require.Len(t, results, 2)
@@ -64,7 +63,6 @@ func TestFind(t *testing.T) {
 		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper1, mockMapper2}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
-		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
 
 		locationDelegation := testutil.RandomLocationDelegation()
@@ -74,12 +72,12 @@ func TestFind(t *testing.T) {
 		equalsDelegation := testutil.RandomEqualsDelegation()
 		equalsDelegationCid := link.ToCID(testutil.RandomCID())
 
-		mockMapper1.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid, equalsDelegationCid}, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: equalsDelegationCid}, &url.URL{}).Return(equalsDelegation, nil)
+		mockMapper1.EXPECT().GetClaims(testutil.AnyContext, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid, equalsDelegationCid}, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: equalsDelegationCid}, &url.URL{}).Return(equalsDelegation, nil)
 
-		results, err := legacyClaims.Find(ctx, contentHash, []multicodec.Code{metadata.LocationCommitmentID})
+		results, err := legacyClaims.Find(context.Background(), contentHash, []multicodec.Code{metadata.LocationCommitmentID})
 
 		require.NoError(t, err)
 		require.Len(t, results, 1)
@@ -91,7 +89,6 @@ func TestFind(t *testing.T) {
 		mockStore := contentclaims.NewMockContentClaimsFinder(t)
 		legacyClaims := testutil.Must(NewLegacyClaimsStore([]ContentToClaimsMapper{mockMapper1, mockMapper2}, mockStore, "https://storacha.network/claims/{claim}"))(t)
 
-		ctx := context.Background()
 		contentHash := testutil.RandomMultihash()
 
 		locationDelegation := testutil.RandomLocationDelegation()
@@ -102,15 +99,15 @@ func TestFind(t *testing.T) {
 		equalsDelegationCid := link.ToCID(testutil.RandomCID())
 
 		// mapper1 returns an equals claim, but we are looking for location and index
-		mockMapper1.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{equalsDelegationCid}, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: equalsDelegationCid}, &url.URL{}).Return(equalsDelegation, nil)
+		mockMapper1.EXPECT().GetClaims(testutil.AnyContext, contentHash).Return([]cid.Cid{equalsDelegationCid}, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: equalsDelegationCid}, &url.URL{}).Return(equalsDelegation, nil)
 
 		// GetClaims is called on mapper2
-		mockMapper2.EXPECT().GetClaims(ctx, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
-		mockStore.EXPECT().Find(ctx, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
+		mockMapper2.EXPECT().GetClaims(testutil.AnyContext, contentHash).Return([]cid.Cid{locationDelegationCid, indexDelegationCid}, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: locationDelegationCid}, &url.URL{}).Return(locationDelegation, nil)
+		mockStore.EXPECT().Find(testutil.AnyContext, cidlink.Link{Cid: indexDelegationCid}, &url.URL{}).Return(indexDelegation, nil)
 
-		results, err := legacyClaims.Find(ctx, contentHash, []multicodec.Code{metadata.LocationCommitmentID, metadata.IndexClaimID})
+		results, err := legacyClaims.Find(context.Background(), contentHash, []multicodec.Code{metadata.LocationCommitmentID, metadata.IndexClaimID})
 
 		require.NoError(t, err)
 		require.Len(t, results, 2)

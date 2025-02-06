@@ -22,6 +22,7 @@ import (
 	ucanhttp "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/indexing-service/pkg/build"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -163,6 +164,9 @@ func PostClaimsHandler(id principal.Signer, service types.Publisher, options ...
 // "/claims?multihash={multihash}".
 func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, s := telemetry.StartSpan(r.Context(), "GetClaimsHandler")
+		defer s.End()
+
 		queryTypeParam := r.URL.Query()["type"]
 		var queryType types.QueryType
 		switch len(queryTypeParam) {
@@ -206,7 +210,7 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 			spaces = append(spaces, space)
 		}
 
-		qr, err := service.Query(r.Context(), types.Query{
+		qr, err := service.Query(ctx, types.Query{
 			Type:   queryType,
 			Hashes: hashes,
 			Match: types.Match{

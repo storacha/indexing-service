@@ -29,7 +29,7 @@ func Start(makeHandler handlerFactory) {
 		defer telemetryShutdown(ctx)
 
 		handler := makeHandler(cfg)
-		instrumentedHandler := telemetry.GetInstrumentedLambdaHandler(handler)
+		instrumentedHandler := telemetry.InstrumentLambdaHandler(handler)
 
 		lambda.StartWithOptions(instrumentedHandler, lambda.WithContext(ctx))
 	} else {
