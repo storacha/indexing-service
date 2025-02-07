@@ -4,10 +4,11 @@ ifneq (,$(wildcard ./.env))
 else
   $(error You haven't setup your .env file. Please refer to the readme)
 endif
+VERSION=$(shell awk -F'"' '/"version":/ {print $$4}' version.json)
 LAMBDA_GOOS=linux
 LAMBDA_GOARCH=arm64
 LAMBDA_GOCC?=go
-LAMBDA_GOFLAGS=-tags=lambda.norpc
+LAMBDA_GOFLAGS=-tags=lambda.norpc -ldflags="-s -w -X github.com/storacha/indexing-service/pkg/build.version=$(VERSION)"
 LAMBDA_CGO_ENABLED=0
 LAMBDADIRS=build/getclaim build/getclaims build/getroot build/notifier build/postclaims build/providercache build/remotesync
 LAMBDAS=$(foreach dir, $(LAMBDADIRS), $(dir)/bootstrap)
@@ -58,7 +59,7 @@ lambdas: $(LAMBDAS) otel-config
 .PHONY: $(LAMBDAS)
 
 $(LAMBDAS): build/%/bootstrap:
-	GOOS=$(LAMBDA_GOOS) GOARCH=$(LAMBDA_GOARCH) CGO_ENABLED=$(LAMBDA_CGO_ENABLED) $(LAMBDA_GOCC) build $(LAMBDA_GOFLAGS) -o $@ cmd/lambda/$*/main.go
+	GOOS=$(LAMBDA_GOOS) GOARCH=$(LAMBDA_GOARCH) CGO_ENABLED=$(LAMBDA_CGO_ENABLED) $(LAMBDA_GOCC) build $(LAMBDA_GOFLAGS) -o $@ ./cmd/lambda/$*
 
 otel-config: otel-collector-config.yaml
 	echo $(LAMBDADIRS) | xargs -n 1 cp $(OTELCOL_CONFIG)
