@@ -227,11 +227,12 @@ func Archive(model ShardedDagIndex) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	// add the root block to the block list
-	blks = append(blks, rootBlk)
 
 	// encode the CAR file
 	return car.Encode([]ipld.Link{rootBlk.Link()}, func(yield func(block.Block, error) bool) {
+		if !yield(rootBlk, nil) {
+			return
+		}
 		for _, b := range blks {
 			if !yield(b, nil) {
 				return
