@@ -87,9 +87,6 @@ resource "aws_apigatewayv2_deployment" "deployment" {
 
   api_id = aws_apigatewayv2_api.api.id
   description = "${terraform.workspace} ${var.app} API Deployment"
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 data "terraform_remote_state" "shared" {
@@ -136,10 +133,6 @@ resource "aws_apigatewayv2_stage" "stage" {
   api_id = aws_apigatewayv2_api.api.id
   name   = "$default"
   deployment_id = aws_apigatewayv2_deployment.deployment.id
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 resource "aws_apigatewayv2_api_mapping" "api_mapping" {

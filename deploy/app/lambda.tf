@@ -399,7 +399,7 @@ resource "aws_security_group" "lambda_security_group" {
 
   egress {
     from_port = 6379
-    to_port   = 6379
+    to_port   = 6380
     protocol  = "tcp"
     description = "Allow elasticache access"
     security_groups = [
