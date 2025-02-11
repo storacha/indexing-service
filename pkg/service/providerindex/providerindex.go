@@ -22,6 +22,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/publisher"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var log = logging.Logger("providerindex")
@@ -85,46 +86,88 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	if err == nil {
 		return res, nil
 	}
-	if err != types.ErrKeyNotFound {
+	if !errors.Is(err, types.ErrKeyNotFound) {
 		telemetry.Error(s, err, "fetching from cache")
 		return nil, err
 	}
 
-	s.AddEvent("fetching from IPNI")
-	results, err := pi.fetchFromIPNI(ctx, mh, targetClaims)
+	type queryResult struct {
+		results []model.ProviderResult
+		err     error
+	}
+
+	// buffered channels so goroutines don't block.
+	ipniCh := make(chan queryResult, 1)
+	legacyCh := make(chan queryResult, 1)
+
+	// Create a cancelable context for the legacy query.
+	legacyCtx, cancelLegacy := context.WithCancel(ctx)
+	defer cancelLegacy()
+
+	// Start IPNI query.
+	go func() {
+		s.AddEvent("fetching from IPNI")
+		r, err := pi.fetchFromIPNI(ctx, mh, targetClaims)
+		ipniCh <- queryResult{results: r, err: err}
+	}()
+
+	// Start legacy query.
+	go func() {
+		s.AddEvent("fetching from legacy services")
+		r, err := pi.legacyClaims.Find(legacyCtx, mh, targetClaims)
+		legacyCh <- queryResult{results: r, err: err}
+	}()
+
+	var ipniRes, legacyRes queryResult
+
+	// Wait for both responses.
+	for i := 0; i < 2; i++ {
+		select {
+		case res := <-ipniCh:
+			ipniRes = res
+			// If IPNI returns valid data, cancel the legacy lookup.
+			if res.err == nil && len(res.results) > 0 {
+				cancelLegacy()
+			}
+		case res := <-legacyCh:
+			legacyRes = res
+		}
+	}
+
+	// Prioritize IPNI results.
+	if ipniRes.err == nil && len(ipniRes.results) > 0 {
+		return pi.cacheResults(ctx, s, mh, ipniRes.results)
+	}
+	if legacyRes.err == nil && len(legacyRes.results) > 0 {
+		return pi.cacheResults(ctx, s, mh, legacyRes.results)
+	}
+
+	// Neither query returned data: if error(s) is/are present join them and return as one wrapped error.
+	// NB(forrest): it is also acceptable to return no result and no error in the event nothing was found.
+	var queryError error
+	if ipniRes.err != nil {
+		queryError = errors.Join(queryError, fmt.Errorf("fetching from IPNI failed: %w", ipniRes.err))
+	}
+	if legacyRes.err != nil {
+		queryError = errors.Join(queryError, fmt.Errorf("fetching from legacy services failed: %w", legacyRes.err))
+	}
+	return nil, queryError
+}
+
+// Helper function to cache results.
+func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, mh mh.Multihash, results []model.ProviderResult) ([]model.ProviderResult, error) {
+	s.AddEvent("caching results")
+	n, err := pi.providerStore.Add(ctx, mh, results...)
 	if err != nil {
-		telemetry.Error(s, err, "fetching from IPNI")
+		telemetry.Error(s, err, "caching results")
 		return nil, err
 	}
-
-	// if nothing was found on IPNI, try legacy claims storage
-	s.AddEvent("fetching from legacy services")
-	if len(results) == 0 {
-		legacyResults, err := pi.legacyClaims.Find(ctx, mh, targetClaims)
-		if err != nil {
-			telemetry.Error(s, err, "fetching from legacy services")
+	if n > 0 {
+		if err := pi.providerStore.SetExpirable(ctx, mh, true); err != nil {
+			telemetry.Error(s, err, "setting cache entry expiration")
 			return nil, err
 		}
-
-		results = legacyResults
 	}
-
-	// cache results if there are results to cache
-	if len(results) > 0 {
-		s.AddEvent("caching results")
-		n, err := pi.providerStore.Add(ctx, mh, results...)
-		if err != nil {
-			telemetry.Error(s, err, "caching results")
-			return nil, err
-		}
-		if n > 0 {
-			if err := pi.providerStore.SetExpirable(ctx, mh, true); err != nil {
-				telemetry.Error(s, err, "setting cache entry expiration")
-				return nil, err
-			}
-		}
-	}
-
 	return results, nil
 }
 
