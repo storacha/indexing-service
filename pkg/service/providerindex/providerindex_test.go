@@ -3,14 +3,19 @@ package providerindex
 import (
 	"context"
 	"errors"
+	"iter"
+	"slices"
 	"testing"
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multicodec"
+	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-metadata"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil/extmocks"
 	"github.com/storacha/indexing-service/pkg/types"
+	"github.com/storacha/ipni-publisher/pkg/publisher"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -219,5 +224,34 @@ func TestGetProviderResults(t *testing.T) {
 		_, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{metadata.LocationCommitmentID})
 
 		require.Error(t, err)
+	})
+}
+
+func TestPublish(t *testing.T) {
+	t.Run("allow skip publish existing advert", func(t *testing.T) {
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
+
+		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+
+		result := testutil.RandomLocationCommitmentProviderResult()
+		provider := *result.Provider
+		contextID := string(result.ContextID)
+		digest := testutil.RandomMultihash()
+		anyDigestSeq := mock.MatchedBy(func(digests iter.Seq[multihash.Multihash]) bool {
+			return true
+		})
+		meta := metadata.MetadataContext.New()
+		err := meta.UnmarshalBinary(result.Metadata)
+		require.NoError(t, err)
+
+		mockStore.EXPECT().Add(testutil.AnyContext, digest, result).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, digest, false).Return(nil)
+		mockIpniPublisher.EXPECT().Publish(testutil.AnyContext, provider, contextID, anyDigestSeq, meta).Return(testutil.RandomCID(), publisher.ErrAlreadyAdvertised)
+
+		err = providerIndex.Publish(context.Background(), provider, contextID, slices.Values([]multihash.Multihash{digest}), meta)
+		require.NoError(t, err)
 	})
 }
