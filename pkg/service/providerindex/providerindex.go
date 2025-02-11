@@ -38,7 +38,7 @@ type ProviderIndexService struct {
 	findClient    ipnifind.Finder
 	publisher     publisher.Publisher
 	legacyClaims  LegacyClaimsFinder
-	mutex         *sync.Mutex
+	mutex         sync.Mutex
 }
 
 var _ ProviderIndex = (*ProviderIndexService)(nil)
@@ -49,7 +49,6 @@ func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publishe
 		findClient:    findClient,
 		publisher:     publisher,
 		legacyClaims:  legacyClaims,
-		mutex:         &sync.Mutex{},
 	}
 }
 
@@ -268,7 +267,7 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 			log.Warnf("Skipping previously published advert")
 			return nil
 		}
-		
+
 		return fmt.Errorf("publishing advert: %w", err)
 	}
 	log.Infof("published IPNI advert: %s", id)
