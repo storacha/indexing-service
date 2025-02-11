@@ -263,10 +263,13 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 
 	id, err := pi.publisher.Publish(ctx, provider, contextID, digests, meta)
 	if err != nil {
-		if !errors.Is(err, publisher.ErrAlreadyAdvertised) {
-			return fmt.Errorf("publishing advert: %w", err)
+		if errors.Is(err, publisher.ErrAlreadyAdvertised) {
+			// skipping is ok in this case
+			log.Warnf("Skipping previously published advert")
+			return nil
 		}
-		log.Warnf("Skipping previously published advert")
+		
+		return fmt.Errorf("publishing advert: %w", err)
 	}
 	log.Infof("published IPNI advert: %s", id)
 	return nil
