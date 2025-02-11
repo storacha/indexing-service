@@ -421,7 +421,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	}
 
 	// with concurrency will still get overridden if a different walker setting is used
-	serviceOpts := append([]service.Option{service.WithConcurrency(5)}, cfg.opts...)
+	serviceOpts := append([]service.Option{service.WithConcurrency(15)}, cfg.opts...)
 
 	s.IndexingService = service.NewIndexingService(blobIndexLookup, claims, publicAddrInfo, providerIndex, serviceOpts...)
 
