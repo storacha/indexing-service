@@ -9,7 +9,7 @@ resource "aws_kms_key" "cache_key" {
 resource "aws_elasticache_serverless_cache" "cache" {
   for_each = local.caches
   
-  engine = "redis"
+  engine = "valkey"
   name = "${terraform.workspace}-${var.app}-${each.key}-cache"
   cache_usage_limits {
     data_storage {
@@ -33,8 +33,8 @@ resource "aws_elasticache_serverless_cache" "cache" {
 }
 
 resource "aws_elasticache_user_group" "cache_user_group" {
-  engine = "REDIS"
-  user_group_id = "${terraform.workspace}-${var.app}-redis"
+  engine = "valkey"
+  user_group_id = "${terraform.workspace}-${var.app}-valkey"
 
   user_ids = [
     aws_elasticache_user.cache_default_user.id, 
@@ -51,12 +51,13 @@ resource "aws_elasticache_user" "cache_default_user" {
   user_name     = "default"
   access_string = "off ~keys* -@all +get"
   authentication_mode {
-    type = "no-password-required"
+    type = "password"
+    passwords = ["does not matter its disabled"]
   }
   lifecycle {
     ignore_changes = [authentication_mode]
   }
-  engine = "REDIS"
+  engine = "valkey"
 }
 
 resource "aws_elasticache_user" "cache_iam_user" {
@@ -66,7 +67,7 @@ resource "aws_elasticache_user" "cache_iam_user" {
   authentication_mode {
     type = "iam"
   }
-  engine = "REDIS"
+  engine = "valkey"
 }
 
 resource "aws_security_group" "cache_security_group" {
@@ -78,7 +79,7 @@ resource "aws_security_group" "cache_security_group" {
     cidr_blocks = [aws_vpc.vpc.cidr_block]
     description = "Redis"
     from_port = 6379
-    to_port = 6379
+    to_port = 6380
     protocol = "tcp"
   }
 }

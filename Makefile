@@ -75,6 +75,11 @@ deploy/app/.terraform:
 
 init: deploy/app/.terraform .tfworkspace
 
+.PHONY: upgrade
+
+upgrade:
+	tofu -chdir=deploy/app init -upgrade
+
 .PHONY: validate
 
 validate: deploy/app/.terraform .tfworkspace
