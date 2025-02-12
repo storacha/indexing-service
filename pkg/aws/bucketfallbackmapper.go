@@ -35,7 +35,12 @@ func NewBucketFallbackMapper(id principal.Signer, httpClient *http.Client, bucke
 }
 
 func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
-	resp, err := cfm.httpClient.Head(cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := cfm.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
