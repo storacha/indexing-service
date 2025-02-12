@@ -203,6 +203,31 @@ func TestGetProviderResults(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("errors in both legacy claims service and IPNI returns wrapped error", func(t *testing.T) {
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
+
+		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+
+		someHash := testutil.RandomMultihash()
+		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
+
+		// Simulate a cache miss.
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		// Both queries error.
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(nil, errors.New("ipni error"))
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return(nil, errors.New("legacy error"))
+
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
+		require.Nil(t, results)
+		require.Error(t, err)
+		// Verify that the final error message contains both errors.
+		require.Contains(t, err.Error(), "fetching from IPNI failed: ipni error")
+		require.Contains(t, err.Error(), "fetching from legacy services failed: legacy error")
+	})
+
 	t.Run("error caching results returns an error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
@@ -269,6 +294,41 @@ func TestGetProviderResults(t *testing.T) {
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
 	})
 
+	t.Run("IPNI returns valid result and legacy returns empty result", func(t *testing.T) {
+		mockStore := types.NewMockProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
+
+		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+
+		someHash := testutil.RandomMultihash()
+		expectedResult := testutil.RandomLocationCommitmentProviderResult()
+		ipniResponse := &model.FindResponse{
+			MultihashResults: []model.MultihashResult{
+				{
+					Multihash:       someHash,
+					ProviderResults: []model.ProviderResult{expectedResult},
+				},
+			},
+		}
+		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
+
+		// Simulate a cache miss.
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		// IPNI returns a valid result.
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniResponse, nil)
+		// Legacy returns an error.
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return([]model.ProviderResult{}, nil)
+		// Expect caching of the IPNI result.
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
+
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
+		require.NoError(t, err)
+		require.Equal(t, []model.ProviderResult{expectedResult}, results)
+	})
+
 	t.Run("legacy returns valid result and IPNI returns error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
@@ -295,7 +355,7 @@ func TestGetProviderResults(t *testing.T) {
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
 	})
 
-	t.Run("both queries error", func(t *testing.T) {
+	t.Run("legacy returns valid result and IPNI returns empty result", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
@@ -304,21 +364,24 @@ func TestGetProviderResults(t *testing.T) {
 		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
+		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
-		// Both queries error.
-		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(nil, errors.New("ipni error"))
-		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return(nil, errors.New("legacy error"))
+		// IPNI returns an error.
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
+		// Legacy returns a valid result.
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return([]model.ProviderResult{expectedResult}, nil)
+		// Expect caching of the legacy result.
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
 
 		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
-		require.Nil(t, results)
-		require.Error(t, err)
-		// Verify that the final error message contains both errors.
-		require.Contains(t, err.Error(), "fetching from IPNI failed: ipni error")
-		require.Contains(t, err.Error(), "fetching from legacy services failed: legacy error")
+		require.NoError(t, err)
+		require.Equal(t, []model.ProviderResult{expectedResult}, results)
 	})
 
+	// NB(forrest): we may remove this test case when legacy service is fully removed and IPNI is the sole finder.
 	t.Run("IPNI returns result before legacy is complete and legacy is canceled", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
