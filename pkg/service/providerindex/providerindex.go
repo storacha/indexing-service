@@ -22,6 +22,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/storacha/ipni-publisher/pkg/publisher"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -84,6 +85,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	s.AddEvent("searching in cache")
 	res, err := pi.providerStore.Members(ctx, mh)
 	if err == nil {
+		s.AddEvent("cache hit")
 		return res, nil
 	}
 	if !errors.Is(err, types.ErrKeyNotFound) {
@@ -108,6 +110,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	go func() {
 		s.AddEvent("fetching from IPNI")
 		r, err := pi.fetchFromIPNI(ctx, mh, targetClaims)
+		s.AddEvent("fetched from IPNI", trace.WithAttributes(attribute.Bool("found", len(r) != 0)))
 		ipniCh <- queryResult{results: r, err: err}
 	}()
 
@@ -115,6 +118,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	go func() {
 		s.AddEvent("fetching from legacy services")
 		r, err := pi.legacyClaims.Find(legacyCtx, mh, targetClaims)
+		s.AddEvent("fetched from legacy services", trace.WithAttributes(attribute.Bool("found", len(r) != 0)))
 		legacyCh <- queryResult{results: r, err: err}
 	}()
 
