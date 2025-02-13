@@ -70,16 +70,20 @@ type ServiceConfig struct {
 }
 
 type config struct {
-	cachingQueue        blobindexlookup.CachingQueue
-	opts                []service.Option
-	ds                  datastore.Batching
-	skipNotification    bool
-	startIPNIServer     bool
-	publisherStore      store.PublisherStore
-	claimsStore         types.ContentClaimsStore
-	providersClient     redis.Client
-	claimsClient        redis.Client
-	indexesClient       redis.Client
+	cachingQueue       blobindexlookup.CachingQueue
+	opts               []service.Option
+	ds                 datastore.Batching
+	skipNotification   bool
+	startIPNIServer    bool
+	publisherStore     store.PublisherStore
+	claimsStore        types.ContentClaimsStore
+	providersClient    redis.Client
+	claimsClient       redis.Client
+	indexesClient      redis.Client
+	providersCacheOpts []redis.Option
+	claimsCacheOpts    []redis.Option
+	indexesCacheOpts   []redis.Option
+
 	legacyClaimsMappers []providerindex.ContentToClaimsMapper
 	legacyClaimsBucket  types.ContentClaimsStore
 	legacyClaimsUrl     string
@@ -216,6 +220,30 @@ func WithHTTPClient(httpClient *http.Client) Option {
 	}
 }
 
+// WithProvidersCacheOptions passes configuration to the providers cache
+func WithProvidersCacheOptions(opts ...redis.Option) Option {
+	return func(cfg *config) error {
+		cfg.providersCacheOpts = opts
+		return nil
+	}
+}
+
+// WithClaimsCacheOptions passes configuration to the providers cache
+func WithClaimsCacheOptions(opts ...redis.Option) Option {
+	return func(cfg *config) error {
+		cfg.claimsCacheOpts = opts
+		return nil
+	}
+}
+
+// WithIndexesCacheOptions passes configuration to the providers cache
+func WithIndexesCacheOptions(opts ...redis.Option) Option {
+	return func(cfg *config) error {
+		cfg.indexesCacheOpts = opts
+		return nil
+	}
+}
+
 // Service is the core methods of the indexing service but with additional
 // lifecycle methods.
 type Service interface {
@@ -276,9 +304,9 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	}
 
 	// build caches
-	providersCache := redis.NewProviderStore(providersClient)
-	claimsCache := redis.NewContentClaimsStore(claimsClient)
-	shardDagIndexesCache := redis.NewShardedDagIndexStore(indexesClient)
+	providersCache := redis.NewProviderStore(providersClient, cfg.providersCacheOpts...)
+	claimsCache := redis.NewContentClaimsStore(claimsClient, cfg.claimsCacheOpts...)
+	shardDagIndexesCache := redis.NewShardedDagIndexStore(indexesClient, cfg.indexesCacheOpts...)
 
 	cachingQueue := cfg.cachingQueue
 	if cachingQueue == nil {

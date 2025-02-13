@@ -16,8 +16,8 @@ var (
 type ShardedDagIndexStore = Store[types.EncodedContextID, blobindex.ShardedDagIndexView]
 
 // NewShardedDagIndexStore returns a new instance of a ShardedDagIndex store using the given redis client
-func NewShardedDagIndexStore(client Client) *ShardedDagIndexStore {
-	return &Store[types.EncodedContextID, blobindex.ShardedDagIndexView]{shardedDagIndexFromRedis, shardedDagIndexToRedis, encodedContextIDKeyString, client}
+func NewShardedDagIndexStore(client Client, opts ...Option) *ShardedDagIndexStore {
+	return NewStore(shardedDagIndexFromRedis, shardedDagIndexToRedis, encodedContextIDKeyString, client, opts...)
 }
 
 func shardedDagIndexFromRedis(data string) (blobindex.ShardedDagIndexView, error) {
