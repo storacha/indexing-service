@@ -14,8 +14,8 @@ var _ types.ContentClaimsCache = (*ContentClaimsStore)(nil)
 type ContentClaimsStore = Store[cid.Cid, delegation.Delegation]
 
 // NewContentClaimsStore returns a new instance of a Content Claims Store using the given redis client
-func NewContentClaimsStore(client Client) *ContentClaimsStore {
-	return &Store[cid.Cid, delegation.Delegation]{delegationFromRedis, delegationToRedis, cidKeyString, client}
+func NewContentClaimsStore(client Client, opts ...Option) *ContentClaimsStore {
+	return NewStore(delegationFromRedis, delegationToRedis, cidKeyString, client, opts...)
 }
 
 func delegationFromRedis(data string) (delegation.Delegation, error) {

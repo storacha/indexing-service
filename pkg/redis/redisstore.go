@@ -29,6 +29,7 @@ type Store[Key, Value any] struct {
 	toRedis   func(Value) (string, error)
 	keyString func(Key) string
 	client    Client
+	config    config
 }
 
 var (
@@ -36,13 +37,36 @@ var (
 	_ types.Cache[any, any] = (*Store[any, any])(nil)
 )
 
+type config struct {
+	expirationTime time.Duration
+}
+
+func newConfig(opts []Option) config {
+	c := config{
+		expirationTime: DefaultExpire,
+	}
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return c
+}
+
+type Option func(*config)
+
+func ExpirationTime(expirationTime time.Duration) Option {
+	return func(c *config) {
+		c.expirationTime = expirationTime
+	}
+}
+
 // NewStore returns a new instance of a redis store with the provided serialization/deserialization functions
 func NewStore[Key, Value any](
 	fromRedis func(string) (Value, error),
 	toRedis func(Value) (string, error),
 	keyString func(Key) string,
-	client Client) *Store[Key, Value] {
-	return &Store[Key, Value]{fromRedis, toRedis, keyString, client}
+	client Client,
+	opts ...Option) *Store[Key, Value] {
+	return &Store[Key, Value]{fromRedis, toRedis, keyString, client, newConfig(opts)}
 }
 
 // Get returns deserialized values from redis
@@ -80,7 +104,7 @@ func (rs *Store[Key, Value]) Set(ctx context.Context, key Key, value Value, expi
 func (rs *Store[Key, Value]) SetExpirable(ctx context.Context, key Key, expires bool) error {
 	var err error
 	if expires {
-		err = rs.client.Expire(ctx, rs.keyString(key), DefaultExpire).Err()
+		err = rs.client.Expire(ctx, rs.keyString(key), rs.config.expirationTime).Err()
 	} else {
 		err = rs.client.Persist(ctx, rs.keyString(key)).Err()
 	}

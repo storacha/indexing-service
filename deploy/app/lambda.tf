@@ -70,10 +70,13 @@ resource "aws_lambda_function" "lambda" {
     variables = {
       	PROVIDERS_REDIS_URL = aws_elasticache_serverless_cache.cache["providers"].endpoint[0].address
         PROVIDERS_REDIS_CACHE = aws_elasticache_serverless_cache.cache["providers"].name
+        PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 30 * 24 * 60 * 60 : 24 * 60 * 60}"
         INDEXES_REDIS_URL = aws_elasticache_serverless_cache.cache["indexes"].endpoint[0].address
         INDEXES_REDIS_CACHE = aws_elasticache_serverless_cache.cache["indexes"].name
+        INDEXES_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
         CLAIMS_REDIS_URL = aws_elasticache_serverless_cache.cache["claims"].endpoint[0].address
         CLAIMS_REDIS_CACHE = aws_elasticache_serverless_cache.cache["claims"].name
+        CLAIMS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 7 * 24 * 60 * 60 : 24 * 60 * 60}"
         REDIS_USER_ID = aws_elasticache_user.cache_iam_user.user_id
         IPNI_ENDPOINT = "https://cid.contact"
         PROVIDER_CACHING_QUEUE_URL = aws_sqs_queue.caching.id
