@@ -28,7 +28,12 @@ func NewSimpleFinder(httpClient *http.Client) Finder {
 // Find attempts to fetch a claim from the provided URL.
 func (sf *simpleFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL) (delegation.Delegation, error) {
 	// attempt to fetch the claim from provided url
-	resp, err := sf.httpClient.Get(fetchURL.String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := sf.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch claim: %w", err)
 	}
