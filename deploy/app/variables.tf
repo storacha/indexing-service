@@ -31,3 +31,9 @@ variable "principal_mapping" {
   description = "JSON encoded mapping of did:web to did:key"
   default     = ""
 }
+
+variable "legacy_data_bucket_url" {
+  type = string
+  description = "URL to use when constructing synthesizing legacy claims"
+  default = ""
+}

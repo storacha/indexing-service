@@ -93,7 +93,7 @@ resource "aws_lambda_function" "lambda" {
         LEGACY_CLAIMS_BUCKET_NAME = data.aws_s3_bucket.legacy_claims_bucket.id
         LEGACY_BLOCK_INDEX_TABLE_NAME = data.aws_dynamodb_table.legacy_block_index_table.id
         LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
-        LEGACY_DATA_BUCKET_URL = "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
+        LEGACY_DATA_BUCKET_URL = var.legacy_data_bucket_url != "" ? var.legacy_data_bucket_url : "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
         OTEL_PROPAGATORS = "tracecontext"
         OTEL_SERVICE_NAME = "${terraform.workspace}-${var.app}"
