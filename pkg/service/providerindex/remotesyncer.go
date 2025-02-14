@@ -6,7 +6,7 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
-	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
+	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -30,10 +30,10 @@ func NewRemoteSyncer(providerStore types.ProviderStore, store Store) *RemoteSync
 func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Link) {
 	log.Infof("handling IPNI remote sync from %s to %s", prev, head)
 
-	q := jobqueue.NewJobQueue(
-		func(ctx context.Context, digest mh.Multihash) error {
+	q := jobqueue.NewJobQueue[mh.Multihash](
+		jobqueue.JobHandler(func(ctx context.Context, digest mh.Multihash) error {
 			return rs.providerStore.SetExpirable(ctx, digest, true)
-		},
+		}),
 		jobqueue.WithConcurrency(5),
 		jobqueue.WithErrorHandler(func(err error) {
 			log.Errorf("setting expirable: %w", err)

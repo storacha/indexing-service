@@ -23,8 +23,8 @@ import (
 	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/publisher"
 	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/server"
 	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
+	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/go-libstoracha/metadata"
-	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
@@ -313,7 +313,8 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		// setup and start the provider caching queue for indexes
 		cachingJobHandler := providercacher.NewJobHandler(providercacher.NewSimpleProviderCacher(providersCache))
 
-		jq := jobqueue.NewJobQueue(cachingJobHandler.Handle,
+		jq := jobqueue.NewJobQueue[providercacher.ProviderCachingJob](
+			jobqueue.JobHandler(cachingJobHandler.Handle),
 			jobqueue.WithBuffer(5),
 			jobqueue.WithConcurrency(5),
 			jobqueue.WithErrorHandler(func(err error) {
