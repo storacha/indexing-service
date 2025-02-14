@@ -8,7 +8,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
-	"github.com/storacha/ipni-publisher/pkg/notifier"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/notifier"
 )
 
 var log = logging.Logger("lambda/notifier")

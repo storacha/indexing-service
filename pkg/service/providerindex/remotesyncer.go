@@ -7,7 +7,7 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/ipni-publisher/pkg/store"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 )
 
 type Store interface {

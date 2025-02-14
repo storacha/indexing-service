@@ -8,8 +8,8 @@ import (
 
 	cid "github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
-	cassert "github.com/storacha/go-capabilities/pkg/assert"
-	ctypes "github.com/storacha/go-capabilities/pkg/types"
+	cassert "github.com/storacha/go-libstoracha/capabilities/pkg/assert"
+	ctypes "github.com/storacha/go-libstoracha/capabilities/pkg/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"

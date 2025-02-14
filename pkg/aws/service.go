@@ -19,7 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/storacha/go-metadata"
+	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
@@ -33,7 +33,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/ipni-publisher/pkg/store"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 )
 
 // ErrNoPrivateKey means that the value returned from Secrets was empty

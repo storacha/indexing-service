@@ -7,7 +7,7 @@ import (
 
 	blobindex "github.com/storacha/indexing-service/pkg/blobindex"
 
-	metadata "github.com/storacha/go-metadata"
+	metadata "github.com/storacha/go-libstoracha/metadata"
 
 	mock "github.com/stretchr/testify/mock"
 
