@@ -5,9 +5,9 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 )
 
 type Store interface {

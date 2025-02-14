@@ -19,6 +19,10 @@ import (
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/notifier"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/publisher"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/server"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/redis"
@@ -28,10 +32,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/notifier"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/publisher"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/server"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 )
 
 var log = logging.Logger("service")

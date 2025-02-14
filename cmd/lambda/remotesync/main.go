@@ -8,13 +8,13 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/telemetry"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 )
 
 func main() {

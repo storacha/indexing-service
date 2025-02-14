@@ -9,9 +9,9 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipld/go-ipld-prime"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
 )
 
 type bucketStore struct {

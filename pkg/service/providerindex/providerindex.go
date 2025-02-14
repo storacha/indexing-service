@@ -16,12 +16,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/publisher"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/publisher"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
