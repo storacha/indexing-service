@@ -19,8 +19,12 @@ import (
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/storacha/go-metadata"
-	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
+	"github.com/storacha/go-libstoracha/ipnipublisher/notifier"
+	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
+	"github.com/storacha/go-libstoracha/ipnipublisher/server"
+	"github.com/storacha/go-libstoracha/ipnipublisher/store"
+	"github.com/storacha/go-libstoracha/jobqueue"
+	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
@@ -28,10 +32,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/ipni-publisher/pkg/notifier"
-	"github.com/storacha/ipni-publisher/pkg/publisher"
-	"github.com/storacha/ipni-publisher/pkg/server"
-	"github.com/storacha/ipni-publisher/pkg/store"
 )
 
 var log = logging.Logger("service")
@@ -313,7 +313,8 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		// setup and start the provider caching queue for indexes
 		cachingJobHandler := providercacher.NewJobHandler(providercacher.NewSimpleProviderCacher(providersCache))
 
-		jq := jobqueue.NewJobQueue(cachingJobHandler.Handle,
+		jq := jobqueue.NewJobQueue[providercacher.ProviderCachingJob](
+			jobqueue.JobHandler(cachingJobHandler.Handle),
 			jobqueue.WithBuffer(5),
 			jobqueue.WithConcurrency(5),
 			jobqueue.WithErrorHandler(func(err error) {

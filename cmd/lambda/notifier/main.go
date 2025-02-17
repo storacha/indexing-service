@@ -6,9 +6,9 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/storacha/go-libstoracha/ipnipublisher/notifier"
 	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
-	"github.com/storacha/ipni-publisher/pkg/notifier"
 )
 
 var log = logging.Logger("lambda/notifier")

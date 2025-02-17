@@ -16,12 +16,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha/go-metadata"
+	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
+	"github.com/storacha/go-libstoracha/jobqueue"
+	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/did"
-	"github.com/storacha/indexing-service/pkg/internal/jobqueue"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
-	"github.com/storacha/ipni-publisher/pkg/publisher"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -264,10 +264,10 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 	}
 
 	var joberr error
-	q := jobqueue.NewJobQueue(
-		func(ctx context.Context, digest mh.Multihash) error {
+	q := jobqueue.NewJobQueue[mh.Multihash](
+		jobqueue.JobHandler(func(ctx context.Context, digest mh.Multihash) error {
 			return addProviderResult(ctx, providerStore, digest, pr, expire)
-		},
+		}),
 		jobqueue.WithConcurrency(5),
 		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
 	)

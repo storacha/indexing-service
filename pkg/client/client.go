@@ -8,8 +8,8 @@ import (
 	gohttp "net/http"
 	"net/url"
 
-	"github.com/storacha/go-capabilities/pkg/assert"
-	"github.com/storacha/go-capabilities/pkg/claim"
+	"github.com/storacha/go-libstoracha/capabilities/assert"
+	"github.com/storacha/go-libstoracha/capabilities/claim"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
