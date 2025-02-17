@@ -11,7 +11,7 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/publisher"
+	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil/extmocks"

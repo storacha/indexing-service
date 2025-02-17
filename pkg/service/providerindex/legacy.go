@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/storacha/go-libstoracha/capabilities/pkg/assert"
+	"github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"

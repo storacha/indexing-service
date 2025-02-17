@@ -5,7 +5,7 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/storacha/go-libstoracha/ipnipublisher/pkg/store"
+	"github.com/storacha/go-libstoracha/ipnipublisher/store"
 	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
 )
