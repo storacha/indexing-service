@@ -26,12 +26,13 @@ func Start(makeHandler handlerFactory) {
 		if err != nil {
 			panic(err)
 		}
-		defer telemetryShutdown(ctx)
 
 		handler := makeHandler(cfg)
 		instrumentedHandler := telemetry.InstrumentLambdaHandler(handler)
 
-		lambda.StartWithOptions(instrumentedHandler, lambda.WithContext(ctx))
+		lambda.StartWithOptions(instrumentedHandler, lambda.WithContext(ctx), lambda.WithEnableSIGTERM(func() {
+			telemetryShutdown(ctx)
+		}))
 	} else {
 		lambda.StartWithOptions(makeHandler(cfg), lambda.WithContext(ctx))
 	}
