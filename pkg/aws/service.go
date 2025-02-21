@@ -249,7 +249,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{blockIndexTableMapper, legacyClaimsMapper, bucketFallbackMapper}, legacyClaimsBucket, legacyClaimsURL),
+		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
 		construct.WithProvidersClient(providersClient),
 		construct.WithClaimsClient(claimsClient),
