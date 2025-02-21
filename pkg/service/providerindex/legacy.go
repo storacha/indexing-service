@@ -77,14 +77,16 @@ func NewLegacyClaimsStore(contentToClaimsMappers []ContentToClaimsMapper, claimS
 // relevant claims, these will be returned and no more mappers will be checked.
 func (ls LegacyClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	for _, mapper := range ls.mappers {
-		claims, err := ls.findInMapper(ctx, contentHash, targetClaims, mapper)
+		results, err := ls.findInMapper(ctx, contentHash, targetClaims, mapper)
 		if err != nil {
 			return nil, err
 		}
-		if len(claims) > 0 {
-			return claims, nil
+
+		if len(results) > 0 {
+			return results, nil
 		}
 	}
+
 	return []model.ProviderResult{}, nil
 }
 

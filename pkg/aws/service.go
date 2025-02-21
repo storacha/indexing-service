@@ -30,7 +30,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/presets"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
-	"github.com/storacha/indexing-service/pkg/service/legacy"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -233,6 +232,13 @@ func Construct(cfg Config) (types.Service, error) {
 			return []delegation.Option{delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix()))}
 		},
 	)
+	blockIndexCfg := cfg.Config.Copy()
+	blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
+	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
+	blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, cfg.LegacyDataBucketURL)
+	if err != nil {
+		return nil, fmt.Errorf("creating block index table mapper: %w", err)
+	}
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(legacyClaimsCfg, cfg.LegacyClaimsBucket, ""))
 	legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
 
@@ -243,7 +249,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper}, legacyClaimsBucket, legacyClaimsURL),
+		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{blockIndexTableMapper, legacyClaimsMapper, bucketFallbackMapper}, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
 		construct.WithProvidersClient(providersClient),
 		construct.WithClaimsClient(claimsClient),
@@ -255,8 +261,6 @@ func Construct(cfg Config) (types.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	blockIndexCfg := cfg.Config.Copy()
-	blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
-	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
-	return legacy.NewService(cfg.Signer, service, legacyBlockIndexStore, cfg.LegacyDataBucketURL)
+
+	return service, nil
 }
