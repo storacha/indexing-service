@@ -36,6 +36,7 @@ type blockIndexTableMapper struct {
 	id              principal.Signer
 	blockIndexStore BlockIndexStore
 	bucketURL       url.URL
+	claimExp        time.Duration
 }
 
 var _ providerindex.ContentToClaimsMapper = blockIndexTableMapper{}
@@ -47,8 +48,8 @@ var _ providerindex.ContentToClaimsMapper = blockIndexTableMapper{}
 // instance does the work of mapping old bucket keys to URLs, where the base URL is the passed bucketURL param.
 //
 // Using the data in the blockIndexStore, the service will materialize content claims using the id param as the
-// signing key.
-func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexStore, bucketURL string) (blockIndexTableMapper, error) {
+// signing key. Claims will be set to expire in the amount of time given by the claimExpiration parameter.
+func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexStore, bucketURL string, claimExpiration time.Duration) (blockIndexTableMapper, error) {
 	burl, err := url.Parse(bucketURL)
 	if err != nil {
 		return blockIndexTableMapper{}, fmt.Errorf("parsing bucket URL: %w", err)
@@ -58,6 +59,7 @@ func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexSto
 		id:              id,
 		blockIndexStore: blockIndexStore,
 		bucketURL:       *burl,
+		claimExp:        claimExpiration,
 	}, nil
 }
 
@@ -107,7 +109,7 @@ func (bit blockIndexTableMapper) GetClaims(ctx context.Context, contentHash mult
 			bit.id,
 			bit.id.DID().String(),
 			loc,
-			delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix())),
+			delegation.WithExpiration(int(time.Now().Add(bit.claimExp).Unix())),
 		)
 		if err != nil {
 			continue

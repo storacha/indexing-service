@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/multiformats/go-multihash"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
@@ -75,7 +76,7 @@ func TestBlockIndexTableMapper(t *testing.T) {
 		t.Run(f.name, func(t *testing.T) {
 			mockStore := newMockBlockIndexStore()
 			mockStore.data.Set(f.digest, []BlockIndexRecord{f.record})
-			bitMapper, err := NewBlockIndexTableMapper(id, mockStore, bucketURL.String())
+			bitMapper, err := NewBlockIndexTableMapper(id, mockStore, bucketURL.String(), time.Hour)
 			require.NoError(t, err)
 
 			claimCids, err := bitMapper.GetClaims(context.Background(), f.digest)
@@ -110,7 +111,7 @@ func TestBlockIndexTableMapper(t *testing.T) {
 
 	t.Run("returns ErrKeyNotFound when block index errors with not found", func(t *testing.T) {
 		mockStore := newMockBlockIndexStore()
-		bitMapper, err := NewBlockIndexTableMapper(id, mockStore, bucketURL.String())
+		bitMapper, err := NewBlockIndexTableMapper(id, mockStore, bucketURL.String(), time.Hour)
 		require.NoError(t, err)
 
 		_, err = bitMapper.GetClaims(context.Background(), testutil.RandomMultihash())
