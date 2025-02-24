@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -15,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -36,6 +38,13 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context)
 	if err != nil {
 		return nil, err
 	}
+
+	// accept incoming trace context from upstream services in both W3C Trace Context and Baggage formats
+	prop := propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+	otel.SetTextMapPropagator(prop)
 
 	tp := tracesdk.NewTracerProvider(
 		tracesdk.WithBatcher(exp),
@@ -65,9 +74,39 @@ func InstrumentLambdaHandler(handlerFunc interface{}) interface{} {
 
 	return otellambda.InstrumentHandler(
 		handlerFunc,
+		otellambda.WithEventToCarrier(jsonEventHeadersToCarrier),
 		otellambda.WithTracerProvider(tp),
 		otellambda.WithFlusher(asFlusher),
 	)
+}
+
+// jsonEventHeadersToCarrier returns a TextMapCarrier that extracts its data from the passed JSON event. It will look
+// for the "headers" field in the event, which is populated by the AWS API Gateway. Therefore, this function will make
+// distributed tracing work only with HTTP-based lambdas that are triggered by the API Gateway.
+func jsonEventHeadersToCarrier(eventJSON []byte) propagation.TextMapCarrier {
+	ev := map[string]any{}
+	err := json.Unmarshal(eventJSON, &ev)
+	if err != nil {
+		return propagation.MapCarrier{}
+	}
+
+	// confirm the event has a headers field
+	if _, ok := ev["headers"]; !ok {
+		return propagation.MapCarrier{}
+	}
+
+	// confirm the headers field is a map
+	headers, ok := ev["headers"].(map[string]any)
+	if !ok {
+		return propagation.MapCarrier{}
+	}
+
+	headerMap := make(map[string]string, len(headers))
+	for k, v := range headers {
+		headerMap[k] = v.(string)
+	}
+
+	return propagation.MapCarrier(headerMap)
 }
 
 func InstrumentHTTPClient(client *http.Client) *http.Client {
