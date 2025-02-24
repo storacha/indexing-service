@@ -46,7 +46,12 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context)
 	)
 	otel.SetTextMapPropagator(prop)
 
+	// We'll use a ParentBased(AlwaysSample) Sampler (which is the default, doing it explicitly here for readability).
+	// This means this service will export spans if the upstream service has sampled the request.
+	// Requests that are NOT coming from an upstream service, however, will always be sampled. This allows producing
+	// traces for manual queries, which is useful for debugging.
 	tp := tracesdk.NewTracerProvider(
+		tracesdk.WithSampler(tracesdk.ParentBased(tracesdk.AlwaysSample())),
 		tracesdk.WithBatcher(exp),
 		tracesdk.WithResource(resource),
 	)
