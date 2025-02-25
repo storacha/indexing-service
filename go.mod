@@ -1,6 +1,6 @@
 module github.com/storacha/indexing-service
 
-go 1.23.2
+go 1.23.3
 
 require (
 	github.com/aws/aws-lambda-go v1.47.0
@@ -30,7 +30,7 @@ require (
 	github.com/redis/go-redis/extra/redisotel/v9 v9.7.0
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/storacha/go-libstoracha v0.0.1
-	github.com/storacha/go-ucanto v0.2.1-0.20241105025747-aa8566a3a3fb
+	github.com/storacha/go-ucanto v0.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.34.0
