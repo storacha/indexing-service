@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -15,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -37,7 +39,19 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context)
 		return nil, err
 	}
 
+	// accept incoming trace context from upstream services in both W3C Trace Context and Baggage formats
+	prop := propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+	otel.SetTextMapPropagator(prop)
+
+	// We'll use a ParentBased(AlwaysSample) Sampler (which is the default, doing it explicitly here for readability).
+	// This means this service will export spans if the upstream service has sampled the request.
+	// Requests that are NOT coming from an upstream service, however, will always be sampled. This allows producing
+	// traces for manual queries, which is useful for debugging.
 	tp := tracesdk.NewTracerProvider(
+		tracesdk.WithSampler(tracesdk.ParentBased(tracesdk.AlwaysSample())),
 		tracesdk.WithBatcher(exp),
 		tracesdk.WithResource(resource),
 	)
@@ -65,9 +79,25 @@ func InstrumentLambdaHandler(handlerFunc interface{}) interface{} {
 
 	return otellambda.InstrumentHandler(
 		handlerFunc,
+		otellambda.WithEventToCarrier(jsonEventHeadersToCarrier),
 		otellambda.WithTracerProvider(tp),
 		otellambda.WithFlusher(asFlusher),
 	)
+}
+
+// jsonEventHeadersToCarrier returns a TextMapCarrier that extracts its data from the passed JSON event. It will look
+// for the "headers" field in the event, which is populated by the AWS API Gateway. Therefore, this function will make
+// distributed tracing work only with HTTP-based lambdas that are triggered by the API Gateway.
+func jsonEventHeadersToCarrier(eventJSON []byte) propagation.TextMapCarrier {
+	var apiGatewayEvent struct {
+		Headers map[string]string `json:"headers"`
+	}
+
+	if err := json.Unmarshal(eventJSON, &apiGatewayEvent); err != nil {
+		return propagation.MapCarrier{}
+	}
+
+	return propagation.MapCarrier(apiGatewayEvent.Headers)
 }
 
 func InstrumentHTTPClient(client *http.Client) *http.Client {
