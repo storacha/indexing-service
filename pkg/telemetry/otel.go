@@ -89,29 +89,15 @@ func InstrumentLambdaHandler(handlerFunc interface{}) interface{} {
 // for the "headers" field in the event, which is populated by the AWS API Gateway. Therefore, this function will make
 // distributed tracing work only with HTTP-based lambdas that are triggered by the API Gateway.
 func jsonEventHeadersToCarrier(eventJSON []byte) propagation.TextMapCarrier {
-	ev := map[string]any{}
-	err := json.Unmarshal(eventJSON, &ev)
-	if err != nil {
+	var apiGatewayEvent struct {
+		Headers map[string]string `json:"headers"`
+	}
+
+	if err := json.Unmarshal(eventJSON, &apiGatewayEvent); err != nil {
 		return propagation.MapCarrier{}
 	}
 
-	// confirm the event has a headers field
-	if _, ok := ev["headers"]; !ok {
-		return propagation.MapCarrier{}
-	}
-
-	// confirm the headers field is a map
-	headers, ok := ev["headers"].(map[string]any)
-	if !ok {
-		return propagation.MapCarrier{}
-	}
-
-	headerMap := make(map[string]string, len(headers))
-	for k, v := range headers {
-		headerMap[k] = v.(string)
-	}
-
-	return propagation.MapCarrier(headerMap)
+	return propagation.MapCarrier(apiGatewayEvent.Headers)
 }
 
 func InstrumentHTTPClient(client *http.Client) *http.Client {
