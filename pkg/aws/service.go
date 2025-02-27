@@ -236,9 +236,9 @@ func Construct(cfg Config) (types.Service, error) {
 	blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
 	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
 
-	// allow claims synthethized from the block index table to live a bit longer after they are expired in the cache
+	// allow claims synthethized from the block index table to live longer after they are expired in the cache
 	// so that the service doesn't return cached but expired delegations
-	synthetizedClaimExp := time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second + 10*time.Minute
+	synthetizedClaimExp := time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second + 1*time.Hour
 	blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, cfg.LegacyDataBucketURL, synthetizedClaimExp)
 	if err != nil {
 		return nil, fmt.Errorf("creating block index table mapper: %w", err)
