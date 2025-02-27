@@ -20,7 +20,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/service/legacy"
 	istypes "github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -107,7 +106,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 		require.Equal(t, len(items), len(results))
 
 		for _, i := range items {
-			require.True(t, slices.ContainsFunc(results, func(r legacy.BlockIndexRecord) bool {
+			require.True(t, slices.ContainsFunc(results, func(r BlockIndexRecord) bool {
 				return r.CarPath == i.path && r.Offset == uint64(i.offset) && r.Length == uint64(i.length)
 			}))
 		}

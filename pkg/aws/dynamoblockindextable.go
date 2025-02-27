@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	multihash "github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
-	"github.com/storacha/indexing-service/pkg/service/legacy"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -25,7 +24,7 @@ type blockIndexItem struct {
 	Length  uint64 `dynamodbav:"length"`
 }
 
-func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multihash.Multihash) ([]legacy.BlockIndexRecord, error) {
+func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multihash.Multihash) ([]BlockIndexRecord, error) {
 	digestAttr, err := attributevalue.Marshal(digestutil.Format(digest))
 	if err != nil {
 		return nil, err
@@ -37,7 +36,7 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 		return nil, err
 	}
 
-	records := []legacy.BlockIndexRecord{}
+	records := []BlockIndexRecord{}
 
 	queryPaginator := dynamodb.NewQueryPaginator(d.client, &dynamodb.QueryInput{
 		TableName:                 aws.String(d.tableName),
@@ -60,7 +59,7 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 		}
 
 		for _, item := range items {
-			records = append(records, legacy.BlockIndexRecord(item))
+			records = append(records, BlockIndexRecord(item))
 		}
 	}
 
@@ -71,7 +70,7 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 	return records, nil
 }
 
-var _ legacy.BlockIndexStore = (*DynamoProviderBlockIndexTable)(nil)
+var _ BlockIndexStore = (*DynamoProviderBlockIndexTable)(nil)
 
 func NewDynamoProviderBlockIndexTable(client dynamodb.QueryAPIClient, tableName string) *DynamoProviderBlockIndexTable {
 	return &DynamoProviderBlockIndexTable{client, tableName}
