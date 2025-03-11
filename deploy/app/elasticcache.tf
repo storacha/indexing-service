@@ -13,7 +13,7 @@ resource "aws_elasticache_serverless_cache" "cache" {
   name = "${terraform.workspace}-${var.app}-${each.key}-cache"
   cache_usage_limits {
     data_storage {
-      maximum = terraform.workspace == "prod" ? 10 : 1
+      maximum = terraform.workspace == "prod" ? 20 : 1
       unit = "GB"
     }
     ecpu_per_second {
