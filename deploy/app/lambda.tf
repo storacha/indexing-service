@@ -17,6 +17,7 @@ locals {
     }
     providercache = {
       name = "providercache"
+      timeout = 300
     }
     remotesync = {
       name = "remotesync"
