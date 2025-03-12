@@ -1,19 +1,19 @@
 locals {
   # Only prod and staging get their own caches. All other envs will share the dev caches
-  should_create_caches = terraform.workspace == "prod" || terraform.workspace == "staging"
+  should_create_shared_caches = terraform.workspace != "prod" && terraform.workspace != "staging"
 }
 
 module "caches" {
-  count = local.should_create_caches ? 1 : 0
+  count = local.should_create_shared_caches ? 1 : 0
 
   source = "../modules/elasticaches"
 
   app = var.app
-  environment = terraform.workspace
+  environment = "dev"
   
   cache_limits = {
-    data_storage_GB = terraform.workspace == "prod" ? 20 : 1
-    ecpu_per_second = terraform.workspace == "prod" ? 10000 : 1000
+    data_storage_GB = 1
+    ecpu_per_second = 1000
   }
   
   vpc = {

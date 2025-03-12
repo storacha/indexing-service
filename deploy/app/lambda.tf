@@ -68,16 +68,16 @@ resource "aws_lambda_function" "lambda" {
 
   environment {
     variables = {
-      	PROVIDERS_REDIS_URL = aws_elasticache_serverless_cache.cache["providers"].endpoint[0].address
-        PROVIDERS_REDIS_CACHE = aws_elasticache_serverless_cache.cache["providers"].name
+      	PROVIDERS_REDIS_URL = module.caches[0].providers.address
+        PROVIDERS_REDIS_CACHE = module.caches[0].providers.name
         PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 30 * 24 * 60 * 60 : 24 * 60 * 60}"
-        INDEXES_REDIS_URL = aws_elasticache_serverless_cache.cache["indexes"].endpoint[0].address
-        INDEXES_REDIS_CACHE = aws_elasticache_serverless_cache.cache["indexes"].name
+        INDEXES_REDIS_URL = module.caches[0].indexes.address
+        INDEXES_REDIS_CACHE = module.caches[0].indexes.name
         INDEXES_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
-        CLAIMS_REDIS_URL = aws_elasticache_serverless_cache.cache["claims"].endpoint[0].address
-        CLAIMS_REDIS_CACHE = aws_elasticache_serverless_cache.cache["claims"].name
+        CLAIMS_REDIS_URL = module.caches[0].claims.address
+        CLAIMS_REDIS_CACHE = module.caches[0].claims.name
         CLAIMS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 7 * 24 * 60 * 60 : 24 * 60 * 60}"
-        REDIS_USER_ID = aws_elasticache_user.cache_iam_user.user_id
+        REDIS_USER_ID = module.caches[0].iam_user.user_id
         IPNI_ENDPOINT = "https://cid.contact"
         PROVIDER_CACHING_QUEUE_URL = aws_sqs_queue.caching.id
         PROVIDER_CACHING_BUCKET_NAME = aws_s3_bucket.caching_bucket.bucket
@@ -108,10 +108,8 @@ resource "aws_lambda_function" "lambda" {
   }
 
   vpc_config {
-    security_group_ids = [
-      aws_security_group.lambda_security_group.id
-    ]
-    subnet_ids = module.vpc[0].subnets.private[*].id
+    security_group_ids = [aws_security_group.lambda_security_group.id]
+    subnet_ids = module.vpc[0].subnet_ids.private
   }
 }
 
@@ -163,7 +161,6 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_access_attachment" {
 }
 
 data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
-
   statement {
     effect = "Allow"
     actions = [
@@ -171,10 +168,10 @@ data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
     ]
 
     resources = [
-      "${aws_elasticache_serverless_cache.cache["providers"].arn}",
-      "${aws_elasticache_serverless_cache.cache["indexes"].arn}",
-      "${aws_elasticache_serverless_cache.cache["claims"].arn}",
-      "${aws_elasticache_user.cache_iam_user.arn}"
+      module.caches[0].providers.arn,
+      module.caches[0].indexes.arn,
+      module.caches[0].claims.arn,
+      module.caches[0].iam_user.arn,
     ]
   }
 }
@@ -401,13 +398,11 @@ resource "aws_security_group" "lambda_security_group" {
   vpc_id      = module.vpc[0].id
 
   egress {
-    from_port = 6379
-    to_port   = 6380
-    protocol  = "tcp"
-    description = "Allow elasticache access"
-    security_groups = [
-      aws_security_group.cache_security_group.id,
-    ]
+    from_port       = 6379
+    to_port         = 6380
+    protocol        = "tcp"
+    description     = "Allow elasticache access"
+    security_groups = [module.caches[0].security_group_id]
   }
 
   egress {
