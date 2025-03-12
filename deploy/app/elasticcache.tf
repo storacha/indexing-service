@@ -27,7 +27,7 @@ resource "aws_elasticache_serverless_cache" "cache" {
   security_group_ids   = [aws_security_group.cache_security_group.id]
 
   snapshot_retention_limit = 7
-  subnet_ids               = aws_subnet.vpc_private_subnet[*].id
+  subnet_ids               = module.vpc[0].subnets.private[*].id
 
   user_group_id = aws_elasticache_user_group.cache_user_group.user_group_id
 }
@@ -74,9 +74,9 @@ resource "aws_security_group" "cache_security_group" {
 
   name        = "${terraform.workspace}-${var.app}-cache-security-group"
   description = "Security group for VPC access to redis"
-  vpc_id      = aws_vpc.vpc[0].id
+  vpc_id      = module.vpc[0].id
   ingress {
-    cidr_blocks = [aws_vpc.vpc[0].cidr_block]
+    cidr_blocks = [module.vpc[0].cidr_block]
     description = "Redis"
     from_port = 6379
     to_port = 6380
