@@ -68,7 +68,12 @@ func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder
 	if err != nil {
 		return err
 	}
-	_, err = providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
+	n, err := providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
+	// If we cached 1 or more records then succeed. We don't need to hold up the
+	// queue by re-attempting a cache operation.
+	if n > 0 {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
