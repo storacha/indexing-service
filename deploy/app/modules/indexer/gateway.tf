@@ -142,4 +142,10 @@ resource "aws_route53_record" "api_gateway" {
     zone_id                = aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
     evaluate_target_health = false
   }
+
+  latency_routing_policy {
+    region = data.aws_region.current.name
+  }
+
+  set_identifier = data.aws_region.current.name
 }
