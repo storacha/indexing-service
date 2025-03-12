@@ -27,8 +27,8 @@ import (
 	"github.com/storacha/go-ucanto/did"
 )
 
-// PeerID is the peer ID used in synthetized provider results.
-var PeerID, _ = peer.Decode("12D3KooWLrikEsjt5wz326bRhCyEThRhJ936o13c5Ej7ttLbkxgp")
+// ProviderID is the peer ID used in synthetized provider results.
+var ProviderID, _ = peer.Decode("12D3KooWLrikEsjt5wz326bRhCyEThRhJ936o13c5Ej7ttLbkxgp")
 
 var ErrIgnoreFiltered = errors.New("claim type is not in list of target claims")
 
@@ -237,7 +237,7 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 	providerAddrs = append(providerAddrs, ls.claimsAddr)
 
 	providerAddrInfo := &peer.AddrInfo{
-		ID:    PeerID,
+		ID:    ProviderID,
 		Addrs: providerAddrs,
 	}
 
@@ -264,7 +264,7 @@ func (ls LegacyClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCa
 
 	// the index claim is fetchable from the legacy claims store
 	providerAddrInfo := &peer.AddrInfo{
-		ID:    PeerID,
+		ID:    ProviderID,
 		Addrs: []ma.Multiaddr{ls.claimsAddr},
 	}
 
@@ -291,7 +291,7 @@ func (ls LegacyClaimsStore) synthetizeEqualsProviderResult(caveats assert.Equals
 
 	// the equals claim is fetchable from the legacy claims store
 	providerAddrInfo := &peer.AddrInfo{
-		ID:    PeerID,
+		ID:    ProviderID,
 		Addrs: []ma.Multiaddr{ls.claimsAddr},
 	}
 
