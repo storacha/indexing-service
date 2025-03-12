@@ -23,37 +23,37 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 
 	// Prioritize the root
 	rootDigest := link.ToCID(index.Content()).Hash()
-	err := addExpirable(ctx, s.providerStore, rootDigest, provider)
+	n, err := addExpirable(ctx, s.providerStore, rootDigest, provider)
 	if err != nil {
 		return written, err
 	}
-	written++
+	written += n
 
 	for _, shardIndex := range index.Shards().Iterator() {
 		for hash := range shardIndex.Iterator() {
 			if string(hash) == string(rootDigest) {
 				continue // already added
 			}
-			err := addExpirable(ctx, s.providerStore, hash, provider)
+			n, err := addExpirable(ctx, s.providerStore, hash, provider)
 			if err != nil {
 				return written, err
 			}
-			written++
+			written += n
 		}
 	}
 	return written, nil
 }
 
-func addExpirable(ctx context.Context, providerStore types.ProviderStore, digest multihash.Multihash, provider model.ProviderResult) error {
+func addExpirable(ctx context.Context, providerStore types.ProviderStore, digest multihash.Multihash, provider model.ProviderResult) (uint64, error) {
 	n, err := providerStore.Add(ctx, digest, provider)
 	if err != nil {
-		return err
+		return n, err
 	}
 	if n > 0 {
 		err = providerStore.SetExpirable(ctx, digest, true)
 		if err != nil {
-			return err
+			return n, err
 		}
 	}
-	return nil
+	return n, nil
 }

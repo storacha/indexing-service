@@ -8,6 +8,7 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -34,11 +35,16 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			shardIndex.SetSlice(shardMhs[i], sliceMhs[i*3+j], blobindex.Position{})
 		}
 	}
+	// the root block should be in the index also
+	shardIndex.SetSlice(shardMhs[0], link.ToCID(testCid1).Hash(), blobindex.Position{})
 
-	shardIndex2 := blobindex.NewShardedDagIndexView(testutil.RandomCID(), 2)
+	testCid2 := testutil.RandomCID()
+	shardIndex2 := blobindex.NewShardedDagIndexView(testCid2, 2)
 	for j := range 2 {
 		shardIndex2.SetSlice(shardMhs[0], sliceMhs[j], blobindex.Position{})
 	}
+	// the root block should be in the index also
+	shardIndex2.SetSlice(shardMhs[0], link.ToCID(testCid2).Hash(), blobindex.Position{})
 
 	evensFilled := func() map[string][]model.ProviderResult {
 		starter := make(map[string][]model.ProviderResult)
@@ -66,10 +72,10 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			name:          "Cache new provider",
 			provider:      testProvider,
 			index:         shardIndex,
-			expectedCount: 6,
+			expectedCount: 7,
 			expectedErr:   nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
-				require.Len(t, store, 6)
+				require.Len(t, store, 7)
 				for _, sliceMh := range sliceMhs {
 					require.Equal(t, store[sliceMh.String()], []model.ProviderResult{testProvider})
 				}
@@ -80,10 +86,10 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			provider:      testProvider,
 			index:         shardIndex,
 			initialStore:  evensFilled(),
-			expectedCount: 3,
+			expectedCount: 4,
 			expectedErr:   nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
-				require.Len(t, store, 6)
+				require.Len(t, store, 7)
 				for _, sliceMh := range sliceMhs {
 					require.Equal(t, store[sliceMh.String()], []model.ProviderResult{testProvider})
 				}
@@ -94,10 +100,10 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			provider:      testProvider2,
 			index:         shardIndex,
 			initialStore:  evensFilled(),
-			expectedCount: 6,
+			expectedCount: 7,
 			expectedErr:   nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
-				require.Len(t, store, 6)
+				require.Len(t, store, 7)
 				for i, sliceMh := range sliceMhs {
 					expected := []model.ProviderResult{testProvider2}
 					if i%2 == 0 {
