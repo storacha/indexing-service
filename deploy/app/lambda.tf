@@ -398,7 +398,7 @@ resource "aws_lambda_permission" "allow_sns_invoke" {
 resource "aws_security_group" "lambda_security_group" {
   name        = "${terraform.workspace}-${var.app}-lambda-security-group"
   description = ("Allow traffic from lambda to elasticache")
-  vpc_id      = aws_vpc.vpc.id
+  vpc_id      = aws_vpc.vpc[0].id
 
   egress {
     from_port = 6379

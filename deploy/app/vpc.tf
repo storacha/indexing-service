@@ -1,31 +1,41 @@
 locals {
   vpc_cidr = "10.0.0.0/16"
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
+
+  # Only prod and staging get their own VPC. All other envs will share the dev VPC
+  should_create_vpc = terraform.workspace == "prod" || terraform.workspace == "staging"
 }
+
+# Get shared dev VPC details if we're in a dev environment
+
 
 data "aws_availability_zones" "available" {}
 
+resource "aws_vpc" "vpc" {
+  count = local.should_create_vpc ? 1 : 0
 
-resource "aws_vpc" "vpc" {  
-  cidr_block = local.vpc_cidr
+  cidr_block           = local.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
+
   tags = {
     Name = "${terraform.workspace}-${var.app}-vpc"
   }
 }
 
 resource "aws_internet_gateway" "vpc_internet_gateway" {
-  vpc_id = aws_vpc.vpc.id
+  count  = local.should_create_vpc ? 1 : 0
+  vpc_id = aws_vpc.vpc[0].id
+
   tags = {
     Name = "${terraform.workspace}-${var.app}-vpc-internet-gateway"
   }
 }
 
 resource "aws_subnet" "vpc_public_subnet" {
-  count = length(local.azs)
+  count = local.should_create_vpc ? length(local.azs) : 0
   
-  vpc_id = aws_vpc.vpc.id
+  vpc_id = aws_vpc.vpc[0].id
   availability_zone =  local.azs[count.index]
   cidr_block = cidrsubnet(local.vpc_cidr, 8, count.index)
 
@@ -35,9 +45,9 @@ resource "aws_subnet" "vpc_public_subnet" {
 }
 
 resource "aws_subnet" "vpc_private_subnet" {
-  count = length(local.azs)
+  count = local.should_create_vpc ? length(local.azs) : 0
   
-  vpc_id = aws_vpc.vpc.id
+  vpc_id = aws_vpc.vpc[0].id
   availability_zone =  local.azs[count.index]
   cidr_block = cidrsubnet(local.vpc_cidr, 8, count.index+10)
 
@@ -47,8 +57,9 @@ resource "aws_subnet" "vpc_private_subnet" {
 }
 
 resource "aws_route_table" "vpc_public_route_table" {
-  count = length(local.azs)
-  vpc_id = aws_vpc.vpc.id
+  count = local.should_create_vpc ? length(local.azs) : 0
+
+  vpc_id = aws_vpc.vpc[0].id
 
   tags = {
     Name = "${terraform.workspace}-${var.app}-vpc-public-route-table-${local.azs[count.index]}"
@@ -56,8 +67,9 @@ resource "aws_route_table" "vpc_public_route_table" {
 }
 
 resource "aws_route_table" "vpc_private_route_table" {
-  count = length(local.azs)
-  vpc_id = aws_vpc.vpc.id
+  count = local.should_create_vpc ? length(local.azs) : 0
+
+  vpc_id = aws_vpc.vpc[0].id
 
   tags = {
     Name = "${terraform.workspace}-${var.app}-vpc-private-route-table-${local.azs[count.index]}"
@@ -65,25 +77,25 @@ resource "aws_route_table" "vpc_private_route_table" {
 }
 
 resource "aws_route_table_association" "vpc_public_route_table_association" {
-  count = length(local.azs)
+  count = local.should_create_vpc ? length(local.azs) : 0
 
   subnet_id      = aws_subnet.vpc_public_subnet[count.index].id
   route_table_id = aws_route_table.vpc_public_route_table[count.index].id
 }
 
 resource "aws_route_table_association" "vpc_private_route_table_association" {
-  count = length(local.azs)
+  count = local.should_create_vpc ? length(local.azs) : 0
 
   subnet_id      = aws_subnet.vpc_private_subnet[count.index].id
   route_table_id = aws_route_table.vpc_private_route_table[count.index].id
 }
 
 resource "aws_route" "vpc_public_internet_gateway" {
-  count = length(local.azs)
+  count = local.should_create_vpc ? length(local.azs) : 0
 
   route_table_id         = aws_route_table.vpc_public_route_table[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.vpc_internet_gateway.id
+  gateway_id             = aws_internet_gateway.vpc_internet_gateway[0].id
 
   timeouts {
     create = "5m"
@@ -91,11 +103,11 @@ resource "aws_route" "vpc_public_internet_gateway" {
 }
 
 resource "aws_route" "vpc_private_nat_gateway" {
-  count = length(local.azs)
+  count = local.should_create_vpc ? length(local.azs) : 0
 
   route_table_id         = aws_route_table.vpc_private_route_table[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id             = aws_nat_gateway.vpc_nat[count.index].id
+  nat_gateway_id         = aws_nat_gateway.vpc_nat[count.index].id
 
   timeouts {
     create = "5m"

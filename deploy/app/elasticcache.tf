@@ -74,9 +74,9 @@ resource "aws_security_group" "cache_security_group" {
 
   name        = "${terraform.workspace}-${var.app}-cache-security-group"
   description = "Security group for VPC access to redis"
-  vpc_id      = aws_vpc.vpc.id
+  vpc_id      = aws_vpc.vpc[0].id
   ingress {
-    cidr_blocks = [aws_vpc.vpc.cidr_block]
+    cidr_blocks = [aws_vpc.vpc[0].cidr_block]
     description = "Redis"
     from_port = 6379
     to_port = 6380
