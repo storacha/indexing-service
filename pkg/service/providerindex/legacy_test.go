@@ -184,6 +184,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		blobUrl := testutil.Must(url.Parse("https://storacha.network/blobs/{blob}"))(t)
 		blobProviderAddr := testutil.Must(maurl.FromURL(blobUrl))(t)
 		require.Equal(t, blobProviderAddr, result.Provider.Addrs[0])
+		require.Equal(t, ProviderID, result.Provider.ID)
 	})
 
 	t.Run("filters out location claims", func(t *testing.T) {
@@ -231,6 +232,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)
 		require.Equal(t, claimsProviderAddr, result.Provider.Addrs[0])
+		require.Equal(t, ProviderID, result.Provider.ID)
 	})
 
 	t.Run("filters out index claims", func(t *testing.T) {
@@ -279,6 +281,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		claimsUrl := testutil.Must(url.Parse("https://storacha.network/claims/{claim}"))(t)
 		claimsProviderAddr := testutil.Must(maurl.FromURL(claimsUrl))(t)
 		require.Equal(t, claimsProviderAddr, result.Provider.Addrs[0])
+		require.Equal(t, ProviderID, result.Provider.ID)
 	})
 
 	t.Run("filters out equals claims", func(t *testing.T) {
