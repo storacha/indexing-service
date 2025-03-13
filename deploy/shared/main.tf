@@ -15,7 +15,6 @@ terraform {
 provider "aws" {
   allowed_account_ids = var.allowed_account_ids
   default_tags {
-    
     tags = {
       "Environment" = terraform.workspace
       "ManagedBy"   = "OpenTofu"
@@ -29,8 +28,4 @@ provider "aws" {
 
 resource "aws_route53_zone" "primary" {
   name = "${var.app}.storacha.network"
-}
-
-output "primary_zone" {
-  value = aws_route53_zone.primary
 }

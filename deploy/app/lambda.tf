@@ -23,6 +23,16 @@ locals {
       name = "remotesync"
     }
   }
+
+  # use dedicated VPC and caches for prod and staging, and shared resources otherwise
+  dedicated_resources = terraform.workspace == "prod" || terraform.workspace == "staging"
+  vpc_id = local.dedicated_resources ? module.vpc[0].id : data.terraform_remote_state.shared.outputs.dev_vpc.id
+  private_subnet_ids = local.dedicated_resources ? module.vpc[0].subnet_ids.private : data.terraform_remote_state.shared.outputs.dev_vpc.subnet_ids.private
+  providers_cache = local.dedicated_resources ? module.caches[0].providers : data.terraform_remote_state.shared.outputs.dev_caches.providers
+  indexes_cache = local.dedicated_resources ? module.caches[0].indexes : data.terraform_remote_state.shared.outputs.dev_caches.indexes
+  claims_cache = local.dedicated_resources ? module.caches[0].claims : data.terraform_remote_state.shared.outputs.dev_caches.claims
+  cache_iam_user = local.dedicated_resources ? module.caches[0].iam_user : data.terraform_remote_state.shared.outputs.dev_caches.iam_user
+  cache_security_group_id = local.dedicated_resources ? module.caches[0].security_group_id : data.terraform_remote_state.shared.outputs.dev_caches.security_group_id
 }
 
 // zip the binary along with the config file for the otel collector
@@ -69,16 +79,16 @@ resource "aws_lambda_function" "lambda" {
 
   environment {
     variables = {
-      	PROVIDERS_REDIS_URL = aws_elasticache_serverless_cache.cache["providers"].endpoint[0].address
-        PROVIDERS_REDIS_CACHE = aws_elasticache_serverless_cache.cache["providers"].name
+      	PROVIDERS_REDIS_URL = local.providers_cache.address
+        PROVIDERS_REDIS_CACHE = local.providers_cache.name
         PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 30 * 24 * 60 * 60 : 24 * 60 * 60}"
-        INDEXES_REDIS_URL = aws_elasticache_serverless_cache.cache["indexes"].endpoint[0].address
-        INDEXES_REDIS_CACHE = aws_elasticache_serverless_cache.cache["indexes"].name
+        INDEXES_REDIS_URL = local.indexes_cache.address
+        INDEXES_REDIS_CACHE = local.indexes_cache.name
         INDEXES_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
-        CLAIMS_REDIS_URL = aws_elasticache_serverless_cache.cache["claims"].endpoint[0].address
-        CLAIMS_REDIS_CACHE = aws_elasticache_serverless_cache.cache["claims"].name
+        CLAIMS_REDIS_URL = local.claims_cache.address
+        CLAIMS_REDIS_CACHE = local.claims_cache.name
         CLAIMS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 7 * 24 * 60 * 60 : 24 * 60 * 60}"
-        REDIS_USER_ID = aws_elasticache_user.cache_iam_user.user_id
+        REDIS_USER_ID = local.cache_iam_user.user_id
         IPNI_ENDPOINT = "https://cid.contact"
         PROVIDER_CACHING_QUEUE_URL = aws_sqs_queue.caching.id
         PROVIDER_CACHING_BUCKET_NAME = aws_s3_bucket.caching_bucket.bucket
@@ -109,10 +119,8 @@ resource "aws_lambda_function" "lambda" {
   }
 
   vpc_config {
-    security_group_ids = [
-      aws_security_group.lambda_security_group.id
-    ]
-    subnet_ids = aws_subnet.vpc_private_subnet[*].id
+    security_group_ids = [aws_security_group.lambda_security_group.id]
+    subnet_ids = local.private_subnet_ids
   }
 }
 
@@ -164,7 +172,6 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_access_attachment" {
 }
 
 data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
-
   statement {
     effect = "Allow"
     actions = [
@@ -172,10 +179,10 @@ data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
     ]
 
     resources = [
-      "${aws_elasticache_serverless_cache.cache["providers"].arn}",
-      "${aws_elasticache_serverless_cache.cache["indexes"].arn}",
-      "${aws_elasticache_serverless_cache.cache["claims"].arn}",
-      "${aws_elasticache_user.cache_iam_user.arn}"
+      local.providers_cache.arn,
+      local.indexes_cache.arn,
+      local.claims_cache.arn,
+      local.cache_iam_user.arn,
     ]
   }
 }
@@ -399,16 +406,14 @@ resource "aws_lambda_permission" "allow_sns_invoke" {
 resource "aws_security_group" "lambda_security_group" {
   name        = "${terraform.workspace}-${var.app}-lambda-security-group"
   description = ("Allow traffic from lambda to elasticache")
-  vpc_id      = aws_vpc.vpc.id
+  vpc_id      = local.vpc_id
 
   egress {
-    from_port = 6379
-    to_port   = 6380
-    protocol  = "tcp"
-    description = "Allow elasticache access"
-    security_groups = [
-      aws_security_group.cache_security_group.id,
-    ]
+    from_port       = 6379
+    to_port         = 6380
+    protocol        = "tcp"
+    description     = "Allow elasticache access"
+    security_groups = [local.cache_security_group_id]
   }
 
   egress {
