@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	logging "github.com/ipfs/go-log/v2"
@@ -16,6 +17,9 @@ import (
 )
 
 var log = logging.Logger("lambda/providercache")
+
+// gracePeriod is the amount of time we have to clean up before a lambda exits
+var gracePeriod = time.Second * 3
 
 func main() {
 	lambda.Start(makeHandler)
@@ -31,6 +35,17 @@ func makeHandler(cfg aws.Config) any {
 	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
 
 	return func(ctx context.Context, sqsEvent events.SQSEvent) error {
+		deadline, ok := ctx.Deadline()
+		if ok {
+			graceDeadline := deadline.Add(-gracePeriod)
+			// if graceful shutdown time is after now then we can apply new deadline
+			if graceDeadline.After(time.Now()) {
+				dctx, cancel := context.WithDeadline(ctx, graceDeadline)
+				defer cancel()
+				ctx = dctx
+			}
+		}
+
 		// process messages in parallel
 		results := make(chan error, len(sqsEvent.Records))
 		var wg sync.WaitGroup
