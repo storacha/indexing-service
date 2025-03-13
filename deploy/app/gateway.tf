@@ -89,15 +89,6 @@ resource "aws_apigatewayv2_deployment" "deployment" {
   description = "${terraform.workspace} ${var.app} API Deployment"
 }
 
-data "terraform_remote_state" "shared" {
-  backend = "s3"
-  config = {
-    bucket = "storacha-terraform-state"
-    key    = "storacha/indexing-service/shared.tfstate"
-    region = "us-west-2"
-  }
-}
-
 resource "aws_acm_certificate" "cert" {
   domain_name       = local.domain_name
   validation_method = "DNS"

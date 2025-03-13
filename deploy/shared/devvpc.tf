@@ -3,7 +3,7 @@ locals {
   should_create_shared_vpc = terraform.workspace != "prod" && terraform.workspace != "staging"
 }
 
-module "vpc" {
+module "dev_vpc" {
   count = local.should_create_shared_vpc ? 1 : 0
 
   source = "../modules/vpc"

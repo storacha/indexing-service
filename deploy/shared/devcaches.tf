@@ -3,7 +3,7 @@ locals {
   should_create_shared_caches = terraform.workspace != "prod" && terraform.workspace != "staging"
 }
 
-module "caches" {
+module "dev_caches" {
   count = local.should_create_shared_caches ? 1 : 0
 
   source = "../modules/elasticaches"
@@ -17,8 +17,8 @@ module "caches" {
   }
   
   vpc = {
-    id = module.vpc[0].id
-    cidr_block = module.vpc[0].cidr_block
-    private_subnet_ids = module.vpc[0].subnet_ids.private
+    id = module.dev_vpc[0].id
+    cidr_block = module.dev_vpc[0].cidr_block
+    private_subnet_ids = module.dev_vpc[0].subnet_ids.private
   }
 }
