@@ -1,15 +1,3 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 5.86.0"
-    }
-    archive = {
-      source = "hashicorp/archive"
-    }
-  }
-}
-
 # access state for shared resources (primary DNS zone, dev VPC and dev caches)
 data "terraform_remote_state" "shared" {
   backend = "s3"
