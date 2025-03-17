@@ -6,7 +6,7 @@ locals {
 module "vpc" {
   count = local.should_create_vpc ? 1 : 0
 
-  source = "../modules/vpc"
+  source = "../../../modules/vpc"
 
   app = var.app
   environment = terraform.workspace

@@ -21,7 +21,7 @@ provider "aws" {
       Owner         = "storacha"
       Team          = "Storacha Engineering"
       Organization  = "Storacha"
-      Project       = "${var.app}"
+      Project       = var.app
     }
   }
 }

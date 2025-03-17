@@ -6,7 +6,7 @@ locals {
 module "caches" {
   count = local.should_create_caches ? 1 : 0
 
-  source = "../modules/elasticaches"
+  source = "../../../modules/elasticaches"
 
   app = var.app
   environment = terraform.workspace
