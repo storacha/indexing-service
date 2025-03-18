@@ -62,6 +62,7 @@ jobs:
 
       - name: Tofu Init
         run: |
+          tofu -version
           tofu -chdir="deploy/app" init
 
       - name: Build Go Apps
