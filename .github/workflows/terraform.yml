@@ -36,7 +36,7 @@ env:
   AWS_REGION: ${{ secrets.aws-region }}
   ENV: ${{ inputs.env }}
   TF_WORKSPACE: ${{ inputs.workspace }}
-  TF_VAR_extra_deployment_regions: ${{ secrets.extra-deployment-regions }}
+  TF_VAR_extra_deployment_regions: ${{ secrets.extra-deployment-regions || '[]' }}
   TF_VAR_private_key: ${{ secrets.private-key }}
   TF_VAR_did: ${{ inputs.did }}
   TF_VAR_honeycomb_api_key: ${{ secrets.honeycomb-api-key }}
@@ -62,7 +62,6 @@ jobs:
 
       - name: Tofu Init
         run: |
-          tofu -version
           tofu -chdir="deploy/app" init
 
       - name: Build Go Apps
