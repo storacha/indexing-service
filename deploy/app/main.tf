@@ -16,9 +16,26 @@ terraform {
   }
 }
 
-module "indexer_deployment" {
+module "main_deployment" {
+  source = "./modules/indexer"
+
+  app = var.app
+  private_key = var.private_key
+  did = var.did
+  honeycomb_api_key = var.honeycomb_api_key
+  principal_mapping = var.principal_mapping
+  legacy_data_bucket_url = var.legacy_data_bucket_url
+
+  providers = {
+    aws = aws
+    aws.legacy_claims = aws.legacy_claims
+    aws.block_index = aws.block_index
+  }
+}
+
+module "extra_deployments" {
   for_each = toset([
-    for region in local.deployment_regions : region
+    for region in local.extra_deployment_regions : region
     if region != "provider"
   ])
 
@@ -32,7 +49,7 @@ module "indexer_deployment" {
   legacy_data_bucket_url = var.legacy_data_bucket_url
 
   providers = {
-    aws = aws.by_region[each.key]
+    aws = aws.extra_deployments[each.key]
     aws.legacy_claims = aws.legacy_claims
     aws.block_index = aws.block_index
   }

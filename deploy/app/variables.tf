@@ -10,6 +10,12 @@ variable "allowed_account_ids" {
   default     = ["505595374361"]
 }
 
+variable "extra_deployment_regions" {
+  type        = list(string)
+  description = "Regions to do additional deployments (beyond the main deployment) in"
+  default     = []
+}
+
 variable "private_key" {
   description = "private_key for the peer for this deployment"
   type        = string
@@ -36,14 +42,4 @@ variable "legacy_data_bucket_url" {
   type        = string
   description = "URL to use when constructing synthesizing legacy claims"
   default     = ""
-}
-
-variable "deployment_regions" {
-  type        = list(string)
-  description = "Regions to deploy to"
-
-  validation {
-    condition     = length(var.deployment_regions) > 0
-    error_message = "At least one deployment region must be specified"
-  }
 }
