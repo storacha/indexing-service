@@ -16,17 +16,13 @@ terraform {
   }
 }
 
-locals {
-  # Only do a multi-region deployment for prod
-  deployment_regions = terraform.workspace == "prod" ? var.deployment_regions : [var.deployment_regions[0]]
-}
-
 module "indexer_deployment" {
-  for_each = var.deployment_regions
+  for_each = toset([
+    for region in local.deployment_regions : region
+    if region != "provider"
+  ])
 
   source = "./modules/indexer"
-
-  region = each.value
 
   app = var.app
   private_key = var.private_key
@@ -34,4 +30,10 @@ module "indexer_deployment" {
   honeycomb_api_key = var.honeycomb_api_key
   principal_mapping = var.principal_mapping
   legacy_data_bucket_url = var.legacy_data_bucket_url
+
+  providers = {
+    aws = aws.by_region[each.key]
+    aws.legacy_claims = aws.legacy_claims
+    aws.block_index = aws.block_index
+  }
 }

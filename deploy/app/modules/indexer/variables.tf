@@ -4,11 +4,6 @@ variable "app" {
   default     = "indexer"
 }
 
-variable "region" {
-  description = "The region to deploy to"
-  type        = string
-}
-
 variable "allowed_account_ids" {
   description = "account ids used for AWS"
   type        = list(string)

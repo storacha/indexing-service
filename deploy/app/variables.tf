@@ -41,7 +41,6 @@ variable "legacy_data_bucket_url" {
 variable "deployment_regions" {
   type        = list(string)
   description = "Regions to deploy to"
-  default     = ["us-east-2"]
 
   validation {
     condition     = length(var.deployment_regions) > 0

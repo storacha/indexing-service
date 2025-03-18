@@ -3,6 +3,7 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = ">= 5.86.0"
+      configuration_aliases = [ aws.legacy_claims, aws.block_index ]
     }
   }
 }

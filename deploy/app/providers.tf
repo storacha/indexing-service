@@ -1,35 +1,18 @@
-provider "aws" {
-  alias  = "us-west"
-  region = "us-west-2"
-  allowed_account_ids = var.allowed_account_ids
-
-  default_tags { 
-    tags = local.common_tags
-  }
-}
-
-provider "aws" {
-  alias  = "us-east"
-  region = "us-east-1"
-  allowed_account_ids = var.allowed_account_ids
-
-  default_tags { 
-    tags = local.common_tags
-  }
-}
-
-provider "aws" {
-  alias  = "europe"
-  region = "eu-central-1"
-  allowed_account_ids = var.allowed_account_ids
-
-  default_tags { 
-    tags = local.common_tags
-  }
-}
-
 locals {
-  common_tags = {
+  # Only do a multi-region deployment for prod
+  # The special "provider" region allows keeping the original provider definition when removing resources in all
+  # other regions (see https://opentofu.org/docs/language/providers/configuration/#referring-to-provider-instances)
+  deployment_regions = terraform.workspace == "prod" ? concat(var.deployment_regions, ["provider"]) : [var.deployment_regions[0], "provider"]
+}
+
+provider "aws" {
+  alias  = "by_region"
+  for_each = toset(local.deployment_regions)
+
+  allowed_account_ids = var.allowed_account_ids
+
+  default_tags { 
+    tags = {
       Environment  = terraform.workspace
       ManagedBy    = "OpenTofu"
       Owner        = "storacha"
@@ -37,4 +20,5 @@ locals {
       Organization = "Storacha"
       Project      = var.app
     }
+  }
 }
