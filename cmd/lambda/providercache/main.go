@@ -80,7 +80,7 @@ func makeHandler(cfg aws.Config) any {
 			}
 		}
 		if err != nil {
-			log.Errorf("handling messages: %w", err)
+			log.Errorf("handling messages: %s", err.Error())
 		}
 		return events.SQSEventResponse{BatchItemFailures: batchItemFailures}, err
 	}
