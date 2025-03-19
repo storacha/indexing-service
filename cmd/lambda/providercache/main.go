@@ -34,7 +34,7 @@ func makeHandler(cfg aws.Config) any {
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
 
-	return func(ctx context.Context, sqsEvent events.SQSEvent) error {
+	return func(ctx context.Context, sqsEvent events.SQSEvent) (events.SQSEventResponse, error) {
 		deadline, ok := ctx.Deadline()
 		if ok {
 			graceDeadline := deadline.Add(-gracePeriod)
@@ -46,6 +46,9 @@ func makeHandler(cfg aws.Config) any {
 			}
 		}
 
+		batchItemFailures := []events.SQSBatchItemFailure{}
+		var failureMutex sync.Mutex
+
 		// process messages in parallel
 		results := make(chan error, len(sqsEvent.Records))
 		var wg sync.WaitGroup
@@ -54,6 +57,16 @@ func makeHandler(cfg aws.Config) any {
 			go func(msg events.SQSMessage) {
 				defer wg.Done()
 				err := handleMessage(ctx, sqsCachingDecoder, providerCacher, msg)
+				if err != nil {
+					failureMutex.Lock()
+					batchItemFailures = append(batchItemFailures, events.SQSBatchItemFailure{ItemIdentifier: msg.MessageId})
+					failureMutex.Unlock()
+				} else {
+					err := sqsCachingDecoder.CleanupMessage(ctx, msg.Body)
+					if err != nil {
+						log.Warnf("unable to cleanup message fully: %s", err.Error())
+					}
+				}
 				results <- err
 			}(msg)
 		}
@@ -64,17 +77,10 @@ func makeHandler(cfg aws.Config) any {
 		for nextErr := range results {
 			err = errors.Join(err, nextErr)
 		}
-		// return overall error
 		if err != nil {
-			return err
+			log.Errorf("handling messages: %w", err)
 		}
-		for _, msg := range sqsEvent.Records {
-			err := sqsCachingDecoder.CleanupMessage(ctx, msg.Body)
-			if err != nil {
-				log.Warnf("unable to cleanup message fully: %s", err.Error())
-			}
-		}
-		return nil
+		return events.SQSEventResponse{BatchItemFailures: batchItemFailures}, err
 	}
 }
 
