@@ -25,11 +25,6 @@ func main() {
 	lambda.Start(makeHandler)
 }
 
-type handlerResult struct {
-	id  string
-	err error
-}
-
 func makeHandler(cfg aws.Config) any {
 	providersRedis := goredis.NewClient(&cfg.ProvidersRedis)
 	if cfg.HoneycombAPIKey != "" {
@@ -49,6 +44,11 @@ func makeHandler(cfg aws.Config) any {
 				defer cancel()
 				ctx = dctx
 			}
+		}
+
+		type handlerResult struct {
+			id  string
+			err error
 		}
 
 		// process messages in parallel
