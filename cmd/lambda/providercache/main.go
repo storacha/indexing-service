@@ -25,6 +25,11 @@ func main() {
 	lambda.Start(makeHandler)
 }
 
+type handlerResult struct {
+	id  string
+	err error
+}
+
 func makeHandler(cfg aws.Config) any {
 	providersRedis := goredis.NewClient(&cfg.ProvidersRedis)
 	if cfg.HoneycombAPIKey != "" {
@@ -46,36 +51,33 @@ func makeHandler(cfg aws.Config) any {
 			}
 		}
 
-		batchItemFailures := []events.SQSBatchItemFailure{}
-		var failureMutex sync.Mutex
-
 		// process messages in parallel
-		results := make(chan error, len(sqsEvent.Records))
+		results := make(chan handlerResult, len(sqsEvent.Records))
 		var wg sync.WaitGroup
 		for _, msg := range sqsEvent.Records {
 			wg.Add(1)
 			go func(msg events.SQSMessage) {
 				defer wg.Done()
 				err := handleMessage(ctx, sqsCachingDecoder, providerCacher, msg)
-				if err != nil {
-					failureMutex.Lock()
-					batchItemFailures = append(batchItemFailures, events.SQSBatchItemFailure{ItemIdentifier: msg.MessageId})
-					failureMutex.Unlock()
-				} else {
+				if err == nil {
 					err := sqsCachingDecoder.CleanupMessage(ctx, msg.Body)
 					if err != nil {
 						log.Warnf("unable to cleanup message fully: %s", err.Error())
 					}
 				}
-				results <- err
+				results <- handlerResult{msg.MessageId, err}
 			}(msg)
 		}
 		wg.Wait()
 		// collect errors
 		close(results)
+		batchItemFailures := []events.SQSBatchItemFailure{}
 		var err error
-		for nextErr := range results {
-			err = errors.Join(err, nextErr)
+		for r := range results {
+			if r.err != nil {
+				err = errors.Join(err, r.err)
+				batchItemFailures = append(batchItemFailures, events.SQSBatchItemFailure{ItemIdentifier: r.id})
+			}
 		}
 		if err != nil {
 			log.Errorf("handling messages: %w", err)
