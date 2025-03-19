@@ -34,7 +34,7 @@ func makeHandler(cfg aws.Config) any {
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
 
-	return func(ctx context.Context, sqsEvent events.SQSEvent) error {
+	return func(ctx context.Context, sqsEvent events.SQSEvent) (events.SQSEventResponse, error) {
 		deadline, ok := ctx.Deadline()
 		if ok {
 			graceDeadline := deadline.Add(-gracePeriod)
@@ -46,35 +46,43 @@ func makeHandler(cfg aws.Config) any {
 			}
 		}
 
+		type handlerResult struct {
+			id  string
+			err error
+		}
+
 		// process messages in parallel
-		results := make(chan error, len(sqsEvent.Records))
+		results := make(chan handlerResult, len(sqsEvent.Records))
 		var wg sync.WaitGroup
 		for _, msg := range sqsEvent.Records {
 			wg.Add(1)
 			go func(msg events.SQSMessage) {
 				defer wg.Done()
 				err := handleMessage(ctx, sqsCachingDecoder, providerCacher, msg)
-				results <- err
+				if err == nil {
+					err := sqsCachingDecoder.CleanupMessage(ctx, msg.Body)
+					if err != nil {
+						log.Warnf("unable to cleanup message fully: %s", err.Error())
+					}
+				}
+				results <- handlerResult{msg.MessageId, err}
 			}(msg)
 		}
 		wg.Wait()
 		// collect errors
 		close(results)
+		batchItemFailures := []events.SQSBatchItemFailure{}
 		var err error
-		for nextErr := range results {
-			err = errors.Join(err, nextErr)
-		}
-		// return overall error
-		if err != nil {
-			return err
-		}
-		for _, msg := range sqsEvent.Records {
-			err := sqsCachingDecoder.CleanupMessage(ctx, msg.Body)
-			if err != nil {
-				log.Warnf("unable to cleanup message fully: %s", err.Error())
+		for r := range results {
+			if r.err != nil {
+				err = errors.Join(err, r.err)
+				batchItemFailures = append(batchItemFailures, events.SQSBatchItemFailure{ItemIdentifier: r.id})
 			}
 		}
-		return nil
+		if err != nil {
+			log.Errorf("handling messages: %w", err)
+		}
+		return events.SQSEventResponse{BatchItemFailures: batchItemFailures}, err
 	}
 }
 
