@@ -365,6 +365,7 @@ resource "aws_lambda_event_source_mapping" "event_source_mapping" {
   enabled          = true
   function_name    = aws_lambda_function.lambda["providercache"].arn
   batch_size       = terraform.workspace == "prod" ? 10 : 1
+  function_response_types = ["ReportBatchItemFailures"]
 }
 
 resource "aws_cloudwatch_event_rule" "head_check" {
