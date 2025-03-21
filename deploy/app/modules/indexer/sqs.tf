@@ -7,7 +7,7 @@ resource "aws_sqs_queue" "caching" {
   visibility_timeout_seconds = 300
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.caching_deadletter.arn
-    maxReceiveCount     = 4
+    maxReceiveCount     = 10
   })
   tags = {
     Name = "${terraform.workspace}-${var.app}-caching"
