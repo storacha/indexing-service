@@ -32,7 +32,7 @@ $ go install github.com/storacha/indexing-service/cmd@latest
 
 Deployment of this service to AWS is managed by terraform which you can invoke with `make`.
 
-First, install OpenTofu (at least v1.9.0 required) e.g.
+First, install OpenTofu e.g.
 
 ```sh
 brew install opentofu
@@ -129,7 +129,6 @@ make indexer
 ```
 
 #### `./indexer query <CID>`
-
 Attempts to find the given CID in the Indexer node. The result can be multiple Location Claims, as there may be several storage nodes that store copies of the content, as well as potential indexes and the indexes themselves. If you want to query a specific node, you can use the following command:
 
 ```sh

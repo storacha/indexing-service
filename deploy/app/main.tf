@@ -8,7 +8,6 @@ terraform {
       source = "hashicorp/archive"
     }
   }
-
   backend "s3" {
     bucket = "storacha-terraform-state"
     key    = "storacha/indexing-service/terraform.tfstate"
@@ -16,41 +15,27 @@ terraform {
   }
 }
 
-module "main_deployment" {
-  source = "./modules/indexer"
-
-  app = var.app
-  private_key = var.private_key
-  did = var.did
-  honeycomb_api_key = var.honeycomb_api_key
-  principal_mapping = var.principal_mapping
-  legacy_data_bucket_url = var.legacy_data_bucket_url
-
-  providers = {
-    aws = aws
-    aws.legacy_claims = aws.legacy_claims
-    aws.block_index = aws.block_index
+provider "aws" {
+  allowed_account_ids = var.allowed_account_ids
+  default_tags {
+    
+    tags = {
+      "Environment" = terraform.workspace
+      "ManagedBy"   = "OpenTofu"
+      Owner         = "storacha"
+      Team          = "Storacha Engineering"
+      Organization  = "Storacha"
+      Project       = "${var.app}"
+    }
   }
 }
 
-module "extra_deployments" {
-  for_each = toset([
-    for region in local.extra_deployment_regions : region
-    if region != "provider"
-  ])
-
-  source = "./modules/indexer"
-
-  app = var.app
-  private_key = var.private_key
-  did = var.did
-  honeycomb_api_key = var.honeycomb_api_key
-  principal_mapping = var.principal_mapping
-  legacy_data_bucket_url = var.legacy_data_bucket_url
-
-  providers = {
-    aws = aws.extra_deployments[each.key]
-    aws.legacy_claims = aws.legacy_claims
-    aws.block_index = aws.block_index
+# access state for shared resources (primary DNS zone, dev VPC and dev caches)
+data "terraform_remote_state" "shared" {
+  backend = "s3"
+  config = {
+    bucket = "storacha-terraform-state"
+    key    = "storacha/indexing-service/shared.tfstate"
+    region = "us-west-2"
   }
 }

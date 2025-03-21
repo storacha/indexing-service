@@ -44,6 +44,8 @@ data "archive_file" "function_archive" {
   output_path = "${path.root}/../../build/${each.key}/${each.key}.zip"
 }
 
+data "aws_region" "current" {}
+
 data "aws_region" "legacy_claims" {
   provider = aws.legacy_claims
 }
