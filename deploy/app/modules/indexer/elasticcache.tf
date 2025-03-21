@@ -10,11 +10,10 @@ module "caches" {
 
   app = var.app
   environment = terraform.workspace
-  
-  cache_limits = {
-    data_storage_GB = terraform.workspace == "prod" ? 20 : 1
-    ecpu_per_second = terraform.workspace == "prod" ? 10000 : 1000
-  }
+
+  # cache.r7g.large => 2 vCPUs, 13.07 GiB memory, 12.5 Gigabit network, $0.1752/hour
+  # cache.t4g.micro => 2 vCPUs, 0.5 GiB memory, 5 Gigabit network, $0.0128/hour
+  node_type = terraform.workspace == "prod" ? "cache.r7g.large" : "cache.t4g.micro"
   
   vpc = {
     id = module.vpc[0].id

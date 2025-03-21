@@ -8,12 +8,9 @@ variable "environment" {
   type        = string
 }
 
-variable "cache_limits" {
-  description = "The caches usage limits"
-  type        = object({
-    data_storage_GB = number
-    ecpu_per_second = number
-  })
+variable "node_type" {
+  description = "The type of nodes to use for the cache"
+  type        = string
 }
 
 variable "vpc" {

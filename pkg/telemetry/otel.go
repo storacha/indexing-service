@@ -107,7 +107,7 @@ func InstrumentHTTPClient(client *http.Client) *http.Client {
 	return client
 }
 
-func InstrumentRedisClient(client *redis.Client) *redis.Client {
+func InstrumentRedisClient(client *redis.ClusterClient) *redis.ClusterClient {
 	redisotel.InstrumentTracing(client)
 	return client
 }

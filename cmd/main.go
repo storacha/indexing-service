@@ -63,24 +63,6 @@ func main() {
 								EnvVars: []string{"REDIS_PASSWD"},
 								Usage:   "passwd for redis",
 							},
-							&cli.IntFlag{
-								Name:    "provider-redis-db",
-								Aliases: []string{"prd"},
-								Usage:   "database number for providers index",
-								Value:   0,
-							},
-							&cli.IntFlag{
-								Name:    "claims-redis-db",
-								Aliases: []string{"c"},
-								Usage:   "database number for claims",
-								Value:   1,
-							},
-							&cli.IntFlag{
-								Name:    "indexes-redis-db",
-								Aliases: []string{"i"},
-								Usage:   "database number for indexes cache",
-								Value:   2,
-							},
 							&cli.StringFlag{
 								Name:        "ipni-endpoint",
 								Aliases:     []string{"ipni"},
@@ -132,20 +114,17 @@ func main() {
 							)
 
 							var sc construct.ServiceConfig
-							sc.ProvidersRedis = redis.Options{
-								Addr:     cCtx.String("redis-url"),
+							sc.ProvidersRedis = redis.ClusterOptions{
+								Addrs:    []string{cCtx.String("redis-url")},
 								Password: cCtx.String("redis-passwd"),
-								DB:       cCtx.Int("providers-redis-db"),
 							}
-							sc.ClaimsRedis = redis.Options{
-								Addr:     cCtx.String("redis-url"),
+							sc.ClaimsRedis = redis.ClusterOptions{
+								Addrs:    []string{cCtx.String("redis-url")},
 								Password: cCtx.String("redis-passwd"),
-								DB:       cCtx.Int("claims-redis-db"),
 							}
-							sc.IndexesRedis = redis.Options{
-								Addr:     cCtx.String("redis-url"),
+							sc.IndexesRedis = redis.ClusterOptions{
+								Addrs:    []string{cCtx.String("redis-url")},
 								Password: cCtx.String("redis-passwd"),
-								DB:       cCtx.Int("indexes-redis-db"),
 							}
 							sc.IndexerURL = cCtx.String("ipni-endpoint")
 
