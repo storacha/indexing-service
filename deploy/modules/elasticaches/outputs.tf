@@ -5,6 +5,13 @@ output "providers" {
     name = aws_elasticache_serverless_cache.cache["providers"].name
   }
 }
+output "no_providers" {
+  value = {
+    arn = aws_elasticache_serverless_cache.cache["no-providers"].arn
+    address = aws_elasticache_serverless_cache.cache["no-providers"].endpoint[0].address
+    name = aws_elasticache_serverless_cache.cache["no-providers"].name
+  }
+}
 
 output "indexes" {
   value = {
