@@ -28,7 +28,7 @@ require (
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/extra/redisotel/v9 v9.7.0
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/storacha/go-libstoracha v0.0.1
 	github.com/storacha/go-ucanto v0.3.0
 	github.com/stretchr/testify v1.10.0
