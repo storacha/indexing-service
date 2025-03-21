@@ -10,12 +10,6 @@ variable "allowed_account_ids" {
   default     = ["505595374361"]
 }
 
-variable "extra_deployment_regions" {
-  type        = list(string)
-  description = "Regions to do additional deployments (beyond the main deployment) in"
-  default     = []
-}
-
 variable "private_key" {
   description = "private_key for the peer for this deployment"
   type        = string

@@ -50,5 +50,6 @@ jobs:
     secrets:
       aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.PROD_AWS_REGION }}
+      extra-deployment-regions: ${{ secrets.PROD_EXTRA_DEPLOYMENT_REGIONS }}
       private-key: ${{ secrets.PROD_PRIVATE_KEY }}
       honeycomb-api-key: ${{ secrets.PROD_HONEYCOMB_API_KEY }}
