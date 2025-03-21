@@ -1,12 +1,3 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 5.86.0"
-    }
-  }
-}
-
 locals {
   azs      = slice(data.aws_availability_zones.available.names, 0, 3)
 }
