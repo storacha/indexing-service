@@ -188,7 +188,7 @@ func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, 
 
 // Helper function to cache empty results.
 func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s trace.Span, mh mh.Multihash) ([]model.ProviderResult, error) {
-	s.AddEvent("caching results")
+	s.AddEvent("caching no results")
 	err := pi.noProviderStore.Set(ctx, mh, struct{}{}, true)
 	if err != nil {
 		telemetry.Error(s, err, "caching no provider results")
