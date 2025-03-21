@@ -71,6 +71,9 @@ type ValueSetCache[Key, Value any] interface {
 // ProviderStore caches queries to IPNI
 type ProviderStore ValueSetCache[mh.Multihash, model.ProviderResult]
 
+// NoProviderStore caches which queries for providers returned no results
+type NoProviderStore Cache[mh.Multihash, struct{}]
+
 // ContentClaimsStore stores published content claims
 type ContentClaimsStore Store[ipld.Link, delegation.Delegation]
 

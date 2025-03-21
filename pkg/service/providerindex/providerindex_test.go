@@ -23,11 +23,12 @@ import (
 func TestGetProviderResults(t *testing.T) {
 	t.Run("results found in the cache", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomProviderResult()
@@ -42,11 +43,12 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("results not cached, found in IPNI, results cached afterwards", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
@@ -62,6 +64,7 @@ func TestGetProviderResults(t *testing.T) {
 		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniFinderResponse, nil)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return(nil, nil)
 		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
@@ -75,16 +78,18 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("results not cached, no results from IPNI, found in legacy claims service, results cached afterwards", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
 		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
@@ -98,11 +103,12 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("results not cached, IPNI returns uninteresting results, search in legacy claims", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		bitswapResult := testutil.RandomBitswapProviderResult()
@@ -117,6 +123,7 @@ func TestGetProviderResults(t *testing.T) {
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniFinderResponse, nil)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{metadata.LocationCommitmentID}).Return([]model.ProviderResult{expectedResult}, nil)
 		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
@@ -128,19 +135,22 @@ func TestGetProviderResults(t *testing.T) {
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
 	})
 
-	t.Run("returns an empty slice when results are not found anywhere, nothing gets cached", func(t *testing.T) {
+	t.Run("returns an empty slice when results are not found anywhere, no providers record gets cached", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{0}).Return([]model.ProviderResult{}, nil)
+		mockNoProviderStore.EXPECT().Set(testutil.AnyContext, someHash, struct{}{}, true).Return(nil)
 
 		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
@@ -150,11 +160,12 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("error in cache returns error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 
@@ -167,15 +178,17 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("error fetching from IPNI returns an error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{0}).Return(nil, nil)
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(nil, errors.New("some error"))
 
@@ -186,15 +199,17 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("error in legacy claims service returns an error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{0}).Return(nil, errors.New("some error"))
 
@@ -205,17 +220,20 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("errors in both legacy claims service and IPNI returns wrapped error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
 
 		// Simulate a cache miss.
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
+
 		// Both queries error.
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(nil, errors.New("ipni error"))
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return(nil, errors.New("legacy error"))
@@ -230,11 +248,12 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("error caching results returns an error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
@@ -250,6 +269,7 @@ func TestGetProviderResults(t *testing.T) {
 		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniFinderResponse, nil)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return(nil, nil)
 		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(0, errors.New("some error"))
@@ -261,11 +281,12 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("IPNI returns valid result and legacy returns error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
@@ -281,6 +302,7 @@ func TestGetProviderResults(t *testing.T) {
 
 		// Simulate a cache miss.
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		// IPNI returns a valid result.
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniResponse, nil)
 		// Legacy returns an error.
@@ -296,11 +318,12 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("IPNI returns valid result and legacy returns empty result", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
@@ -316,6 +339,7 @@ func TestGetProviderResults(t *testing.T) {
 
 		// Simulate a cache miss.
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		// IPNI returns a valid result.
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniResponse, nil)
 		// Legacy returns an error.
@@ -331,17 +355,19 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("legacy returns valid result and IPNI returns error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		// IPNI returns an error.
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(nil, errors.New("ipni error"))
 		// Legacy returns a valid result.
@@ -357,17 +383,19 @@ func TestGetProviderResults(t *testing.T) {
 
 	t.Run("legacy returns valid result and IPNI returns empty result", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		// IPNI returns an error.
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
 		// Legacy returns a valid result.
@@ -384,11 +412,12 @@ func TestGetProviderResults(t *testing.T) {
 	// NB(forrest): we may remove this test case when legacy service is fully removed and IPNI is the sole finder.
 	t.Run("IPNI returns result before legacy is complete and legacy is canceled", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
 		expectedResult := testutil.RandomLocationCommitmentProviderResult()
@@ -404,6 +433,7 @@ func TestGetProviderResults(t *testing.T) {
 
 		// Simulate a cache miss.
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, types.ErrKeyNotFound)
 		// IPNI returns immediately with a valid result.
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniResponse, nil)
 		// Legacy query simulates a delay and then returns, but will be canceled.
@@ -432,11 +462,12 @@ func TestGetProviderResults(t *testing.T) {
 func TestPublish(t *testing.T) {
 	t.Run("allow skip publish existing advert", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
 		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
 
-		providerIndex := New(mockStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		result := testutil.RandomLocationCommitmentProviderResult()
 		provider := *result.Provider

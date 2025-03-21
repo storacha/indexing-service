@@ -29,6 +29,7 @@ locals {
   vpc_id = local.dedicated_resources ? module.vpc[0].id : data.terraform_remote_state.shared.outputs.dev_vpc.id
   private_subnet_ids = local.dedicated_resources ? module.vpc[0].subnet_ids.private : data.terraform_remote_state.shared.outputs.dev_vpc.subnet_ids.private
   providers_cache = local.dedicated_resources ? module.caches[0].providers : data.terraform_remote_state.shared.outputs.dev_caches.providers
+  no_providers_cache = local.dedicated_resources ? module.caches[0].no_providers : data.terraform_remote_state.shared.outputs.dev_caches.no_providers
   indexes_cache = local.dedicated_resources ? module.caches[0].indexes : data.terraform_remote_state.shared.outputs.dev_caches.indexes
   claims_cache = local.dedicated_resources ? module.caches[0].claims : data.terraform_remote_state.shared.outputs.dev_caches.claims
   cache_iam_user = local.dedicated_resources ? module.caches[0].iam_user : data.terraform_remote_state.shared.outputs.dev_caches.iam_user
@@ -82,6 +83,9 @@ resource "aws_lambda_function" "lambda" {
       	PROVIDERS_REDIS_URL = local.providers_cache.address
         PROVIDERS_REDIS_CACHE = local.providers_cache.name
         PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 30 * 24 * 60 * 60 : 24 * 60 * 60}"
+        NO_PROVIDERS_REDIS_URL = local.no_providers_cache.address
+        NO_PROVIDERS_REDIS_CACHE = local.no_providers_cache.name
+        NO_PROVIDERS_CACHE_EXPIRATION_SECONDS = 30 * 60
         INDEXES_REDIS_URL = local.indexes_cache.address
         INDEXES_REDIS_CACHE = local.indexes_cache.name
         INDEXES_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"

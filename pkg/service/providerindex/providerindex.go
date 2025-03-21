@@ -36,21 +36,23 @@ type QueryKey struct {
 
 // ProviderIndexService is a read/write interface to a local cache of providers that falls back to IPNI
 type ProviderIndexService struct {
-	providerStore types.ProviderStore
-	findClient    ipnifind.Finder
-	publisher     publisher.Publisher
-	legacyClaims  LegacyClaimsFinder
-	mutex         sync.Mutex
+	providerStore   types.ProviderStore
+	noProviderStore types.NoProviderStore
+	findClient      ipnifind.Finder
+	publisher       publisher.Publisher
+	legacyClaims    LegacyClaimsFinder
+	mutex           sync.Mutex
 }
 
 var _ ProviderIndex = (*ProviderIndexService)(nil)
 
-func New(providerStore types.ProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder) *ProviderIndexService {
+func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder) *ProviderIndexService {
 	return &ProviderIndexService{
-		providerStore: providerStore,
-		findClient:    findClient,
-		publisher:     publisher,
-		legacyClaims:  legacyClaims,
+		providerStore:   providerStore,
+		noProviderStore: noProviderStore,
+		findClient:      findClient,
+		publisher:       publisher,
+		legacyClaims:    legacyClaims,
 	}
 }
 
@@ -90,6 +92,12 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	}
 	if !errors.Is(err, types.ErrKeyNotFound) {
 		telemetry.Error(s, err, "fetching from cache")
+		return nil, err
+	}
+
+	// check if we already know there are no results
+	_, err = pi.noProviderStore.Get(ctx, mh)
+	if !errors.Is(types.ErrKeyNotFound, err) {
 		return nil, err
 	}
 
@@ -155,6 +163,9 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	if legacyRes.err != nil {
 		queryError = errors.Join(queryError, fmt.Errorf("fetching from legacy services failed: %w", legacyRes.err))
 	}
+	if queryError == nil {
+		return pi.cacheNoProviderResults(ctx, s, mh)
+	}
 	return nil, queryError
 }
 
@@ -173,6 +184,17 @@ func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, 
 		}
 	}
 	return results, nil
+}
+
+// Helper function to cache empty results.
+func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s trace.Span, mh mh.Multihash) ([]model.ProviderResult, error) {
+	s.AddEvent("caching results")
+	err := pi.noProviderStore.Set(ctx, mh, struct{}{}, true)
+	if err != nil {
+		telemetry.Error(s, err, "caching no provider results")
+		return nil, err
+	}
+	return nil, nil
 }
 
 func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
