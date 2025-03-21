@@ -4,6 +4,7 @@ resource "aws_sqs_queue" "caching" {
   name = "${terraform.workspace}-${var.app}-caching.fifo"
   fifo_queue = true
   content_based_deduplication = true
+  visibility_timeout_seconds = 300
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.caching_deadletter.arn
     maxReceiveCount     = 4
