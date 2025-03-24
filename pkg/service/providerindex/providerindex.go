@@ -97,7 +97,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 
 	// check if we already know there are no results
 	_, err = pi.noProviderStore.Get(ctx, mh)
-	if !errors.Is(types.ErrKeyNotFound, err) {
+	if !errors.Is(err, types.ErrKeyNotFound) {
 		return nil, err
 	}
 
