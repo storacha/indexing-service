@@ -44,7 +44,6 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 			mutex.Unlock()
 			return nil
 		}),
-		jobqueue.WithBuffer(5),
 		jobqueue.WithConcurrency(cacherConcurrency),
 		jobqueue.WithErrorHandler(func(err error) {
 			mutex.Lock()
