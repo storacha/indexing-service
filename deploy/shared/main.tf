@@ -5,7 +5,6 @@ terraform {
       version = ">= 5.86.0"
     }
   }
-
   backend "s3" {
     bucket = "storacha-terraform-state"
     key    = "storacha/indexing-service/shared.tfstate"
@@ -22,7 +21,7 @@ provider "aws" {
       Owner         = "storacha"
       Team          = "Storacha Engineering"
       Organization  = "Storacha"
-      Project       = var.app
+      Project       = "${var.app}"
     }
   }
 }
