@@ -3,6 +3,7 @@ package providercacher_test
 import (
 	"context"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/ipni/go-libipni/find/model"
@@ -146,10 +147,50 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 	}
 }
 
+// Simulate a 10k NFT - a directory with 10k image/metadata files
+func TestSimpleProviderCacher_10kNFT(t *testing.T) {
+	// Create a test context
+	ctx := context.Background()
+
+	prov := testutil.RandomProviderResult()
+	root := testutil.RandomCID()
+	idx := blobindex.NewShardedDagIndexView(root, 2)
+
+	shardDigests := testutil.RandomMultihashes(2)
+	// make 10_000 unique hashes
+	sliceDigests := make([]multihash.Multihash, 0, 10_000)
+	for range 10_000 {
+		for {
+			digest := testutil.RandomMultihash()
+			if slices.ContainsFunc(sliceDigests, func(s multihash.Multihash) bool { return s.String() == digest.String() }) {
+				continue
+			}
+			sliceDigests = append(sliceDigests, digest)
+			break
+		}
+	}
+
+	for i := range 2 {
+		for j := range 5_000 {
+			idx.SetSlice(shardDigests[i], sliceDigests[i*5_000+j], blobindex.Position{})
+		}
+	}
+	// the root block should be in the index also
+	idx.SetSlice(shardDigests[0], link.ToCID(root).Hash(), blobindex.Position{})
+
+	mockStore := &MockProviderStore{store: map[string][]model.ProviderResult{}}
+
+	cacher := providercacher.NewSimpleProviderCacher(mockStore)
+	n, err := cacher.CacheProviderForIndexRecords(ctx, prov, idx)
+	require.NoError(t, err)
+	require.Equal(t, 10_001, int(n))
+}
+
 // MockProviderStore is a mock implementation of the ProviderStore interface
 type MockProviderStore struct {
 	setErr, getErr error
 	store          map[string][]model.ProviderResult
+	mutex          sync.RWMutex
 }
 
 var _ types.ProviderStore = &MockProviderStore{}
@@ -158,6 +199,8 @@ func (m *MockProviderStore) Members(ctx context.Context, hash multihash.Multihas
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 	results, exists := m.store[hash.String()]
 	if !exists {
 		return nil, types.ErrKeyNotFound
@@ -167,6 +210,8 @@ func (m *MockProviderStore) Members(ctx context.Context, hash multihash.Multihas
 
 func (m *MockProviderStore) Add(ctx context.Context, hash multihash.Multihash, providers ...model.ProviderResult) (uint64, error) {
 	written := uint64(0)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	for _, provider := range providers {
 		providers := m.store[hash.String()]
 		if !slices.ContainsFunc(providers, func(p model.ProviderResult) bool { return p.Equal(provider) }) {
