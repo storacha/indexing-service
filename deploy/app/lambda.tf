@@ -79,14 +79,14 @@ resource "aws_lambda_function" "lambda" {
 
   environment {
     variables = {
-      	PROVIDERS_REDIS_URL = local.providers_cache.address
-        PROVIDERS_REDIS_CACHE = local.providers_cache.name
+      	PROVIDERS_REDIS_URL = "${local.providers_cache.address}:${local.providers_cache.port}"
+        PROVIDERS_REDIS_CACHE = local.providers_cache.id
         PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 30 * 24 * 60 * 60 : 24 * 60 * 60}"
-        INDEXES_REDIS_URL = local.indexes_cache.address
-        INDEXES_REDIS_CACHE = local.indexes_cache.name
+        INDEXES_REDIS_URL = "${local.indexes_cache.address}:${local.indexes_cache.port}"
+        INDEXES_REDIS_CACHE = local.indexes_cache.id
         INDEXES_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
-        CLAIMS_REDIS_URL = local.claims_cache.address
-        CLAIMS_REDIS_CACHE = local.claims_cache.name
+        CLAIMS_REDIS_URL = "${local.claims_cache.address}:${local.claims_cache.port}"
+        CLAIMS_REDIS_CACHE = local.claims_cache.id
         CLAIMS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 7 * 24 * 60 * 60 : 24 * 60 * 60}"
         REDIS_USER_ID = local.cache_iam_user.user_id
         IPNI_ENDPOINT = "https://cid.contact"

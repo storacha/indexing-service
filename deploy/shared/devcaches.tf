@@ -10,11 +10,7 @@ module "dev_caches" {
 
   app = var.app
   environment = "dev"
-  
-  cache_limits = {
-    data_storage_GB = 1
-    ecpu_per_second = 1000
-  }
+  node_type = "cache.t4g.micro" # 2 vCPUs, 0.5 GiB memory, 5 Gigabit network, $0.0128/hour
   
   vpc = {
     id = module.dev_vpc[0].id

@@ -51,9 +51,9 @@ type ServiceConfig struct {
 	// claim that is available.
 	PublicURL []string
 
-	ProvidersRedis goredis.Options
-	ClaimsRedis    goredis.Options
-	IndexesRedis   goredis.Options
+	ProvidersRedis goredis.ClusterOptions
+	ClaimsRedis    goredis.ClusterOptions
+	IndexesRedis   goredis.ClusterOptions
 
 	// IndexerURL is the URL of an IPNI node to use for find queries.
 	IndexerURL string
@@ -292,15 +292,15 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	// connect to redis
 	providersClient := cfg.providersClient
 	if providersClient == nil {
-		providersClient = goredis.NewClient(&sc.ProvidersRedis)
+		providersClient = goredis.NewClusterClient(&sc.ProvidersRedis)
 	}
 	claimsClient := cfg.claimsClient
 	if claimsClient == nil {
-		claimsClient = goredis.NewClient(&sc.ClaimsRedis)
+		claimsClient = goredis.NewClusterClient(&sc.ClaimsRedis)
 	}
 	indexesClient := cfg.indexesClient
 	if indexesClient == nil {
-		indexesClient = goredis.NewClient(&sc.IndexesRedis)
+		indexesClient = goredis.NewClusterClient(&sc.IndexesRedis)
 	}
 
 	// build caches
