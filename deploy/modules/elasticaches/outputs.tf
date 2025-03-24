@@ -6,9 +6,10 @@ output "providers" {
     port    = aws_elasticache_replication_group.cache["providers"].port
   }
 }
+
 output "no_providers" {
   value = {
-    name    = aws_elasticache_replication_group.cache["no-providers"].id
+    id      = aws_elasticache_replication_group.cache["no-providers"].id
     arn     = aws_elasticache_replication_group.cache["no-providers"].arn
     address = aws_elasticache_replication_group.cache["no-providers"].configuration_endpoint_address
     port    = aws_elasticache_replication_group.cache["no-providers"].port
