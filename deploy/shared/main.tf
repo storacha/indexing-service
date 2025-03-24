@@ -53,7 +53,11 @@ resource "aws_cloudfront_distribution" "indexer" {
 
     allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods = ["GET", "HEAD"]
+
+    # Managed policy AllViewerExceptHostHeader: forward all parameters in viewer requests except for the Host header
     origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+
+    # Managed policy CachingDisabled: policy with caching disabled
     cache_policy_id  = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
   }
 
