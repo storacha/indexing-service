@@ -41,6 +41,28 @@ func TestGetProviderResults(t *testing.T) {
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
 	})
 
+	t.Run("results not cached, found in no providers cache, empty results returned", func(t *testing.T) {
+		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
+
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+
+		someHash := testutil.RandomMultihash()
+
+		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
+
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Get(testutil.AnyContext, someHash).Return(struct{}{}, nil)
+
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
+
+		require.NoError(t, err)
+		require.Empty(t, results)
+	})
+
 	t.Run("results not cached, found in IPNI, results cached afterwards", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
 		mockNoProviderStore := types.NewMockNoProviderStore(t)
