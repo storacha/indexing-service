@@ -29,6 +29,7 @@ provider "aws" {
 resource "aws_route53_zone" "primary" {
   name = "${var.app}.storacha.network"
 }
+
 resource "aws_cloudfront_distribution" "indexer" {
   origin {
     domain_name = "indexer.storacha.network"
@@ -56,7 +57,7 @@ resource "aws_cloudfront_distribution" "indexer" {
     cache_policy_id  = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
   }
 
-  price_class = "PriceClass_100"
+  price_class = "PriceClass_All"
 
   restrictions {
     geo_restriction {
