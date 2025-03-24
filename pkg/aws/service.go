@@ -59,27 +59,28 @@ func mustGetInt(envVar string) int64 {
 type Config struct {
 	construct.ServiceConfig
 	aws.Config
-	ProvidersCacheExpirationSeconds int64
-	ClaimsCacheExpirationSeconds    int64
-	IndexesCacheExpirationSeconds   int64
-	SQSCachingQueueURL              string
-	CachingBucket                   string
-	ChunkLinksTableName             string
-	MetadataTableName               string
-	IPNIStoreBucket                 string
-	IPNIStorePrefix                 string
-	NotifierHeadBucket              string
-	NotifierTopicArn                string
-	ClaimStoreBucket                string
-	ClaimStorePrefix                string
-	LegacyClaimsTableName           string
-	LegacyClaimsTableRegion         string
-	LegacyClaimsBucket              string
-	LegacyBlockIndexTableName       string
-	LegacyBlockIndexTableRegion     string
-	LegacyDataBucketURL             string
-	HoneycombAPIKey                 string
-	PrincipalMapping                map[string]string
+	ProvidersCacheExpirationSeconds   int64
+	NoProvidersCacheExpirationSeconds int64
+	ClaimsCacheExpirationSeconds      int64
+	IndexesCacheExpirationSeconds     int64
+	SQSCachingQueueURL                string
+	CachingBucket                     string
+	ChunkLinksTableName               string
+	MetadataTableName                 string
+	IPNIStoreBucket                   string
+	IPNIStorePrefix                   string
+	NotifierHeadBucket                string
+	NotifierTopicArn                  string
+	ClaimStoreBucket                  string
+	ClaimStorePrefix                  string
+	LegacyClaimsTableName             string
+	LegacyClaimsTableRegion           string
+	LegacyClaimsBucket                string
+	LegacyBlockIndexTableName         string
+	LegacyBlockIndexTableRegion       string
+	LegacyDataBucketURL               string
+	HoneycombAPIKey                   string
+	PrincipalMapping                  map[string]string
 	principal.Signer
 }
 
@@ -157,6 +158,13 @@ func FromEnv(ctx context.Context) Config {
 					MinVersion: tls.VersionTLS12,
 				},
 			},
+			NoProviderRedis: goredis.ClusterOptions{
+				Addrs:                      []string{mustGetEnv("NO_PROVIDERS_REDIS_URL")},
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("NO_PROVIDERS_REDIS_CACHE")),
+				TLSConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				},
+			},
 			ClaimsRedis: goredis.ClusterOptions{
 				Addrs:                      []string{mustGetEnv("CLAIMS_REDIS_URL")},
 				ReadOnly:                   true,
@@ -178,27 +186,28 @@ func FromEnv(ctx context.Context) Config {
 			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
 			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
 		},
-		ProvidersCacheExpirationSeconds: mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
-		ClaimsCacheExpirationSeconds:    mustGetInt("CLAIMS_CACHE_EXPIRATION_SECONDS"),
-		IndexesCacheExpirationSeconds:   mustGetInt("INDEXES_CACHE_EXPIRATION_SECONDS"),
-		SQSCachingQueueURL:              mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
-		CachingBucket:                   mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
-		ChunkLinksTableName:             mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
-		MetadataTableName:               mustGetEnv("METADATA_TABLE_NAME"),
-		IPNIStoreBucket:                 mustGetEnv("IPNI_STORE_BUCKET_NAME"),
-		IPNIStorePrefix:                 ipniStoreKeyPrefix,
-		NotifierHeadBucket:              mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
-		NotifierTopicArn:                mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
-		ClaimStoreBucket:                mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
-		ClaimStorePrefix:                os.Getenv("CLAIM_STORE_KEY_REFIX"),
-		LegacyClaimsTableName:           mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
-		LegacyClaimsTableRegion:         mustGetEnv("LEGACY_CLAIMS_TABLE_REGION"),
-		LegacyClaimsBucket:              mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
-		LegacyBlockIndexTableName:       mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
-		LegacyBlockIndexTableRegion:     mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
-		LegacyDataBucketURL:             mustGetEnv("LEGACY_DATA_BUCKET_URL"),
-		HoneycombAPIKey:                 os.Getenv("HONEYCOMB_API_KEY"),
-		PrincipalMapping:                principalMapping,
+		ProvidersCacheExpirationSeconds:   mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
+		NoProvidersCacheExpirationSeconds: mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
+		ClaimsCacheExpirationSeconds:      mustGetInt("CLAIMS_CACHE_EXPIRATION_SECONDS"),
+		IndexesCacheExpirationSeconds:     mustGetInt("INDEXES_CACHE_EXPIRATION_SECONDS"),
+		SQSCachingQueueURL:                mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
+		CachingBucket:                     mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
+		ChunkLinksTableName:               mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
+		MetadataTableName:                 mustGetEnv("METADATA_TABLE_NAME"),
+		IPNIStoreBucket:                   mustGetEnv("IPNI_STORE_BUCKET_NAME"),
+		IPNIStorePrefix:                   ipniStoreKeyPrefix,
+		NotifierHeadBucket:                mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
+		NotifierTopicArn:                  mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
+		ClaimStoreBucket:                  mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
+		ClaimStorePrefix:                  os.Getenv("CLAIM_STORE_KEY_REFIX"),
+		LegacyClaimsTableName:             mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
+		LegacyClaimsTableRegion:           mustGetEnv("LEGACY_CLAIMS_TABLE_REGION"),
+		LegacyClaimsBucket:                mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
+		LegacyBlockIndexTableName:         mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
+		LegacyBlockIndexTableRegion:       mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
+		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		HoneycombAPIKey:                   os.Getenv("HONEYCOMB_API_KEY"),
+		PrincipalMapping:                  principalMapping,
 	}
 }
 
@@ -206,6 +215,7 @@ func FromEnv(ctx context.Context) Config {
 func Construct(cfg Config) (types.Service, error) {
 	httpClient := construct.DefaultHTTPClient()
 	providersClient := goredis.NewClusterClient(&cfg.ProvidersRedis)
+	noProvidersClient := goredis.NewClusterClient(&cfg.NoProviderRedis)
 	claimsClient := goredis.NewClusterClient(&cfg.ClaimsRedis)
 	indexesClient := goredis.NewClusterClient(&cfg.IndexesRedis)
 
@@ -213,6 +223,7 @@ func Construct(cfg Config) (types.Service, error) {
 	if cfg.HoneycombAPIKey != "" {
 		httpClient = telemetry.InstrumentHTTPClient(construct.DefaultHTTPClient())
 		providersClient = telemetry.InstrumentRedisClient(providersClient)
+		noProvidersClient = telemetry.InstrumentRedisClient(noProvidersClient)
 		claimsClient = telemetry.InstrumentRedisClient(claimsClient)
 		indexesClient = telemetry.InstrumentRedisClient(indexesClient)
 	}
@@ -262,9 +273,11 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
 		construct.WithProvidersClient(providersClient),
+		construct.WithNoProvidersClient(noProvidersClient),
 		construct.WithClaimsClient(claimsClient),
 		construct.WithIndexesClient(indexesClient),
 		construct.WithProvidersCacheOptions(redis.ExpirationTime(time.Duration(cfg.ProvidersCacheExpirationSeconds)*time.Second)),
+		construct.WithNoProvidersCacheOptions(redis.ExpirationTime(time.Duration(cfg.NoProvidersCacheExpirationSeconds)*time.Second)),
 		construct.WithClaimsCacheOptions(redis.ExpirationTime(time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second)),
 		construct.WithIndexesCacheOptions(redis.ExpirationTime(time.Duration(cfg.IndexesCacheExpirationSeconds)*time.Second)),
 	)

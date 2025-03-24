@@ -7,6 +7,15 @@ output "providers" {
   }
 }
 
+output "no_providers" {
+  value = {
+    id      = aws_elasticache_replication_group.cache["no-providers"].id
+    arn     = aws_elasticache_replication_group.cache["no-providers"].arn
+    address = aws_elasticache_replication_group.cache["no-providers"].configuration_endpoint_address
+    port    = aws_elasticache_replication_group.cache["no-providers"].port
+  }
+}
+
 output "indexes" {
   value = {
     id      = aws_elasticache_replication_group.cache["indexes"].id

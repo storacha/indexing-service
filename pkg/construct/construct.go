@@ -51,9 +51,10 @@ type ServiceConfig struct {
 	// claim that is available.
 	PublicURL []string
 
-	ProvidersRedis goredis.ClusterOptions
-	ClaimsRedis    goredis.ClusterOptions
-	IndexesRedis   goredis.ClusterOptions
+	ProvidersRedis  goredis.ClusterOptions
+	NoProviderRedis goredis.ClusterOptions
+	ClaimsRedis     goredis.ClusterOptions
+	IndexesRedis    goredis.ClusterOptions
 
 	// IndexerURL is the URL of an IPNI node to use for find queries.
 	IndexerURL string
@@ -70,19 +71,21 @@ type ServiceConfig struct {
 }
 
 type config struct {
-	cachingQueue       blobindexlookup.CachingQueue
-	opts               []service.Option
-	ds                 datastore.Batching
-	skipNotification   bool
-	startIPNIServer    bool
-	publisherStore     store.PublisherStore
-	claimsStore        types.ContentClaimsStore
-	providersClient    redis.Client
-	claimsClient       redis.Client
-	indexesClient      redis.Client
-	providersCacheOpts []redis.Option
-	claimsCacheOpts    []redis.Option
-	indexesCacheOpts   []redis.Option
+	cachingQueue         blobindexlookup.CachingQueue
+	opts                 []service.Option
+	ds                   datastore.Batching
+	skipNotification     bool
+	startIPNIServer      bool
+	publisherStore       store.PublisherStore
+	claimsStore          types.ContentClaimsStore
+	providersClient      redis.Client
+	noProvidersClient    redis.Client
+	claimsClient         redis.Client
+	indexesClient        redis.Client
+	providersCacheOpts   []redis.Option
+	noProvidersCacheOpts []redis.Option
+	claimsCacheOpts      []redis.Option
+	indexesCacheOpts     []redis.Option
 
 	legacyClaimsMappers []providerindex.ContentToClaimsMapper
 	legacyClaimsBucket  types.ContentClaimsStore
@@ -186,6 +189,14 @@ func WithProvidersClient(client redis.Client) Option {
 	}
 }
 
+// WithNoProvidersClient configures the redis client used for caching empty provider results
+func WithNoProvidersClient(client redis.Client) Option {
+	return func(cfg *config) error {
+		cfg.noProvidersClient = client
+		return nil
+	}
+}
+
 // WithClaimsClient configures the redis client used for caching content claims.
 func WithClaimsClient(client redis.Client) Option {
 	return func(cfg *config) error {
@@ -224,6 +235,14 @@ func WithHTTPClient(httpClient *http.Client) Option {
 func WithProvidersCacheOptions(opts ...redis.Option) Option {
 	return func(cfg *config) error {
 		cfg.providersCacheOpts = opts
+		return nil
+	}
+}
+
+// WithNoProvidersCacheOptions passes configuration to the no providers cache
+func WithNoProvidersCacheOptions(opts ...redis.Option) Option {
+	return func(cfg *config) error {
+		cfg.noProvidersCacheOpts = opts
 		return nil
 	}
 }
@@ -294,6 +313,10 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	if providersClient == nil {
 		providersClient = goredis.NewClusterClient(&sc.ProvidersRedis)
 	}
+	noProvidersClient := cfg.noProvidersClient
+	if noProvidersClient == nil {
+		noProvidersClient = goredis.NewClusterClient(&sc.NoProviderRedis)
+	}
 	claimsClient := cfg.claimsClient
 	if claimsClient == nil {
 		claimsClient = goredis.NewClusterClient(&sc.ClaimsRedis)
@@ -305,6 +328,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 	// build caches
 	providersCache := redis.NewProviderStore(providersClient, cfg.providersCacheOpts...)
+	noProvidersCache := redis.NewNoProviderStore(noProvidersClient, cfg.noProvidersCacheOpts...)
 	claimsCache := redis.NewContentClaimsStore(claimsClient, cfg.claimsCacheOpts...)
 	shardDagIndexesCache := redis.NewShardedDagIndexStore(indexesClient, cfg.indexesCacheOpts...)
 
@@ -410,7 +434,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		legacyClaims = providerindex.NewNoResultsLegacyClaimsFinder()
 	}
 
-	providerIndex := providerindex.New(providersCache, findClient, publisher, legacyClaims)
+	providerIndex := providerindex.New(providersCache, noProvidersCache, findClient, publisher, legacyClaims)
 
 	claimsStore := cfg.claimsStore
 	if claimsStore == nil {

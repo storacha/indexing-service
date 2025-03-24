@@ -1,5 +1,5 @@
 locals {
-  caches = toset(["providers", "indexes", "claims"])
+  caches = toset(["providers", "no-providers", "indexes", "claims"])
 }
 
 resource "aws_kms_key" "cache_key" {

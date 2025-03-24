@@ -13,6 +13,7 @@ output "dev_vpc" {
 output "dev_caches" {
   value = {
     providers = module.dev_caches[0].providers
+    no_providers = module.dev_caches[0].no_providers
     indexes = module.dev_caches[0].indexes
     claims = module.dev_caches[0].claims
     iam_user = module.dev_caches[0].iam_user
