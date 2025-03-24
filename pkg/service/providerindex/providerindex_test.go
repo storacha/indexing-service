@@ -151,6 +151,7 @@ func TestGetProviderResults(t *testing.T) {
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(&model.FindResponse{}, nil)
 		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, []multicodec.Code{0}).Return([]model.ProviderResult{}, nil)
 		mockNoProviderStore.EXPECT().Set(testutil.AnyContext, someHash, struct{}{}, true).Return(nil)
+		mockNoProviderStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
 
 		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
