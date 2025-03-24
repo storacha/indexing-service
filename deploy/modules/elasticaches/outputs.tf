@@ -1,31 +1,35 @@
 output "providers" {
   value = {
-    arn = aws_elasticache_serverless_cache.cache["providers"].arn
-    address = aws_elasticache_serverless_cache.cache["providers"].endpoint[0].address
-    name = aws_elasticache_serverless_cache.cache["providers"].name
+    id      = aws_elasticache_replication_group.cache["providers"].id
+    arn     = aws_elasticache_replication_group.cache["providers"].arn
+    address = aws_elasticache_replication_group.cache["providers"].configuration_endpoint_address
+    port    = aws_elasticache_replication_group.cache["providers"].port
   }
 }
 output "no_providers" {
   value = {
-    arn = aws_elasticache_serverless_cache.cache["no-providers"].arn
-    address = aws_elasticache_serverless_cache.cache["no-providers"].endpoint[0].address
-    name = aws_elasticache_serverless_cache.cache["no-providers"].name
+    name    = aws_elasticache_replication_group.cache["no-providers"].id
+    arn     = aws_elasticache_replication_group.cache["no-providers"].arn
+    address = aws_elasticache_replication_group.cache["no-providers"].configuration_endpoint_address
+    port    = aws_elasticache_replication_group.cache["no-providers"].port
   }
 }
 
 output "indexes" {
   value = {
-    arn = aws_elasticache_serverless_cache.cache["indexes"].arn
-    address = aws_elasticache_serverless_cache.cache["indexes"].endpoint[0].address
-    name = aws_elasticache_serverless_cache.cache["indexes"].name
+    id      = aws_elasticache_replication_group.cache["indexes"].id
+    arn     = aws_elasticache_replication_group.cache["indexes"].arn
+    address = aws_elasticache_replication_group.cache["indexes"].configuration_endpoint_address
+    port    = aws_elasticache_replication_group.cache["indexes"].port
   }
 }
 
 output "claims" {
   value = {
-    arn = aws_elasticache_serverless_cache.cache["claims"].arn
-    address = aws_elasticache_serverless_cache.cache["claims"].endpoint[0].address
-    name = aws_elasticache_serverless_cache.cache["claims"].name
+    id      = aws_elasticache_replication_group.cache["claims"].id
+    arn     = aws_elasticache_replication_group.cache["claims"].arn
+    address = aws_elasticache_replication_group.cache["claims"].configuration_endpoint_address
+    port    = aws_elasticache_replication_group.cache["claims"].port
   }
 }
 

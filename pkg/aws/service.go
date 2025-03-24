@@ -149,29 +149,35 @@ func FromEnv(ctx context.Context) Config {
 		ServiceConfig: construct.ServiceConfig{
 			PrivateKey: cryptoPrivKey,
 			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
-			ProvidersRedis: goredis.Options{
-				Addr:                       mustGetEnv("PROVIDERS_REDIS_URL") + ":6379",
+			ProvidersRedis: goredis.ClusterOptions{
+				Addrs:                      []string{mustGetEnv("PROVIDERS_REDIS_URL")},
+				ReadOnly:                   true,
+				RouteRandomly:              true,
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
-			NoProviderRedis: goredis.Options{
-				Addr:                       mustGetEnv("NO_PROVIDERS_REDIS_URL") + ":6379",
+			NoProviderRedis: goredis.ClusterOptions{
+				Addrs:                      []string{mustGetEnv("NO_PROVIDERS_REDIS_URL")},
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
-			ClaimsRedis: goredis.Options{
-				Addr:                       mustGetEnv("CLAIMS_REDIS_URL") + ":6379",
+			ClaimsRedis: goredis.ClusterOptions{
+				Addrs:                      []string{mustGetEnv("CLAIMS_REDIS_URL")},
+				ReadOnly:                   true,
+				RouteRandomly:              true,
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("CLAIMS_REDIS_CACHE")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
-			IndexesRedis: goredis.Options{
-				Addr:                       mustGetEnv("INDEXES_REDIS_URL") + ":6379",
+			IndexesRedis: goredis.ClusterOptions{
+				Addrs:                      []string{mustGetEnv("INDEXES_REDIS_URL")},
+				ReadOnly:                   true,
+				RouteRandomly:              true,
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("INDEXES_REDIS_CACHE")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
@@ -208,10 +214,10 @@ func FromEnv(ctx context.Context) Config {
 // Construct constructs types.Service from AWS deps for Lamda functions
 func Construct(cfg Config) (types.Service, error) {
 	httpClient := construct.DefaultHTTPClient()
-	providersClient := goredis.NewClient(&cfg.ProvidersRedis)
-	noProvidersClient := goredis.NewClient(&cfg.NoProviderRedis)
-	claimsClient := goredis.NewClient(&cfg.ClaimsRedis)
-	indexesClient := goredis.NewClient(&cfg.IndexesRedis)
+	providersClient := goredis.NewClusterClient(&cfg.ProvidersRedis)
+	noProvidersClient := goredis.NewClusterClient(&cfg.NoProviderRedis)
+	claimsClient := goredis.NewClusterClient(&cfg.ClaimsRedis)
+	indexesClient := goredis.NewClusterClient(&cfg.IndexesRedis)
 
 	// instrument HTTP and redis clients if telemetry is enabled
 	if cfg.HoneycombAPIKey != "" {
