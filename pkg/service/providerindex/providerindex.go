@@ -189,11 +189,16 @@ func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, 
 // Helper function to cache empty results.
 func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s trace.Span, mh mh.Multihash) ([]model.ProviderResult, error) {
 	s.AddEvent("caching no results")
-	err := pi.noProviderStore.Set(ctx, mh, struct{}{}, true)
-	if err != nil {
+	if err := pi.noProviderStore.Set(ctx, mh, struct{}{}, true); err != nil {
 		telemetry.Error(s, err, "caching no provider results")
 		return nil, err
 	}
+
+	if err := pi.noProviderStore.SetExpirable(ctx, mh, true); err != nil {
+		telemetry.Error(s, err, "setting no provider results expiration")
+		return nil, err
+	}
+
 	return nil, nil
 }
 
