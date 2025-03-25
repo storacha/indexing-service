@@ -45,7 +45,7 @@ resource "aws_cloudfront_distribution" "indexer" {
   }
 
   viewer_certificate {
-    acm_certificate_arn            = aws_acm_certificate.cert.arn
+    acm_certificate_arn            = aws_acm_certificate.cloudfront_cert.arn
     ssl_support_method             = "sni-only"
     minimum_protocol_version       = "TLSv1.2_2021"
   }
@@ -54,7 +54,7 @@ resource "aws_cloudfront_distribution" "indexer" {
 }
 
 
-resource "aws_acm_certificate" "cert" {
+resource "aws_acm_certificate" "cloudfront_cert" {
   domain_name       = "accelerated.${var.app}.storacha.network"
   validation_method = "DNS"
   
@@ -63,16 +63,16 @@ resource "aws_acm_certificate" "cert" {
   }
 }
 
-resource "aws_route53_record" "cert_validation" {
+resource "aws_route53_record" "cloudfront_cert_validation" {
   allow_overwrite = true
-  name    = tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_name
-  type    = tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_type
-  zone_id = aws_route53_zone.primary.zone_id
-  records = [tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_value]
+  name    = tolist(aws_acm_certificate.cloudfront_cert.domain_validation_options)[0].resource_record_name
+  type    = tolist(aws_acm_certificate.cloudfront_cert.domain_validation_options)[0].resource_record_type
+  zone_id = data.terraform_remote_state.shared.outputs.primary_zone.zone_id
+  records = [tolist(aws_acm_certificate.cloudfront_cert.domain_validation_options)[0].resource_record_value]
   ttl     = 60
 }
 
-resource "aws_acm_certificate_validation" "cert" {
-  certificate_arn = aws_acm_certificate.cert.arn
-  validation_record_fqdns = [ aws_route53_record.cert_validation.fqdn ]
+resource "aws_acm_certificate_validation" "cloudfront_cert" {
+  certificate_arn = aws_acm_certificate.cloudfront_cert.arn
+  validation_record_fqdns = [ aws_route53_record.cloudfront_cert_validation.fqdn ]
 }
