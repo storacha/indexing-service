@@ -53,8 +53,15 @@ resource "aws_cloudfront_distribution" "indexer" {
   aliases = ["accelerated.${var.app}.storacha.network"]
 }
 
+# CloudFront is a global service. Certs must be created in us-east-1, where the core ACM infra lives
+provider "aws" {
+  region = "us-east-1"
+  alias = "acm"
+}
 
 resource "aws_acm_certificate" "cloudfront_cert" {
+  provider = aws.acm
+
   domain_name       = "accelerated.${var.app}.storacha.network"
   validation_method = "DNS"
   
@@ -73,6 +80,8 @@ resource "aws_route53_record" "cloudfront_cert_validation" {
 }
 
 resource "aws_acm_certificate_validation" "cloudfront_cert" {
+  provider = aws.acm
+
   certificate_arn = aws_acm_certificate.cloudfront_cert.arn
   validation_record_fqdns = [ aws_route53_record.cloudfront_cert_validation.fqdn ]
 }
