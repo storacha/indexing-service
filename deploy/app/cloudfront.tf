@@ -1,4 +1,11 @@
+locals {
+  # Only prod gets a CloudFront distribution
+  should_create_cloudfront = terraform.workspace == "prod"
+}
+
 resource "aws_cloudfront_distribution" "indexer" {
+  count = local.should_create_cloudfront ? 1 : 0
+
   origin {
     domain_name = "${var.app}.storacha.network"
     origin_id   = "indexer-origin"
