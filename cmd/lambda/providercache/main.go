@@ -59,12 +59,6 @@ func makeHandler(cfg aws.Config) any {
 			go func(msg events.SQSMessage) {
 				defer wg.Done()
 				err := handleMessage(ctx, sqsCachingDecoder, providerCacher, msg)
-				if err == nil {
-					err := sqsCachingDecoder.CleanupMessage(ctx, msg.Body)
-					if err != nil {
-						log.Warnf("unable to cleanup message fully: %s", err.Error())
-					}
-				}
 				results <- handlerResult{msg.MessageId, err}
 			}(msg)
 		}
