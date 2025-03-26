@@ -24,7 +24,7 @@ permissions:
   contents: read # This is required for actions/checkout
 
 jobs:
-  # always deploy to staging
+  # apply staging on pushes to main, plan otherwise
   staging:
     uses: ./.github/workflows/terraform.yml
     with:
@@ -38,15 +38,14 @@ jobs:
       private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
       honeycomb-api-key: ${{ secrets.STAGING_HONEYCOMB_API_KEY }}
 
-  # deploy to prod on new releases
+  # apply prod on successful release, plan otherwise
   production:
-    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/terraform.yml
     with:
       env: production
       workspace: prod
       did: did:web:indexer.storacha.network
-      apply: true
+      apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
     secrets:
       aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.PROD_AWS_REGION }}
