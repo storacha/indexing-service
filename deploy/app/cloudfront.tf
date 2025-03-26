@@ -58,3 +58,16 @@ provider "aws" {
   region = "us-east-1"
   alias = "acm"
 }
+
+resource "aws_acm_certificate" "cloudfront_cert" {
+  count = local.should_create_cloudfront ? 1 : 0
+
+  provider = aws.acm
+
+  domain_name       = "accelerated.${var.app}.storacha.network"
+  validation_method = "DNS"
+  
+  lifecycle {
+    create_before_destroy = true
+  }
+}
