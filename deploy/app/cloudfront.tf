@@ -97,7 +97,7 @@ resource "aws_route53_record" "cloudfront" {
   count = local.should_create_cloudfront ? 1 : 0
 
   zone_id = data.terraform_remote_state.shared.outputs.primary_zone.zone_id
-  name    = local.domain_name
+  name    = local.cloudfront_domain_name
   type    = "A"
 
   alias {
