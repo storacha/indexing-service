@@ -138,8 +138,8 @@ resource "aws_route53_record" "api_gateway" {
   type    = "A"
 
   alias {
-    name                   = aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].target_domain_name
-    zone_id                = aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
+    name                   = terraform.workspace == "prod" ? aws_cloudfront_distribution.indexer[0].domain_name : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].target_domain_name
+    zone_id                = terraform.workspace == "prod" ? aws_cloudfront_distribution.indexer[0].hosted_zone_id : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
