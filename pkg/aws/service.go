@@ -160,6 +160,8 @@ func FromEnv(ctx context.Context) Config {
 			},
 			NoProviderRedis: goredis.ClusterOptions{
 				Addrs:                      []string{mustGetEnv("NO_PROVIDERS_REDIS_URL")},
+				ReadOnly:                   true,
+				RouteRandomly:              true,
 				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("NO_PROVIDERS_REDIS_CACHE")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
