@@ -1,6 +1,7 @@
 locals {
   # Only prod gets a CloudFront distribution
   should_create_cloudfront = terraform.workspace == "prod"
+  cloudfront_domain_name = "accelerated.${var.app}.storacha.network"
 }
 
 resource "aws_cloudfront_distribution" "indexer" {
@@ -50,7 +51,7 @@ resource "aws_cloudfront_distribution" "indexer" {
     minimum_protocol_version       = "TLSv1.2_2021"
   }
 
-  aliases = ["accelerated.${var.app}.storacha.network"]
+  aliases = [local.cloudfront_domain_name]
 }
 
 # CloudFront is a global service. Certs must be created in us-east-1, where the core ACM infra lives
@@ -64,7 +65,7 @@ resource "aws_acm_certificate" "cloudfront_cert" {
 
   provider = aws.acm
 
-  domain_name       = "accelerated.${var.app}.storacha.network"
+  domain_name       = local.cloudfront_domain_name
   validation_method = "DNS"
   
   lifecycle {
@@ -90,4 +91,18 @@ resource "aws_acm_certificate_validation" "cloudfront_cert" {
 
   certificate_arn = aws_acm_certificate.cloudfront_cert[0].arn
   validation_record_fqdns = [ aws_route53_record.cloudfront_cert_validation[0].fqdn ]
+}
+
+resource "aws_route53_record" "cloudfront" {
+  count = local.should_create_cloudfront ? 1 : 0
+
+  zone_id = data.terraform_remote_state.shared.outputs.primary_zone.zone_id
+  name    = local.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.indexer[0].domain_name
+    zone_id                = aws_cloudfront_distribution.indexer[0].hosted_zone_id
+    evaluate_target_health = false
+  }
 }
