@@ -1,5 +1,5 @@
 locals {
-    domain_name = terraform.workspace == "prod" ? "api.${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
+    domain_name = terraform.workspace == "prod" ? "api.${var.app}.storacha.network" : (terraform.workspace == "staging" ? "api.staging.${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network")
 }
 
 resource "aws_apigatewayv2_api" "api" {

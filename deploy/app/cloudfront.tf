@@ -1,7 +1,7 @@
 locals {
-  # Only prod gets a CloudFront distribution
-  should_create_cloudfront = terraform.workspace == "prod"
-  cloudfront_alternate_domain = "${var.app}.storacha.network"
+  # Only prod and staging get a CloudFront distribution
+  should_create_cloudfront = terraform.workspace == "prod" || terraform.workspace == "staging"
+  cloudfront_alternate_domain = terraform.workspace == "prod" ? "${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
 }
 
 resource "aws_cloudfront_distribution" "indexer" {
