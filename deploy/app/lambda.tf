@@ -85,7 +85,7 @@ resource "aws_lambda_function" "lambda" {
         PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 30 * 24 * 60 * 60 : 24 * 60 * 60}"
         NO_PROVIDERS_REDIS_URL = "${local.no_providers_cache.address}:${local.no_providers_cache.port}"
         NO_PROVIDERS_REDIS_CACHE = local.no_providers_cache.id
-        NO_PROVIDERS_CACHE_EXPIRATION_SECONDS = 30 * 60
+        NO_PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
         INDEXES_REDIS_URL = "${local.indexes_cache.address}:${local.indexes_cache.port}"
         INDEXES_REDIS_CACHE = local.indexes_cache.id
         INDEXES_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
