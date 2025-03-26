@@ -186,6 +186,7 @@ data "aws_iam_policy_document" "lambda_elasticache_connect_document" {
       local.providers_cache.arn,
       local.indexes_cache.arn,
       local.claims_cache.arn,
+      local.no_providers_cache.arn,
       local.cache_iam_user.arn,
     ]
   }
