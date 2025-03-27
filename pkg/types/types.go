@@ -9,6 +9,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
@@ -72,7 +73,7 @@ type ValueSetCache[Key, Value any] interface {
 type ProviderStore ValueSetCache[mh.Multihash, model.ProviderResult]
 
 // NoProviderStore caches which queries for providers returned no results
-type NoProviderStore Cache[mh.Multihash, struct{}]
+type NoProviderStore ValueSetCache[mh.Multihash, multicodec.Code]
 
 // ContentClaimsStore stores published content claims
 type ContentClaimsStore Store[ipld.Link, delegation.Delegation]
