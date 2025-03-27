@@ -133,17 +133,3 @@ func (s *SQSCachingDecoder) DecodeMessage(ctx context.Context, messageBody strin
 	}
 	return providercacher.ProviderCachingJob{Provider: msg.Provider, Index: index}, nil
 }
-
-// CleanupMessage removes stored information in the s3 bucket
-func (s *SQSCachingDecoder) CleanupMessage(ctx context.Context, messageBody string) error {
-	var msg CachingQueueMessage
-	err := json.Unmarshal([]byte(messageBody), &msg)
-	if err != nil {
-		return fmt.Errorf("deserializing message: %w", err)
-	}
-	_, err = s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(msg.JobID.String()),
-	})
-	return err
-}
