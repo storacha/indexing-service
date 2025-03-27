@@ -87,18 +87,22 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	s.AddEvent("searching in cache")
 	res, err := pi.providerStore.Members(ctx, mh)
 	if err == nil {
-		s.AddEvent("cache hit")
-		return res, nil
-	}
-	if !errors.Is(err, types.ErrKeyNotFound) {
-		telemetry.Error(s, err, "fetching from cache")
-		return nil, err
-	}
+		res, _ = filterCodecs(res, targetClaims)
+		if len(res) > 0 {
+			s.AddEvent("cache hit")
+			return res, nil
+		}
+	} else {
+		if !errors.Is(err, types.ErrKeyNotFound) {
+			telemetry.Error(s, err, "fetching from cache")
+			return nil, err
+		}
 
-	// check if we already know there are no results
-	_, err = pi.noProviderStore.Get(ctx, mh)
-	if !errors.Is(err, types.ErrKeyNotFound) {
-		return nil, err
+		// check if we already know there are no results
+		_, err = pi.noProviderStore.Get(ctx, mh)
+		if !errors.Is(err, types.ErrKeyNotFound) {
+			return nil, err
+		}
 	}
 
 	type queryResult struct {

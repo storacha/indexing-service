@@ -31,11 +31,47 @@ func TestGetProviderResults(t *testing.T) {
 		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
 
 		someHash := testutil.RandomMultihash()
-		expectedResult := testutil.RandomProviderResult()
+		expectedResult := testutil.RandomLocationCommitmentProviderResult()
 
 		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return([]model.ProviderResult{expectedResult}, nil)
 
-		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{metadata.LocationCommitmentID})
+
+		require.NoError(t, err)
+		require.Equal(t, []model.ProviderResult{expectedResult}, results)
+	})
+
+	t.Run("results found in the cache, do not match current query type", func(t *testing.T) {
+		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
+
+		providerIndex := New(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims)
+
+		existingResult := testutil.RandomIndexClaimProviderResult()
+
+		someHash := testutil.RandomMultihash()
+		expectedResult := testutil.RandomLocationCommitmentProviderResult()
+		ipniFinderResponse := &model.FindResponse{
+			MultihashResults: []model.MultihashResult{
+				{
+					Multihash:       someHash,
+					ProviderResults: []model.ProviderResult{expectedResult},
+				},
+			},
+		}
+
+		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
+
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return([]model.ProviderResult{existingResult}, nil)
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).Return(ipniFinderResponse, nil)
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return(nil, nil)
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
+
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{metadata.LocationCommitmentID})
 
 		require.NoError(t, err)
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
