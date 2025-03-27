@@ -87,18 +87,32 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	s.AddEvent("searching in cache")
 	res, err := pi.providerStore.Members(ctx, mh)
 	if err == nil {
-		s.AddEvent("cache hit")
-		return res, nil
-	}
-	if !errors.Is(err, types.ErrKeyNotFound) {
-		telemetry.Error(s, err, "fetching from cache")
-		return nil, err
+		res, _ = filterCodecs(res, targetClaims)
+		if len(res) > 0 {
+			s.AddEvent("cache hit")
+			return res, nil
+		}
+	} else {
+		if !errors.Is(err, types.ErrKeyNotFound) {
+			telemetry.Error(s, err, "fetching from cache")
+			return nil, err
+		}
 	}
 
 	// check if we already know there are no results
-	_, err = pi.noProviderStore.Get(ctx, mh)
-	if !errors.Is(err, types.ErrKeyNotFound) {
-		return nil, err
+	codes, err := pi.noProviderStore.Members(ctx, mh)
+	if err == nil {
+		missingClaims, _ := filter(targetClaims, func(targetCode multicodec.Code) (bool, error) {
+			return !slices.Contains(codes, targetCode), nil
+		})
+		if len(missingClaims) == 0 {
+			return nil, nil
+		}
+	} else {
+		if !errors.Is(err, types.ErrKeyNotFound) {
+			telemetry.Error(s, err, "fetching from cache")
+			return nil, err
+		}
 	}
 
 	type queryResult struct {
@@ -164,7 +178,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 		queryError = errors.Join(queryError, fmt.Errorf("fetching from legacy services failed: %w", legacyRes.err))
 	}
 	if queryError == nil {
-		return pi.cacheNoProviderResults(ctx, s, mh)
+		return pi.cacheNoProviderResults(ctx, s, mh, targetClaims)
 	}
 	return nil, queryError
 }
@@ -187,18 +201,20 @@ func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, 
 }
 
 // Helper function to cache empty results.
-func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s trace.Span, mh mh.Multihash) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s trace.Span, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	s.AddEvent("caching no results")
-	if err := pi.noProviderStore.Set(ctx, mh, struct{}{}, true); err != nil {
+	n, err := pi.noProviderStore.Add(ctx, mh, targetClaims...)
+	if err != nil {
 		telemetry.Error(s, err, "caching no provider results")
 		return nil, err
 	}
 
-	if err := pi.noProviderStore.SetExpirable(ctx, mh, true); err != nil {
-		telemetry.Error(s, err, "setting no provider results expiration")
-		return nil, err
+	if n > 0 {
+		if err := pi.noProviderStore.SetExpirable(ctx, mh, true); err != nil {
+			telemetry.Error(s, err, "setting no provider results expiration")
+			return nil, err
+		}
 	}
-
 	return nil, nil
 }
 
@@ -360,9 +376,9 @@ func addProviderResult(ctx context.Context, providerStore types.ProviderStore, d
 	return nil
 }
 
-func filter(results []model.ProviderResult, filterFunc func(model.ProviderResult) (bool, error)) ([]model.ProviderResult, error) {
+func filter[T any](results []T, filterFunc func(T) (bool, error)) ([]T, error) {
 
-	filtered := make([]model.ProviderResult, 0, len(results))
+	filtered := make([]T, 0, len(results))
 	for _, result := range results {
 		include, err := filterFunc(result)
 		if err != nil {

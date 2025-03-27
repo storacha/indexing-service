@@ -197,6 +197,19 @@ func RandomBitswapProviderResult() model.ProviderResult {
 	return pr
 }
 
+func RandomIndexClaimProviderResult() model.ProviderResult {
+	indexMeta := metadata.IndexClaimMetadata{
+		Index:      RandomCID().(cidlink.Link).Cid,
+		Expiration: 0,
+		Claim:      RandomCID().(cidlink.Link).Cid,
+	}
+	metaBytes, _ := indexMeta.MarshalBinary()
+
+	pr := RandomProviderResult()
+	pr.Metadata = metaBytes
+	return pr
+}
+
 func RandomLocationCommitmentProviderResult() model.ProviderResult {
 	shard := RandomCID().(cidlink.Link).Cid
 	locationMeta := metadata.LocationCommitmentMetadata{

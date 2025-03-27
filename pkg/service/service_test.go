@@ -76,7 +76,7 @@ func TestQuery(t *testing.T) {
 
 		mockProviderIndex.EXPECT().Find(testutil.AnyContext, providerindex.QueryKey{
 			Hash:         indexCid.Hash(),
-			TargetClaims: []multicodec.Code{metadata.IndexClaimID, metadata.LocationCommitmentID},
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
 		}).Return([]model.ProviderResult{indexLocationProviderResult}, nil)
 
 		// fetch the index's location claim
@@ -273,7 +273,7 @@ func TestQuery(t *testing.T) {
 
 		mockProviderIndex.EXPECT().Find(testutil.AnyContext, providerindex.QueryKey{
 			Hash:         indexCid.Hash(),
-			TargetClaims: []multicodec.Code{metadata.IndexClaimID, metadata.LocationCommitmentID},
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
 		}).Return([]model.ProviderResult{indexLocationProviderResult}, nil)
 
 		// fetch the index's location claim

@@ -190,7 +190,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 
 				// for an index claim, we follow by looking for a location claim for the index, and fetching the index
 				mh := j.mh
-				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, types.QueryTypeIndexOrLocation}); err != nil {
+				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, types.QueryTypeLocation}); err != nil {
 					telemetry.Error(s, err, "queuing job for the index's location claim")
 					return err
 				}
@@ -233,7 +233,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					shards := index.Shards().Iterator()
 					for shard, index := range shards {
 						if index.Has(*j.indexForMh) {
-							if err := spawn(job{shard, nil, nil, types.QueryTypeIndexOrLocation}); err != nil {
+							if err := spawn(job{shard, nil, nil, types.QueryTypeLocation}); err != nil {
 								telemetry.Error(s, err, "queuing location job for shard")
 								return err
 							}
