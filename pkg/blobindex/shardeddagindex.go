@@ -214,8 +214,8 @@ func Archive(model ShardedDagIndex) (io.Reader, error) {
 	// encode blob index shards to blocks and add links to sharded dag index
 	blks := make([]ipld.Block, 0, len(blobIndexDatas)+1)
 	for _, shard := range blobIndexDatas {
-		buf := new(bytes.Buffer)
-		err := shard.MarshalCBOR(buf)
+		var buf bytes.Buffer
+		err := shard.MarshalCBOR(&buf)
 		if err != nil {
 			return nil, err
 		}
