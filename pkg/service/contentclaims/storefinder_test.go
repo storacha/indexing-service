@@ -49,7 +49,7 @@ func TestWithStore__Find(t *testing.T) {
 			claimCid:      storedCid,
 			expectedClaim: nil,
 			getErr:        anError,
-			expectedErr:   fmt.Errorf("reading from claim store: %w", anError),
+			expectedErr:   errors.Join(fmt.Errorf("reading from claim store: %w", anError), types.ErrKeyNotFound),
 		},
 		{
 			name:          "underlying find error",

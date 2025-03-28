@@ -99,3 +99,8 @@ apply: deploy/app/.terraform .tfworkspace lambdas
 
 mockery:
 	mockery --config=.mockery.yaml
+
+.PHONY: serde
+
+serde:
+	go generate ./...

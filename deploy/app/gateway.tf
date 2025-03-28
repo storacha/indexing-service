@@ -87,6 +87,9 @@ resource "aws_apigatewayv2_deployment" "deployment" {
 
   api_id = aws_apigatewayv2_api.api.id
   description = "${terraform.workspace} ${var.app} API Deployment"
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_acm_certificate" "cert" {
