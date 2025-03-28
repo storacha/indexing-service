@@ -36,7 +36,7 @@ func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL
 	storeCtx, cancelStore := context.WithCancel(ctx)
 	defer cancelStore()
 
-	// Create a cancelable context for the legacy query.
+	// Create a cancelable context for the finder query.
 	finderCtx, cancelFinder := context.WithCancel(ctx)
 	defer cancelFinder()
 
