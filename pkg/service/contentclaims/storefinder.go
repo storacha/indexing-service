@@ -26,7 +26,6 @@ func WithStore(finder Finder, store types.ContentClaimsStore) Finder {
 
 // Find attempts to fetch a claim from either the permenant storage or via the provided URL
 func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL) (delegation.Delegation, error) {
-	// attempt to read claim from store and return it if succesful
 
 	// buffered channels so goroutines don't block.
 	storeCh := make(chan result.Result[delegation.Delegation, error], 1)
@@ -66,7 +65,7 @@ func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL
 		}
 	}
 
-	// Prioritize store results.
+	// Return any successful result or the combo of errors
 	return result.Unwrap(
 		result.OrElse(storeRes,
 			func(storeErr error) result.Result[delegation.Delegation, error] {
