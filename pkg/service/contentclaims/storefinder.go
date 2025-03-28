@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -26,16 +27,56 @@ func WithStore(finder Finder, store types.ContentClaimsStore) Finder {
 // Find attempts to fetch a claim from either the permenant storage or via the provided URL
 func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL) (delegation.Delegation, error) {
 	// attempt to read claim from store and return it if succesful
-	claim, err := sf.store.Get(ctx, id)
-	if err == nil {
-		return claim, nil
+
+	// buffered channels so goroutines don't block.
+	storeCh := make(chan result.Result[delegation.Delegation, error], 1)
+	finderCh := make(chan result.Result[delegation.Delegation, error], 1)
+
+	// Create a cancelable context for the legacy query.
+	storeCtx, cancelStore := context.WithCancel(ctx)
+	defer cancelStore()
+
+	// Create a cancelable context for the legacy query.
+	finderCtx, cancelFinder := context.WithCancel(ctx)
+	defer cancelFinder()
+
+	// Start store query
+	go func() {
+		storeCh <- result.Wrap(func() (delegation.Delegation, error) { return sf.store.Get(storeCtx, id) })
+	}()
+
+	// Start finder query
+	go func() {
+		finderCh <- result.Wrap(func() (delegation.Delegation, error) { return sf.finder.Find(finderCtx, id, fetchURL) })
+	}()
+
+	var storeRes, finderRes result.Result[delegation.Delegation, error]
+
+	// Wait for both responses.
+	for i := 0; i < 2; i++ {
+		select {
+		case storeRes = <-storeCh:
+			if _, err := result.Unwrap(storeRes); err == nil {
+				cancelFinder()
+			}
+		case finderRes = <-finderCh:
+			if _, err := result.Unwrap(finderRes); err == nil {
+				cancelStore()
+			}
+		}
 	}
 
-	// if an error occurred other than the claim not being in the store, return it
-	if !errors.Is(err, types.ErrKeyNotFound) {
-		return nil, fmt.Errorf("reading from claim store: %w", err)
-	}
-
-	// attempt to fetch the claim from the underlying claim finder
-	return sf.finder.Find(ctx, id, fetchURL)
+	// Prioritize store results.
+	return result.Unwrap(
+		result.OrElse(storeRes,
+			func(storeErr error) result.Result[delegation.Delegation, error] {
+				return result.OrElse(finderRes, func(finderErr error) result.Result[delegation.Delegation, error] {
+					// if an error occurred other than the claim not being in the store, return it
+					if !errors.Is(storeErr, types.ErrKeyNotFound) {
+						return result.Error[delegation.Delegation](errors.Join(fmt.Errorf("reading from claim store: %w", storeErr), finderErr))
+					}
+					return result.Error[delegation.Delegation](finderErr)
+				})
+			}),
+	)
 }
