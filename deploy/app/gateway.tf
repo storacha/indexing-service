@@ -1,5 +1,5 @@
 locals {
-    domain_name = terraform.workspace == "prod" ? "api.${var.app}.storacha.network" : (terraform.workspace == "staging" ? "api.staging.${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network")
+    domain_name = terraform.workspace == "prod" ? "${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
 }
 
 resource "aws_apigatewayv2_api" "api" {
@@ -111,7 +111,6 @@ resource "aws_acm_certificate_validation" "cert" {
   certificate_arn = aws_acm_certificate.cert.arn
   validation_record_fqdns = [ aws_route53_record.cert_validation.fqdn ]
 }
-
 resource "aws_apigatewayv2_domain_name" "custom_domain" {
   domain_name = local.domain_name
 
@@ -121,7 +120,6 @@ resource "aws_apigatewayv2_domain_name" "custom_domain" {
     security_policy = "TLS_1_2"
   }
 }
-
 resource "aws_apigatewayv2_stage" "stage" {
   api_id = aws_apigatewayv2_api.api.id
   name   = "$default"
@@ -140,8 +138,8 @@ resource "aws_route53_record" "api_gateway" {
   type    = "A"
 
   alias {
-    name                   = aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].target_domain_name
-    zone_id                = aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
+    name                   = terraform.workspace == "prod" || terraform.workspace == "staging" ? aws_cloudfront_distribution.indexer[0].domain_name : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].target_domain_name
+    zone_id                = terraform.workspace == "prod" || terraform.workspace == "staging" ? aws_cloudfront_distribution.indexer[0].hosted_zone_id : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
