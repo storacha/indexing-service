@@ -52,7 +52,7 @@ func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL
 	var storeRes, finderRes result.Result[delegation.Delegation, error]
 
 	// Wait for both responses.
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		select {
 		case storeRes = <-storeCh:
 			if _, err := result.Unwrap(storeRes); err == nil {
