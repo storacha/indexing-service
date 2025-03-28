@@ -32,7 +32,7 @@ func (sf *storeFinder) Find(ctx context.Context, id ipld.Link, fetchURL *url.URL
 	storeCh := make(chan result.Result[delegation.Delegation, error], 1)
 	finderCh := make(chan result.Result[delegation.Delegation, error], 1)
 
-	// Create a cancelable context for the legacy query.
+	// Create a cancelable context for the store query.
 	storeCtx, cancelStore := context.WithCancel(ctx)
 	defer cancelStore()
 
