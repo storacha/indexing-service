@@ -84,7 +84,8 @@ func View(root ipld.Link, blockMap map[ipld.Link]ipld.Block) (ShardedDagIndexVie
 			return nil, NewDecodeFailureError(fmt.Errorf("missing shard block: %s", shardLink))
 		}
 		var blobIndexData dm.BlobIndexModel
-		if err := cbor.Decode(shard.Bytes(), &blobIndexData, dm.BlobIndexSchema()); err != nil {
+		err := blobIndexData.UnmarshalCBOR(bytes.NewReader(shard.Bytes()))
+		if err != nil {
 			return nil, NewDecodeFailureError(err)
 		}
 		blobIndex := NewMultihashMap[Position](len(blobIndexData.Slices))
@@ -213,12 +214,20 @@ func Archive(model ShardedDagIndex) (io.Reader, error) {
 	// encode blob index shards to blocks and add links to sharded dag index
 	blks := make([]ipld.Block, 0, len(blobIndexDatas)+1)
 	for _, shard := range blobIndexDatas {
-		blk, err := block.Encode(&shard, dm.BlobIndexSchema(), cbor.Codec, sha256.Hasher)
+		buf := new(bytes.Buffer)
+		err := shard.MarshalCBOR(buf)
 		if err != nil {
 			return nil, err
 		}
-		blks = append(blks, blk)
-		shardedDagIndex.Shards = append(shardedDagIndex.Shards, blk.Link())
+		b := buf.Bytes()
+		d, err := sha256.Hasher.Sum(b)
+		if err != nil {
+			return nil, err
+		}
+
+		l := cidlink.Link{Cid: cid.NewCidV1(cbor.Codec.Code(), d.Bytes())}
+		blks = append(blks, block.NewBlock(l, b))
+		shardedDagIndex.Shards = append(shardedDagIndex.Shards, l)
 	}
 	// encode the root block
 	rootBlk, err := block.Encode(&dm.ShardedDagIndexModel{
