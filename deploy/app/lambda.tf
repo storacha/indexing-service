@@ -119,6 +119,7 @@ resource "aws_lambda_function" "lambda" {
         HONEYCOMB_OTLP_ENDPOINT = "api.honeycomb.io:443"
         HONEYCOMB_API_KEY = "${var.honeycomb_api_key}"
         PRINCIPAL_MAPPING = var.principal_mapping
+        BASE_TRACE_SAMPLE_RATIO = terraform.workspace == "prod" ? "0.0001" : "1.0"
     }
   }
 

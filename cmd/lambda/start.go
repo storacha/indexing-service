@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/telemetry"
+	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 // handlerFactory is a factory function that returns a function suitable to use as a lambda handler. See
@@ -22,7 +23,11 @@ func Start(makeHandler handlerFactory) {
 
 	// an empty API key disables instrumentation
 	if cfg.HoneycombAPIKey != "" {
-		telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg.Config)
+		var telemetryOpts []telemetry.TelemetryOption
+		if cfg.BaseTraceSampleRatio < 1.0 {
+			telemetryOpts = append(telemetryOpts, telemetry.WithBaseSampler(trace.TraceIDRatioBased(cfg.BaseTraceSampleRatio)))
+		}
+		telemetryShutdown, err := telemetry.SetupTelemetry(ctx, &cfg.Config, telemetryOpts...)
 		if err != nil {
 			panic(err)
 		}

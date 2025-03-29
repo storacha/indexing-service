@@ -55,6 +55,15 @@ func mustGetInt(envVar string) int64 {
 	return value
 }
 
+func mustGetFloat(envVar string) float64 {
+	stringValue := mustGetEnv(envVar)
+	value, err := strconv.ParseFloat(stringValue, 64)
+	if err != nil {
+		panic(fmt.Errorf("parsing env var %s to int: %w", envVar, err))
+	}
+	return value
+}
+
 // Config describes all the values required to setup AWS from the environment
 type Config struct {
 	construct.ServiceConfig
@@ -79,6 +88,7 @@ type Config struct {
 	LegacyBlockIndexTableName         string
 	LegacyBlockIndexTableRegion       string
 	LegacyDataBucketURL               string
+	BaseTraceSampleRatio              float64
 	HoneycombAPIKey                   string
 	PrincipalMapping                  map[string]string
 	principal.Signer
@@ -208,6 +218,7 @@ func FromEnv(ctx context.Context) Config {
 		LegacyBlockIndexTableName:         mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
 		LegacyBlockIndexTableRegion:       mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
 		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		BaseTraceSampleRatio:              mustGetFloat("BASE_TRACE_SAMPLE_RATIO"),
 		HoneycombAPIKey:                   os.Getenv("HONEYCOMB_API_KEY"),
 		PrincipalMapping:                  principalMapping,
 	}
