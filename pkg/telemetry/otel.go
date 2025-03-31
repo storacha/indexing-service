@@ -21,10 +21,32 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+type config struct {
+	baseSampler tracesdk.Sampler
+}
+
+type TelemetryOption func(*config) error
+
+func WithBaseSampler(baseSampler tracesdk.Sampler) TelemetryOption {
+	return func(c *config) error {
+		c.baseSampler = baseSampler
+		return nil
+	}
+}
+
 // SetupTelemetry configures the OpenTelemetry SDK by setting up a global tracer provider.
 // It also adds instrumentation middleware to the config so that all AWS SDK clients based on that config are instrumented.
 // This function updates the configuration in place. It should be called before any AWS SDK clients are created.
-func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context), error) {
+func SetupTelemetry(ctx context.Context, cfg *aws.Config, opts ...TelemetryOption) (func(context.Context), error) {
+	c := config{
+		baseSampler: tracesdk.AlwaysSample(),
+	}
+	for _, opt := range opts {
+		if err := opt(&c); err != nil {
+			return nil, err
+		}
+	}
+
 	// WithInsecure is ok here because we are exporting traces to the AWS OpenTelemetry collector which is running
 	// in a layer within the lambda's execution environment
 	exp, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
@@ -51,7 +73,7 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config) (func(context.Context)
 	// Requests that are NOT coming from an upstream service, however, will always be sampled. This allows producing
 	// traces for manual queries, which is useful for debugging.
 	tp := tracesdk.NewTracerProvider(
-		tracesdk.WithSampler(tracesdk.ParentBased(tracesdk.AlwaysSample())),
+		tracesdk.WithSampler(tracesdk.ParentBased(c.baseSampler)),
 		tracesdk.WithBatcher(exp),
 		tracesdk.WithResource(resource),
 	)
