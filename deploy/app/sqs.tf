@@ -1,10 +1,7 @@
-
-
 resource "aws_sqs_queue" "caching" {
-  name = "${terraform.workspace}-${var.app}-caching.fifo"
-  fifo_queue = true
-  content_based_deduplication = true
+  name = "${terraform.workspace}-${var.app}-caching"
   visibility_timeout_seconds = 300
+  message_retention_seconds = 86400
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.caching_deadletter.arn
     maxReceiveCount     = 4
@@ -15,9 +12,7 @@ resource "aws_sqs_queue" "caching" {
 }
 
 resource "aws_sqs_queue" "caching_deadletter" {
-  fifo_queue = true
-  content_based_deduplication = true
-  name = "${terraform.workspace}-${var.app}-caching-deadletter.fifo"
+  name = "${terraform.workspace}-${var.app}-caching-deadletter"
 }
 
 resource "aws_sqs_queue_redrive_allow_policy" "caching" {
