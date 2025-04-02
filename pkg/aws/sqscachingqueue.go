@@ -86,9 +86,8 @@ func (s *SQSCachingQueue) sendMessage(ctx context.Context, msg CachingQueueMessa
 		return fmt.Errorf("serializing message json: %w", err)
 	}
 	_, err = s.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
-		QueueUrl:       aws.String(s.queueURL),
-		MessageBody:    aws.String(string(messageJSON)),
-		MessageGroupId: aws.String("default"),
+		QueueUrl:    aws.String(s.queueURL),
+		MessageBody: aws.String(string(messageJSON)),
 	})
 	if err != nil {
 		return fmt.Errorf("enqueueing message: %w", err)
