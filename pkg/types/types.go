@@ -62,9 +62,17 @@ type Cache[Key, Value any] interface {
 	Get(ctx context.Context, key Key) (Value, error)
 }
 
+type MultiOperation[Value any] interface {
+	Add(values ...Value)
+	SetExpirable(expires bool)
+}
+
+type ProviderMultiOperation = MultiOperation[model.ProviderResult]
+
 // ValueSetCache describes a cache interface whose values are sets
 type ValueSetCache[Key, Value any] interface {
 	Add(ctx context.Context, key Key, values ...Value) (uint64, error)
+	Multi(ctx context.Context, keys []Key, operation func(MultiOperation[Value])) (uint64, error)
 	SetExpirable(ctx context.Context, key Key, expires bool) error
 	Members(ctx context.Context, key Key) ([]Value, error)
 }

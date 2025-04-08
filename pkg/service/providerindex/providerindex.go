@@ -17,7 +17,6 @@ import (
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
-	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/telemetry"
@@ -306,29 +305,13 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 		Provider:  &provider,
 	}
 
-	var joberr error
-	q := jobqueue.NewJobQueue[mh.Multihash](
-		jobqueue.JobHandler(func(ctx context.Context, digest mh.Multihash) error {
-			return addProviderResult(ctx, providerStore, digest, pr, expire)
-		}),
-		jobqueue.WithConcurrency(5),
-		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
-	)
-	q.Startup()
-	i := 0
-	for d := range digests {
-		err := q.Queue(ctx, d)
-		if err != nil {
-			return err
-		}
-		i++
-	}
-	err = q.Shutdown(ctx)
+	i, err := providerStore.Multi(ctx, slices.Collect(digests), func(operation types.ProviderMultiOperation) {
+		operation.Add(pr)
+		operation.SetExpirable(expire)
+	})
+
 	if err != nil {
-		return fmt.Errorf("shutting down job queue: %w", err)
-	}
-	if joberr != nil {
-		return fmt.Errorf("appending provider result: %w", joberr)
+		return fmt.Errorf("appending provider result: %w", err)
 	}
 
 	log.Infof("cached %d provider results", i)
