@@ -220,7 +220,7 @@ func (t *BlobIndexModel) MarshalCBOR(w io.Writer) error {
 	}
 
 	// t.Slices ([]datamodeltype.BlobSliceModel) (slice)
-	if len(t.Slices) > 8192 {
+	if len(t.Slices) > 131072 {
 		return xerrors.Errorf("Slice value in field t.Slices was too long")
 	}
 
@@ -288,7 +288,7 @@ func (t *BlobIndexModel) UnmarshalCBOR(r io.Reader) (err error) {
 		return err
 	}
 
-	if extra > 8192 {
+	if extra > 131072 {
 		return fmt.Errorf("t.Slices: array too large (%d)", extra)
 	}
 
