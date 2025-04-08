@@ -100,7 +100,7 @@ apply: deploy/app/.terraform .tfworkspace lambdas
 mockery:
 	mockery --config=.mockery.yaml
 
-.PHONY: serde
+pkg/blobindex/datamodel/shardeddagindex_cbor_gen.go: pkg/blobindex/datamodel/shardeddagindex.go
+	go run ./scripts/cbor_gen.go
 
-serde:
-	go generate ./...
+serde: pkg/blobindex/datamodel/shardeddagindex_cbor_gen.go

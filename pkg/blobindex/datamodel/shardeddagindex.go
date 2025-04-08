@@ -32,8 +32,6 @@ func BlobIndexSchema() schema.Type {
 	return shardedTs.TypeByName("BlobIndex")
 }
 
-//go:generate cbor-gen-for PositionModel BlobSliceModel BlobIndexModel
-
 // ShardedDagIndexModel is the golang structure for encoding sharded DAG index header blocks
 type ShardedDagIndexModel struct {
 	DagO_1 *ShardedDagIndexModel_0_1
