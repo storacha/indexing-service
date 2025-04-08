@@ -326,6 +326,8 @@ func (is *IndexingService) Cache(ctx context.Context, provider peer.AddrInfo, cl
 // The service should lookup the index cid location claim, and fetch the ShardedDagIndexView, then use the hashes inside
 // to assemble all the multihashes in the index advertisement
 func (is *IndexingService) Publish(ctx context.Context, claim delegation.Delegation) error {
+	ctx, s := telemetry.StartSpan(ctx, "IndexingService.Publish")
+	defer s.End()
 	return Publish(ctx, is.blobIndexLookup, is.claims, is.providerIndex, is.provider, claim)
 }
 
