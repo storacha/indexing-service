@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -154,4 +155,65 @@ func (rs *Store[Key, Value]) Add(ctx context.Context, key Key, values ...Value) 
 		return 0, fmt.Errorf("adding set member: %w", err)
 	}
 	return uint64(n), nil
+}
+
+type operation[Value any] struct {
+	values  []Value
+	expires *bool
+}
+
+func (o *operation[Value]) Add(values ...Value) {
+	o.values = append(o.values, values...)
+}
+
+func (o *operation[Value]) SetExpirable(expires bool) {
+	o.expires = &expires
+}
+
+func (rs *Store[Key, Value]) MultiAdd(ctx context.Context, keys []Key, setupOperation func(types.MultiOperation[Value])) (uint64, error) {
+	o := operation[Value]{}
+	setupOperation(&o)
+	var data []any
+	for _, v := range o.values {
+		d, err := rs.toRedis(v)
+		if err != nil {
+			return 0, err
+		}
+		data = append(data, d)
+	}
+
+	var joberr error
+	q := jobqueue.NewJobQueue[Key](
+		jobqueue.JobHandler(func(ctx context.Context, key Key) error {
+			if len(data) > 0 {
+				_, err := rs.client.SAdd(ctx, rs.keyString(key), data...).Result()
+				if err != nil {
+					return fmt.Errorf("adding set member: %w", err)
+				}
+			}
+			if o.expires == nil {
+				return nil
+			}
+			return rs.SetExpirable(ctx, key, *o.expires)
+		}),
+		jobqueue.WithConcurrency(5),
+		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
+	)
+	q.Startup()
+	i := uint64(0)
+	for _, key := range keys {
+		err := q.Queue(ctx, key)
+		if err != nil {
+			return i, err
+		}
+		i++
+	}
+	err := q.Shutdown(ctx)
+	if err != nil {
+		return i, fmt.Errorf("shutting down job queue: %w", err)
+	}
+	if joberr != nil {
+		return i, fmt.Errorf("executing multi store operation: %w", joberr)
+	}
+	return i, nil
 }
