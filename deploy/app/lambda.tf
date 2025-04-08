@@ -11,6 +11,7 @@ locals {
     }
     postclaims = {
       name = "POSTclaims"
+      timeout = 300
     }
     notifier = {
       name = "notifier"
