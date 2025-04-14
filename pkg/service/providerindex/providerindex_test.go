@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
 	"github.com/storacha/go-libstoracha/metadata"
+	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil/extmocks"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -500,6 +502,53 @@ func TestGetProviderResults(t *testing.T) {
 		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
 
 		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
+		require.NoError(t, err)
+		require.Equal(t, []model.ProviderResult{expectedResult}, results)
+	})
+	t.Run("legacy returns valid result and IPNI hangs", func(t *testing.T) {
+		mockStore := types.NewMockProviderStore(t)
+		mockNoProviderStore := types.NewMockNoProviderStore(t)
+		mockIpniFinder := extmocks.NewMockIpniFinder(t)
+		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
+		mockLegacyClaims := NewMockLegacyClaimsFinder(t)
+		clock := clock.NewMock()
+		providerIndex := NewWithClock(mockStore, mockNoProviderStore, mockIpniFinder, mockIpniPublisher, mockLegacyClaims, clock)
+
+		someHash := testutil.RandomMultihash()
+		expectedResult := testutil.RandomLocationCommitmentProviderResult()
+		targetClaim := []multicodec.Code{metadata.LocationCommitmentID}
+
+		mockStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		// IPNI returns an error.
+		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).RunAndReturn(func(ctx context.Context, _ multihash.Multihash) (*model.FindResponse, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		})
+
+		// Legacy returns a valid result.
+		mockLegacyClaims.EXPECT().Find(testutil.AnyContext, someHash, targetClaim).Return([]model.ProviderResult{expectedResult}, nil)
+		// Expect caching of the legacy result.
+		mockStore.EXPECT().Add(testutil.AnyContext, someHash, expectedResult).Return(1, nil)
+		mockStore.EXPECT().SetExpirable(testutil.AnyContext, someHash, true).Return(nil)
+
+		resultChan := make(chan result.Result[[]model.ProviderResult, error], 1)
+		go func() {
+			resultChan <- result.Wrap(func() ([]model.ProviderResult, error) {
+				return providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
+			})
+		}()
+
+		clock.Add(IPNITimeout / 2)
+		select {
+		case <-resultChan:
+			t.Fatal("should not yet have a result until IPNI context is cancelled")
+		default:
+		}
+
+		// after timeout result should be available with IPNI context cancelled
+		clock.Add(IPNITimeout)
+		results, err := result.Unwrap(<-resultChan)
 		require.NoError(t, err)
 		require.Equal(t, []model.ProviderResult{expectedResult}, results)
 	})

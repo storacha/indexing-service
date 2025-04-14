@@ -8,7 +8,9 @@ import (
 	"iter"
 	"slices"
 	"sync"
+	"time"
 
+	"github.com/benbjohnson/clock"
 	logging "github.com/ipfs/go-log/v2"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	"github.com/ipni/go-libipni/find/model"
@@ -26,6 +28,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const IPNITimeout = 1500 * time.Millisecond
+
 var log = logging.Logger("providerindex")
 
 type QueryKey struct {
@@ -42,17 +46,24 @@ type ProviderIndexService struct {
 	publisher       publisher.Publisher
 	legacyClaims    LegacyClaimsFinder
 	mutex           sync.Mutex
+	clock           clock.Clock
 }
 
 var _ ProviderIndex = (*ProviderIndexService)(nil)
 
 func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder) *ProviderIndexService {
+	return NewWithClock(providerStore, noProviderStore, findClient, publisher, legacyClaims, clock.New())
+}
+
+func NewWithClock(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder, clock clock.Clock) *ProviderIndexService {
+
 	return &ProviderIndexService{
 		providerStore:   providerStore,
 		noProviderStore: noProviderStore,
 		findClient:      findClient,
 		publisher:       publisher,
 		legacyClaims:    legacyClaims,
+		clock:           clock,
 	}
 }
 
@@ -220,6 +231,11 @@ func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s tr
 
 func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	var results []model.ProviderResult
+
+	// IPNI will occassionally hang. If it does, don't wait for it.
+	ctx, cancel := pi.clock.WithTimeout(ctx, IPNITimeout)
+	defer cancel()
+
 	findRes, err := pi.findClient.Find(ctx, mh)
 	if err != nil {
 		return nil, err
