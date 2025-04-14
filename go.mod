@@ -69,6 +69,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.32.2 // indirect
 	github.com/aws/smithy-go v1.22.1 // indirect
+	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/containerd v1.7.27 // indirect
