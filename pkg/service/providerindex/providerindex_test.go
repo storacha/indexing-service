@@ -522,10 +522,8 @@ func TestGetProviderResults(t *testing.T) {
 		mockNoProviderStore.EXPECT().Members(testutil.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
 		// IPNI returns an error.
 		mockIpniFinder.EXPECT().Find(testutil.AnyContext, someHash).RunAndReturn(func(ctx context.Context, _ multihash.Multihash) (*model.FindResponse, error) {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
+			<-ctx.Done()
+			return nil, ctx.Err()
 		})
 
 		// Legacy returns a valid result.
