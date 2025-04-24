@@ -199,7 +199,7 @@ func FromEnv(ctx context.Context) Config {
 			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
 		},
 		ProvidersCacheExpirationSeconds:   mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
-		NoProvidersCacheExpirationSeconds: mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
+		NoProvidersCacheExpirationSeconds: mustGetInt("NO_PROVIDERS_CACHE_EXPIRATION_SECONDS"),
 		ClaimsCacheExpirationSeconds:      mustGetInt("CLAIMS_CACHE_EXPIRATION_SECONDS"),
 		IndexesCacheExpirationSeconds:     mustGetInt("INDEXES_CACHE_EXPIRATION_SECONDS"),
 		SQSCachingQueueURL:                mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
