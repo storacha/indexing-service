@@ -355,9 +355,12 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 // 1. Write the entries to the cache with no expiration until publishing is complete
 // 2. Generate an advertisement for the advertised hashes and publish/announce it
 func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
+	ctx, s := telemetry.StartSpan(ctx, "ProviderIndexService.Publish")
+	defer s.End()
 	log := log.With("contextID", []byte(contextID))
 
 	// cache but do not expire (entries will be expired via the notifier)
+	s.AddEvent("start pre-cache")
 	err := Cache(ctx, pi.providerStore, provider, contextID, digests, meta, false)
 	if err != nil {
 		return fmt.Errorf("caching provider results: %w", err)
@@ -366,6 +369,7 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 	pi.mutex.Lock()
 	defer pi.mutex.Unlock()
 
+	s.AddEvent("start publish")
 	id, err := pi.publisher.Publish(ctx, provider, contextID, digests, meta)
 	if err != nil {
 		if errors.Is(err, publisher.ErrAlreadyAdvertised) {
