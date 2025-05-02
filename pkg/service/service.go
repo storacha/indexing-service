@@ -21,6 +21,7 @@ import (
 	"github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/iterable"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/validator"
 	"github.com/storacha/indexing-service/pkg/blobindex"
@@ -40,8 +41,9 @@ import (
 )
 
 const (
-	ClaimUrlPlaceholder = "{claim}"
-	blobUrlPlaceholder  = "{blob}"
+	ClaimUrlPlaceholder   = "{claim}"
+	blobUrlPlaceholder    = "{blob}"
+	blobCIDUrlPlaceholder = "{blobCID}"
 )
 
 var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
@@ -275,7 +277,12 @@ func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.Quer
 	return queryresult.Build(qs.qr.Claims, qs.qr.Indexes)
 }
 
-func urlForResource(provider peer.AddrInfo, resourcePlaceholder string, resourceID string) (*url.URL, error) {
+type replacement struct {
+	resourcePlaceholder string
+	resourceID          string
+}
+
+func urlForResource(provider peer.AddrInfo, replacements []replacement) (*url.URL, error) {
 	for _, addr := range provider.Addrs {
 		// first, attempt to convert the addr to a url scheme
 		url, err := maurl.ToURL(addr)
@@ -287,23 +294,31 @@ func urlForResource(provider peer.AddrInfo, resourcePlaceholder string, resource
 		if !(url.Scheme == "http" || url.Scheme == "https") {
 			continue
 		}
-		// we must have a place to place the resourceId in the path
-		if !strings.Contains(url.Path, resourcePlaceholder) {
-			continue
+		replacedAny := false
+		for _, replacement := range replacements {
+			resourcePlaceholder, resourceID := replacement.resourcePlaceholder, replacement.resourceID
+			// we must have a place to place the resourceId in the path
+			if !strings.Contains(url.Path, resourcePlaceholder) {
+				continue
+			}
+			replacedAny = true
+			// ok we have a matching URL, return with all resource placeholders replaced with the id
+			url.Path = strings.ReplaceAll(url.Path, resourcePlaceholder, resourceID)
 		}
-		// ok we have a matching URL, return with all resource placeholders replaced with the id
-		url.Path = strings.ReplaceAll(url.Path, resourcePlaceholder, resourceID)
-		return url, nil
+		if replacedAny {
+			return url, nil
+		}
 	}
-	return nil, fmt.Errorf("no %s endpoint found", resourcePlaceholder)
+	placeholders := strings.Join(slices.Collect(iterable.Map(func(r replacement) string { return r.resourcePlaceholder }, slices.Values(replacements))), " or ")
+	return nil, fmt.Errorf("no %s endpoint found", placeholders)
 }
 
 func fetchClaimURL(provider peer.AddrInfo, claimCid cid.Cid) (*url.URL, error) {
-	return urlForResource(provider, ClaimUrlPlaceholder, claimCid.String())
+	return urlForResource(provider, []replacement{{ClaimUrlPlaceholder, claimCid.String()}})
 }
 
 func fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) {
-	return urlForResource(provider, "{blob}", digestutil.Format(shard.Hash()))
+	return urlForResource(provider, []replacement{{blobUrlPlaceholder, digestutil.Format(shard.Hash())}, {blobCIDUrlPlaceholder, shard.String()}})
 }
 
 func (is *IndexingService) Get(ctx context.Context, claim ipld.Link) (delegation.Delegation, error) {

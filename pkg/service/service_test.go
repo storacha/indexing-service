@@ -1164,22 +1164,25 @@ func TestCacheClaim(t *testing.T) {
 func TestUrlForResource(t *testing.T) {
 	const addrBase = "/dns/storacha.network/https/http-path/"
 	testCases := []struct {
-		name        string
-		addrs       []ma.Multiaddr
-		placeholder string
-		id          string
-		expectedUrl string
-		expectErr   bool
+		name         string
+		addrs        []ma.Multiaddr
+		expectedUrl  string
+		expectErr    bool
+		replacements []replacement
 	}{
 		{
 			name: "happy path",
 			addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims/{claim}")))(t),
 			},
-			placeholder: "{claim}",
-			id:          "123",
 			expectedUrl: "https://storacha.network/claims/123",
 			expectErr:   false,
+			replacements: []replacement{
+				{
+					resourcePlaceholder: "{claim}",
+					resourceID:          "123",
+				},
+			},
 		},
 		{
 			name: "multiple addresses, uses the first one that contains the placeholder",
@@ -1188,17 +1191,26 @@ func TestUrlForResource(t *testing.T) {
 				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims1/{claim}")))(t),
 				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims2/{claim}")))(t),
 			},
-			placeholder: "{claim}",
-			id:          "123",
 			expectedUrl: "https://storacha.network/claims1/123",
 			expectErr:   false,
+			replacements: []replacement{
+				{
+					resourcePlaceholder: "{claim}",
+					resourceID:          "123",
+				},
+			},
 		},
 		{
 			name:        "no addresses in peer addr info",
 			addrs:       []ma.Multiaddr{},
-			placeholder: "{claim}",
 			expectedUrl: "",
 			expectErr:   true,
+			replacements: []replacement{
+				{
+					resourcePlaceholder: "{claim}",
+					resourceID:          "",
+				},
+			},
 		},
 		{
 			name: "no address contains the placeholder",
@@ -1207,9 +1219,70 @@ func TestUrlForResource(t *testing.T) {
 				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims/{bar}")))(t),
 				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims/{baz}")))(t),
 			},
-			placeholder: "{claim}",
 			expectedUrl: "",
 			expectErr:   true,
+			replacements: []replacement{
+				{
+					resourcePlaceholder: "{claim}",
+					resourceID:          "",
+				},
+			},
+		},
+		{
+			name: "happy path, multiple replacements",
+			addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims/{claim}-{subclaim}")))(t),
+			},
+			expectedUrl: "https://storacha.network/claims/123-456",
+			expectErr:   false,
+			replacements: []replacement{
+				{
+					resourcePlaceholder: "{claim}",
+					resourceID:          "123",
+				},
+				{
+					resourcePlaceholder: "{subclaim}",
+					resourceID:          "456",
+				},
+			},
+		},
+		{
+			name: "multiple replacements, only one in source string",
+			addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims/{subclaim}")))(t),
+			},
+			expectedUrl: "https://storacha.network/claims/456",
+			expectErr:   false,
+			replacements: []replacement{
+				{
+					resourcePlaceholder: "{claim}",
+					resourceID:          "123",
+				},
+				{
+					resourcePlaceholder: "{subclaim}",
+					resourceID:          "456",
+				},
+			},
+		},
+		{
+			name: "multiple addresses, multiple replacements, uses the first one that contains any the placeholder",
+			addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/blobs/{blob}")))(t),
+				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims1/{claim}")))(t),
+				testutil.Must(ma.NewMultiaddr(addrBase + url.PathEscape("/claims2/{claim}-{subclaim}")))(t),
+			},
+			expectedUrl: "https://storacha.network/claims1/123",
+			expectErr:   false,
+			replacements: []replacement{
+				{
+					resourcePlaceholder: "{claim}",
+					resourceID:          "123",
+				},
+				{
+					resourcePlaceholder: "{subclaim}",
+					resourceID:          "456",
+				},
+			},
 		},
 	}
 
@@ -1218,7 +1291,7 @@ func TestUrlForResource(t *testing.T) {
 			provider := peer.AddrInfo{
 				Addrs: tc.addrs,
 			}
-			u, err := urlForResource(provider, tc.placeholder, tc.id)
+			u, err := urlForResource(provider, tc.replacements)
 			if tc.expectErr {
 				require.Error(t, err)
 			} else {
