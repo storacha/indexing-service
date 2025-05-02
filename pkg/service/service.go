@@ -41,8 +41,9 @@ import (
 )
 
 const (
-	ClaimUrlPlaceholder = "{claim}"
-	blobUrlPlaceholder  = "{blob}"
+	ClaimUrlPlaceholder   = "{claim}"
+	blobUrlPlaceholder    = "{blob}"
+	blobCIDUrlPlaceholder = "{blobCID}"
 )
 
 var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
@@ -317,7 +318,7 @@ func fetchClaimURL(provider peer.AddrInfo, claimCid cid.Cid) (*url.URL, error) {
 }
 
 func fetchRetrievalURL(provider peer.AddrInfo, shard cid.Cid) (*url.URL, error) {
-	return urlForResource(provider, []replacement{{"{blob}", digestutil.Format(shard.Hash())}, {"blobCID", shard.String()}})
+	return urlForResource(provider, []replacement{{blobUrlPlaceholder, digestutil.Format(shard.Hash())}, {blobCIDUrlPlaceholder, shard.String()}})
 }
 
 func (is *IndexingService) Get(ctx context.Context, claim ipld.Link) (delegation.Delegation, error) {
