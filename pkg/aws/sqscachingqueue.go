@@ -96,7 +96,7 @@ func (s *SQSCachingQueue) Queue(ctx context.Context, msg providercacher.CachePro
 
 func (s *SQSCachingQueue) sendMessage(ctx context.Context, msgs []CachingQueueMessage) error {
 	var entries []types.SendMessageBatchRequestEntry
-	for m := range msgs {
+	for _, m := range msgs {
 		body, err := json.Marshal(m)
 		if err != nil {
 			return fmt.Errorf("marshaling message: %w", err)
