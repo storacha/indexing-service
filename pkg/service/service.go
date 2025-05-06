@@ -46,14 +46,20 @@ const (
 
 var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
 
+// ProviderIndexAsyncCacheThreshold is the number above which provider index
+// records will be cached asynchronously by the service instead of synchronously
+// in order to bound the time spent on a request to cache an index claim.
+var ProviderIndexAsyncCacheThreshold = 1000
+
 // IndexingService implements read/write logic for indexing data with IPNI, content claims, sharded dag indexes, and a cache layer
 type IndexingService struct {
 	blobIndexLookup blobindexlookup.BlobIndexLookup
 	claims          contentclaims.Service
 	providerIndex   providerindex.ProviderIndex
 	// provider is the peer info for this service, used when publishing claims.
-	provider  peer.AddrInfo
-	jobWalker jobwalker.JobWalker[job, queryState]
+	provider            peer.AddrInfo
+	jobWalker           jobwalker.JobWalker[job, queryState]
+	asyncCacheThreshold int
 }
 
 var _ types.Service = (*IndexingService)(nil)
@@ -415,7 +421,7 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 		},
 	)
 
-	err = provIndex.Cache(ctx, provider, string(contextID), slices.Values(digests), meta)
+	err = provIndex.Cache(ctx, provider, string(contextID), slices.Values(digests), meta, true)
 	if err != nil {
 		return fmt.Errorf("caching claim with provider index: %w", err)
 	}
@@ -467,6 +473,12 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	digests = append(digests, nb.Content.Hash())
 	digests = append(digests, nb.Equals.(cidlink.Link).Cid.Hash())
 	contextID := nb.Equals.Binary()
+
+	err = provIndex.Cache(ctx, provider, contextID, slices.Values(digests), meta, false)
+	if err != nil {
+		return fmt.Errorf("caching equals claim: %w", err)
+	}
+
 	err = provIndex.Publish(ctx, provider, contextID, slices.Values(digests), meta)
 	if err != nil {
 		return fmt.Errorf("publishing equals claim: %w", err)
@@ -525,13 +537,48 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	)
 
 	digests := bytemap.NewByteMap[multihash.Multihash, struct{}](-1)
+	asyncDigests := bytemap.NewByteMap[multihash.Multihash, struct{}](-1)
+
+	// add priority digests for caching: root hash and shard hash(es).
+	digests.Set(link.ToCID(idx.Content()).Hash(), struct{}{})
+	for s := range idx.Shards().Iterator() {
+		digests.Set(s, struct{}{})
+	}
+
 	for _, slices := range idx.Shards().Iterator() {
 		for d := range slices.Iterator() {
-			digests.Set(d, struct{}{})
+			// add remaining hashes to the digests list up to the threshold, after
+			// which they are added to the other list for caching asynchronously.
+			if digests.Size() <= ProviderIndexAsyncCacheThreshold {
+				digests.Set(d, struct{}{})
+			} else {
+				asyncDigests.Set(d, struct{}{})
+			}
 		}
 	}
 
 	contextID := nb.Index.Binary()
+
+	var cacheErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err := provIndex.Cache(ctx, provider, contextID, digests.Keys(), meta, false)
+		errors.Join(cacheErr, err)
+	}()
+	if asyncDigests.Size() > 0 {
+		wg.Add(1)
+		go func() {
+			err := provIndex.CacheAsync(ctx, provider, contextID, asyncDigests.Keys(), meta)
+			errors.Join(cacheErr, err)
+		}()
+	}
+	wg.Wait()
+
+	if cacheErr != nil {
+		return fmt.Errorf("caching index claim: %w", err)
+	}
+
 	err = provIndex.Publish(ctx, provider, contextID, digests.Keys(), meta)
 	if err != nil {
 		return fmt.Errorf("publishing index claim: %w", err)

@@ -1,18 +1,3 @@
-resource "aws_s3_bucket" "caching_bucket" {
-  bucket = "${terraform.workspace}-${var.app}-caching-bucket"
-}
-
-resource "aws_s3_bucket_lifecycle_configuration" "caching_lifecycle" {
-  bucket = aws_s3_bucket.caching_bucket.id
-  rule {
-    id     = "${terraform.workspace}-${var.app}-caching-bucket-expire-all-rule"
-    status = "Enabled"
-    expiration {
-      days = 14
-    }
-  }
-}
-
 resource "aws_s3_bucket" "ipni_store_bucket" {
   bucket = "${terraform.workspace}-${var.app}-ipni-store-bucket"
 }

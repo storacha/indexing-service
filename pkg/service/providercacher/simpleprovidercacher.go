@@ -8,8 +8,6 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/jobqueue"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -24,23 +22,21 @@ type simpleProviderCacher struct {
 	providerStore types.ProviderStore
 }
 
-func NewSimpleProviderCacher(providerStore types.ProviderStore) ProviderCacher {
+func NewSimpleProviderCacher(providerStore types.ProviderStore) ProviderCachingQueue {
 	return &simpleProviderCacher{providerStore: providerStore}
 }
 
-func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) (uint64, error) {
+func (s *simpleProviderCacher) Queue(ctx context.Context, msg CacheProviderMessage) error {
 	var mutex sync.Mutex
-	var written uint64
 	var jobErr error
 
 	jq := jobqueue.NewJobQueue[digestProviderJob](
 		jobqueue.JobHandler(func(ctx context.Context, job digestProviderJob) error {
-			n, err := addExpirable(ctx, s.providerStore, job.digest, job.provider)
+			_, err := addExpirable(ctx, s.providerStore, job.digest, job.provider)
 			if err != nil {
 				return err
 			}
 			mutex.Lock()
-			written += n
 			mutex.Unlock()
 			return nil
 		}),
@@ -53,25 +49,16 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 
 	jq.Startup()
 
-	// Prioritize the root
-	rootDigest := link.ToCID(index.Content()).Hash()
-	jq.Queue(ctx, digestProviderJob{rootDigest, provider})
-
-	for _, shardIndex := range index.Shards().Iterator() {
-		for hash := range shardIndex.Iterator() {
-			if string(hash) == string(rootDigest) {
-				continue // already added
-			}
-			jq.Queue(ctx, digestProviderJob{hash, provider})
-		}
+	for digest := range msg.Digests {
+		jq.Queue(ctx, digestProviderJob{digest, msg.Provider})
 	}
 
 	err := jq.Shutdown(ctx)
 	if err != nil {
-		return written, err
+		return err
 	}
 
-	return written, jobErr
+	return jobErr
 }
 
 func addExpirable(ctx context.Context, providerStore types.ProviderStore, digest multihash.Multihash, provider model.ProviderResult) (uint64, error) {

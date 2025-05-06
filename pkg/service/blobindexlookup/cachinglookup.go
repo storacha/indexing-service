@@ -7,27 +7,23 @@ import (
 	"net/url"
 
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-// CachingQueue can queue a provider record to be cached for all CIDs in an index
-type CachingQueue interface {
-	Queue(ctx context.Context, job providercacher.ProviderCachingJob) error
-}
-
 type cachingLookup struct {
 	blobIndexLookup    BlobIndexLookup
 	shardDagIndexCache types.ShardedDagIndexStore
-	cachingQueue       CachingQueue
+	cachingQueue       providercacher.ProviderCachingQueue
 }
 
 var _ BlobIndexLookup = (*cachingLookup)(nil)
 
 // WithCache returns a blobIndexLookup that attempts to read blobs from the cache, and also caches providers asociated with index cids
-func WithCache(blobIndexLookup BlobIndexLookup, shardedDagIndexCache types.ShardedDagIndexStore, cachingQueue CachingQueue) BlobIndexLookup {
+func WithCache(blobIndexLookup BlobIndexLookup, shardedDagIndexCache types.ShardedDagIndexStore, cachingQueue providercacher.ProviderCachingQueue) BlobIndexLookup {
 	return &cachingLookup{
 		blobIndexLookup:    blobIndexLookup,
 		shardDagIndexCache: shardedDagIndexCache,
@@ -58,10 +54,20 @@ func (b *cachingLookup) Find(ctx context.Context, contextID types.EncodedContext
 		return nil, fmt.Errorf("caching fetched index: %w", err)
 	}
 
+	digests := func(yield func(multihash.Multihash) bool) {
+		for _, slices := range index.Shards().Iterator() {
+			for d := range slices.Iterator() {
+				if !yield(d) {
+					return
+				}
+			}
+		}
+	}
+
 	// queue a background cache of an provider record for all cids in the index without one
-	if err := b.cachingQueue.Queue(ctx, providercacher.ProviderCachingJob{
+	if err := b.cachingQueue.Queue(ctx, providercacher.CacheProviderMessage{
 		Provider: provider,
-		Index:    index,
+		Digests:  digests,
 	}); err != nil {
 		return nil, fmt.Errorf("queueing provider caching for index failed: %w", err)
 	}

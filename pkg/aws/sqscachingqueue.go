@@ -1,134 +1,141 @@
 package aws
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/google/uuid"
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
+	"github.com/multiformats/go-multihash"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 )
 
+// MaxDigests is the maximum number of digests to include in an SQS message.
+//
+// sha2-256 multihash will encode as base64 string of 48 bytes:
+// e.g. EiADkFjG8sDLSSxTOwpNFO93zA94q8zO1Sh9hKGiARz7gQ==
+//
+// Add extra 3 bytes for quotes and comma separator:
+// e.g. "EiADkFjG8sDLSSxTOwpNFO93zA94q8zO1Sh9hKGiARz7gQ==",
+//
+// Max message size is 262,144 bytes (256 KiB) which would allow this many
+// hashes in total:
+// (48 + 3) / 262,144 = ~5140
+//
+// However, the message also has the provider result, so lets leave ample space
+// for this and allow up to 1,000 hashes per message.
+//
+// SQS message batch allows up to 10 messages to be sent so we can enqueue a
+// 10k NFT / ~10GB of data (assuming 1MB chunk size) in a single request.
+var MaxDigests = 1_000
+
+// MaxBatchEntries is the max number of messages allowed in a SQS message batch.
+// https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html
+var MaxBatchEntries = 10
+
 // CachingQueueMessage is the struct that is serialized onto an SQS message queue in JSON
 type CachingQueueMessage struct {
-	JobID    uuid.UUID            `json:"JobID,omitempty"`
-	Provider model.ProviderResult `json:"Provider,omitempty"`
+	Provider model.ProviderResult  `json:"Provider,omitempty"`
+	Digests  []multihash.Multihash `json:"Digests,omitempty"`
 }
 
 // SQSCachingQueue implements the providercacher.CachingQueue interface using SQS
 type SQSCachingQueue struct {
 	queueURL  string
-	bucket    string
-	s3Client  *s3.Client
 	sqsClient *sqs.Client
 }
 
 // NewSQSCachingQueue returns a new SQSCachingQueue for the given aws config
-func NewSQSCachingQueue(cfg aws.Config, queurURL string, bucket string) *SQSCachingQueue {
+func NewSQSCachingQueue(cfg aws.Config, queueURL string) *SQSCachingQueue {
 	return &SQSCachingQueue{
-		queueURL:  queurURL,
-		bucket:    bucket,
-		s3Client:  s3.NewFromConfig(cfg),
+		queueURL:  queueURL,
 		sqsClient: sqs.NewFromConfig(cfg),
 	}
 }
 
-// Queue implements blobindexlookup.CachingQueue.
-func (s *SQSCachingQueue) Queue(ctx context.Context, job providercacher.ProviderCachingJob) error {
-	uuid := uuid.New()
-	r, err := job.Index.Archive()
-	if err != nil {
-		return fmt.Errorf("serializing index to CAR: %w", err)
-	}
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return fmt.Errorf("reading index from CAR: %w", err)
-	}
-	_, err = s.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:        aws.String(s.bucket),
-		Key:           aws.String(uuid.String()),
-		Body:          bytes.NewReader(data),
-		ContentLength: aws.Int64(int64(len(data))),
-	})
-	if err != nil {
-		return fmt.Errorf("saving index CAR to S3: %w", err)
-	}
-	err = s.sendMessage(ctx, CachingQueueMessage{
-		JobID:    uuid,
-		Provider: job.Provider,
-	})
-	if err != nil {
-		// error sending message so cleanup queue
-		_, s3deleteErr := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
-			Bucket: aws.String(s.bucket),
-			Key:    aws.String(uuid.String()),
-		})
-		if s3deleteErr != nil {
-			err = errors.Join(err, fmt.Errorf("cleaning up index CAR on S3: %w", s3deleteErr))
+// Queue implements [providercacher.ProviderCachingQueue].
+func (s *SQSCachingQueue) Queue(ctx context.Context, msg providercacher.CacheProviderMessage) error {
+	var batch []CachingQueueMessage
+	qmsg := CachingQueueMessage{Provider: msg.Provider}
+	for digest := range msg.Digests {
+		qmsg.Digests = append(qmsg.Digests, digest)
+
+		if len(qmsg.Digests) >= MaxDigests {
+			batch = append(batch, qmsg)
+
+			if len(batch) >= MaxBatchEntries {
+				err := s.sendMessage(ctx, batch)
+				if err != nil {
+					return fmt.Errorf("sending batch: %w", err)
+				}
+				batch = []CachingQueueMessage{}
+			}
+
+			qmsg = CachingQueueMessage{Provider: msg.Provider}
 		}
 	}
-	return err
+
+	if len(qmsg.Digests) > 0 {
+		batch = append(batch, qmsg)
+	}
+
+	if len(batch) > 0 {
+		err := s.sendMessage(ctx, batch)
+		if err != nil {
+			return fmt.Errorf("sending final batch: %w", err)
+		}
+	}
+
+	return nil
 }
 
-func (s *SQSCachingQueue) sendMessage(ctx context.Context, msg CachingQueueMessage) error {
-
-	messageJSON, err := json.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("serializing message json: %w", err)
+func (s *SQSCachingQueue) sendMessage(ctx context.Context, msgs []CachingQueueMessage) error {
+	var entries []types.SendMessageBatchRequestEntry
+	for m := range msgs {
+		body, err := json.Marshal(m)
+		if err != nil {
+			return fmt.Errorf("marshaling message: %w", err)
+		}
+		entries = append(entries, types.SendMessageBatchRequestEntry{
+			Id:          aws.String(uuid.New().String()),
+			MessageBody: aws.String(string(body)),
+		})
 	}
-	_, err = s.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
-		QueueUrl:    aws.String(s.queueURL),
-		MessageBody: aws.String(string(messageJSON)),
+
+	_, err := s.sqsClient.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
+		QueueUrl: aws.String(s.queueURL),
+		Entries:  entries,
 	})
 	if err != nil {
-		return fmt.Errorf("enqueueing message: %w", err)
+		return fmt.Errorf("sending batch: %w", err)
 	}
 	return nil
 }
 
-var _ blobindexlookup.CachingQueue = (*SQSCachingQueue)(nil)
+var _ providercacher.ProviderCachingQueue = (*SQSCachingQueue)(nil)
 
 // SQSCachingDecoder provides interfaces for working with caching jobs received over SQS
-type SQSCachingDecoder struct {
-	bucket   string
-	s3Client *s3.Client
-}
+type SQSCachingDecoder struct{}
 
 // NewSQSCachingDecoder returns a new decoder for the given AWS config
-func NewSQSCachingDecoder(cfg aws.Config, bucket string) *SQSCachingDecoder {
-	return &SQSCachingDecoder{
-		bucket:   bucket,
-		s3Client: s3.NewFromConfig(cfg),
-	}
+func NewSQSCachingDecoder() *SQSCachingDecoder {
+	return &SQSCachingDecoder{}
 }
 
 // DecodeMessage decodes a provider caching job from the SQS message body, reading the stored index from S3
-func (s *SQSCachingDecoder) DecodeMessage(ctx context.Context, messageBody string) (providercacher.ProviderCachingJob, error) {
+func (s *SQSCachingDecoder) DecodeMessage(ctx context.Context, messageBody string) (providercacher.CacheProviderMessage, error) {
 	var msg CachingQueueMessage
 	err := json.Unmarshal([]byte(messageBody), &msg)
 	if err != nil {
-		return providercacher.ProviderCachingJob{}, fmt.Errorf("deserializing message: %w", err)
+		return providercacher.CacheProviderMessage{}, fmt.Errorf("deserializing message: %w", err)
 	}
-	received, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(msg.JobID.String()),
-	})
-	if err != nil {
-		return providercacher.ProviderCachingJob{}, fmt.Errorf("reading stored index CAR: %w", err)
-	}
-	defer received.Body.Close()
-	index, err := blobindex.Extract(received.Body)
-	if err != nil {
-		return providercacher.ProviderCachingJob{}, fmt.Errorf("deserializing index: %w", err)
-	}
-	return providercacher.ProviderCachingJob{Provider: msg.Provider, Index: index}, nil
+	return providercacher.CacheProviderMessage{
+		Provider: msg.Provider,
+		Digests:  slices.Values(msg.Digests),
+	}, nil
 }

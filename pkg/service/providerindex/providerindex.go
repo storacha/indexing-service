@@ -22,6 +22,7 @@ import (
 	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"go.opentelemetry.io/otel/attribute"
@@ -40,30 +41,47 @@ type QueryKey struct {
 
 // ProviderIndexService is a read/write interface to a local cache of providers that falls back to IPNI
 type ProviderIndexService struct {
-	providerStore   types.ProviderStore
-	noProviderStore types.NoProviderStore
-	findClient      ipnifind.Finder
-	publisher       publisher.Publisher
-	legacyClaims    LegacyClaimsFinder
-	mutex           sync.Mutex
-	clock           clock.Clock
+	providerStore        types.ProviderStore
+	noProviderStore      types.NoProviderStore
+	providerCachingQueue providercacher.ProviderCachingQueue
+	findClient           ipnifind.Finder
+	publisher            publisher.Publisher
+	legacyClaims         LegacyClaimsFinder
+	mutex                sync.Mutex
+	clock                clock.Clock
 }
 
 var _ ProviderIndex = (*ProviderIndexService)(nil)
 
-func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder) *ProviderIndexService {
-	return NewWithClock(providerStore, noProviderStore, findClient, publisher, legacyClaims, clock.New())
+func New(
+	providerStore types.ProviderStore,
+	noProviderStore types.NoProviderStore,
+	providerCachingQueue providercacher.ProviderCachingQueue,
+	findClient ipnifind.Finder,
+	publisher publisher.Publisher,
+	legacyClaims LegacyClaimsFinder,
+) *ProviderIndexService {
+	return NewWithClock(providerStore, noProviderStore, providerCachingQueue, findClient, publisher, legacyClaims, clock.New())
 }
 
-func NewWithClock(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder, clock clock.Clock) *ProviderIndexService {
+func NewWithClock(
+	providerStore types.ProviderStore,
+	noProviderStore types.NoProviderStore,
+	providerCachingQueue providercacher.ProviderCachingQueue,
+	findClient ipnifind.Finder,
+	publisher publisher.Publisher,
+	legacyClaims LegacyClaimsFinder,
+	clock clock.Clock,
+) *ProviderIndexService {
 
 	return &ProviderIndexService{
-		providerStore:   providerStore,
-		noProviderStore: noProviderStore,
-		findClient:      findClient,
-		publisher:       publisher,
-		legacyClaims:    legacyClaims,
-		clock:           clock,
+		providerStore:        providerStore,
+		noProviderStore:      noProviderStore,
+		providerCachingQueue: providerCachingQueue,
+		findClient:           findClient,
+		publisher:            publisher,
+		legacyClaims:         legacyClaims,
+		clock:                clock,
 	}
 }
 
@@ -301,10 +319,12 @@ func filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did
 	return filtered, nil
 }
 
-func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
-	// Cache the entries _with_ expiry - we cannot rely on the IPNI notifier to
-	// tell us when they are published since we are not publishing to IPNI.
-	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, true)
+func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata, expire bool) error {
+	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, expire)
+}
+
+func (pi *ProviderIndexService) CacheAsync(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
+	return CacheAsync(ctx, pi.providerCachingQueue, provider, contextID, digests, meta)
 }
 
 func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata, expire bool) error {
@@ -351,20 +371,30 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 	return nil
 }
 
-// Publish should do the following:
-// 1. Write the entries to the cache with no expiration until publishing is complete
-// 2. Generate an advertisement for the advertised hashes and publish/announce it
+func CacheAsync(ctx context.Context, providerCachingQueue providercacher.ProviderCachingQueue, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
+	mdb, err := meta.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("marshaling metadata: %w", err)
+	}
+
+	pr := model.ProviderResult{
+		ContextID: []byte(contextID),
+		Metadata:  mdb,
+		Provider:  &provider,
+	}
+
+	msg := providercacher.CacheProviderMessage{
+		Provider: pr,
+		Digests:  digests,
+	}
+
+	return providerCachingQueue.Queue(ctx, msg)
+}
+
 func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
 	ctx, s := telemetry.StartSpan(ctx, "ProviderIndexService.Publish")
 	defer s.End()
 	log := log.With("contextID", []byte(contextID))
-
-	// cache but do not expire (entries will be expired via the notifier)
-	s.AddEvent("start pre-cache")
-	err := Cache(ctx, pi.providerStore, provider, contextID, digests, meta, false)
-	if err != nil {
-		return fmt.Errorf("caching provider results: %w", err)
-	}
 
 	pi.mutex.Lock()
 	defer pi.mutex.Unlock()

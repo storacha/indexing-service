@@ -95,7 +95,6 @@ resource "aws_lambda_function" "lambda" {
         REDIS_USER_ID = local.cache_iam_user.user_id
         IPNI_ENDPOINT = "https://cid.contact"
         PROVIDER_CACHING_QUEUE_URL = aws_sqs_queue.caching.id
-        PROVIDER_CACHING_BUCKET_NAME = aws_s3_bucket.caching_bucket.bucket
         CHUNK_LINKS_TABLE_NAME = aws_dynamodb_table.chunk_links.id
         METADATA_TABLE_NAME = aws_dynamodb_table.metadata.id
         IPNI_STORE_BUCKET_NAME = aws_s3_bucket.ipni_store_bucket.bucket
@@ -236,7 +235,6 @@ data "aws_iam_policy_document" "lambda_s3_put_get_document" {
       "s3:DeleteObject",
     ]
     resources = [
-      "${aws_s3_bucket.caching_bucket.arn}/*",
       "${aws_s3_bucket.ipni_store_bucket.arn}/*",
       "${aws_s3_bucket.notifier_head_bucket.arn}/*",
       "${aws_s3_bucket.claim_store_bucket.arn}/*"
@@ -247,7 +245,6 @@ data "aws_iam_policy_document" "lambda_s3_put_get_document" {
       "s3:ListBucket","s3:GetBucketLocation"
     ]
     resources = [
-      aws_s3_bucket.caching_bucket.arn,
       aws_s3_bucket.ipni_store_bucket.arn,
       aws_s3_bucket.notifier_head_bucket.arn,
       aws_s3_bucket.claim_store_bucket.arn

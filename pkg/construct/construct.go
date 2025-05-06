@@ -71,7 +71,7 @@ type ServiceConfig struct {
 }
 
 type config struct {
-	cachingQueue         blobindexlookup.CachingQueue
+	providerCachingQueue providercacher.ProviderCachingQueue
 	opts                 []service.Option
 	ds                   datastore.Batching
 	skipNotification     bool
@@ -117,10 +117,10 @@ func WithServiceOptions(opts ...service.Option) Option {
 	}
 }
 
-// WithCachingQueue overrides the default caching queue for provider caching
-func WithCachingQueue(cachingQueue blobindexlookup.CachingQueue) Option {
+// WithProviderCachingQueue overrides the default caching queue for provider caching
+func WithProviderCachingQueue(queue providercacher.ProviderCachingQueue) Option {
 	return func(cfg *config) error {
-		cfg.cachingQueue = cachingQueue
+		cfg.providerCachingQueue = queue
 		return nil
 	}
 }
@@ -332,12 +332,12 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	claimsCache := redis.NewContentClaimsStore(claimsClient, cfg.claimsCacheOpts...)
 	shardDagIndexesCache := redis.NewShardedDagIndexStore(indexesClient, cfg.indexesCacheOpts...)
 
-	cachingQueue := cfg.cachingQueue
-	if cachingQueue == nil {
+	providerCachingQueue := cfg.providerCachingQueue
+	if providerCachingQueue == nil {
 		// setup and start the provider caching queue for indexes
 		cachingJobHandler := providercacher.NewJobHandler(providercacher.NewSimpleProviderCacher(providersCache))
 
-		jq := jobqueue.NewJobQueue[providercacher.ProviderCachingJob](
+		jq := jobqueue.NewJobQueue[providercacher.CacheProviderMessage](
 			jobqueue.JobHandler(cachingJobHandler.Handle),
 			jobqueue.WithBuffer(5),
 			jobqueue.WithConcurrency(5),
@@ -347,7 +347,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 		s.startupFuncs = append(s.startupFuncs, func(context.Context) error { jq.Startup(); return nil })
 		s.shutdownFuncs = append(s.shutdownFuncs, jq.Shutdown)
-		cachingQueue = jq
+		providerCachingQueue = jq
 	}
 
 	httpClient := DefaultHTTPClient()
@@ -434,7 +434,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		legacyClaims = providerindex.NewNoResultsLegacyClaimsFinder()
 	}
 
-	providerIndex := providerindex.New(providersCache, noProvidersCache, findClient, publisher, legacyClaims)
+	providerIndex := providerindex.New(providersCache, noProvidersCache, providerCachingQueue, findClient, publisher, legacyClaims)
 
 	claimsStore := cfg.claimsStore
 	if claimsStore == nil {
@@ -452,7 +452,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	blobIndexLookup := blobindexlookup.WithCache(
 		blobindexlookup.NewBlobIndexLookup(httpClient),
 		shardDagIndexesCache,
-		cachingQueue,
+		providerCachingQueue,
 	)
 
 	peerID, err := peer.IDFromPrivateKey(sc.PrivateKey)

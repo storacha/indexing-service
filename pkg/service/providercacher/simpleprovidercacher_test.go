@@ -181,7 +181,7 @@ func TestSimpleProviderCacher_10kNFT(t *testing.T) {
 	mockStore := &MockProviderStore{store: map[string][]model.ProviderResult{}}
 
 	cacher := providercacher.NewSimpleProviderCacher(mockStore)
-	n, err := cacher.CacheProviderForIndexRecords(ctx, prov, idx)
+	n, err := cacher.Queue(ctx, prov, idx)
 	require.NoError(t, err)
 	require.Equal(t, 10_001, int(n))
 }
