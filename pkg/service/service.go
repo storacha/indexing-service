@@ -565,12 +565,14 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	go func() {
 		err := provIndex.Cache(ctx, provider, contextID, digests.Keys(), meta, false)
 		errors.Join(cacheErr, err)
+		wg.Done()
 	}()
 	if asyncDigests.Size() > 0 {
 		wg.Add(1)
 		go func() {
 			err := provIndex.CacheAsync(ctx, provider, contextID, asyncDigests.Keys(), meta)
 			errors.Join(cacheErr, err)
+			wg.Done()
 		}()
 	}
 	wg.Wait()

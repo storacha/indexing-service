@@ -8,7 +8,6 @@ import (
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
@@ -25,27 +24,10 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 	testProvider := testutil.RandomProviderResult()
 	testProvider2 := testutil.RandomProviderResult()
 
-	// Create a test index with random CIDs
+	// Create random CIDs
 	testCid1 := testutil.RandomCID()
-	shardIndex := blobindex.NewShardedDagIndexView(testCid1, 2)
-
-	shardMhs := testutil.RandomMultihashes(2)
 	sliceMhs := testutil.RandomMultihashes(6)
-	for i := range 2 {
-		for j := range 3 {
-			shardIndex.SetSlice(shardMhs[i], sliceMhs[i*3+j], blobindex.Position{})
-		}
-	}
-	// the root block should be in the index also
-	shardIndex.SetSlice(shardMhs[0], link.ToCID(testCid1).Hash(), blobindex.Position{})
-
-	testCid2 := testutil.RandomCID()
-	shardIndex2 := blobindex.NewShardedDagIndexView(testCid2, 2)
-	for j := range 2 {
-		shardIndex2.SetSlice(shardMhs[0], sliceMhs[j], blobindex.Position{})
-	}
-	// the root block should be in the index also
-	shardIndex2.SetSlice(shardMhs[0], link.ToCID(testCid2).Hash(), blobindex.Position{})
+	sliceMhs = append(sliceMhs, link.ToCID(testCid1).Hash())
 
 	evensFilled := func() map[string][]model.ProviderResult {
 		starter := make(map[string][]model.ProviderResult)
@@ -61,7 +43,7 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 	testCases := []struct {
 		name          string
 		provider      model.ProviderResult
-		index         blobindex.ShardedDagIndexView
+		digests       []multihash.Multihash
 		getErr        error
 		setErr        error
 		initialStore  map[string][]model.ProviderResult
@@ -72,7 +54,7 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 		{
 			name:          "Cache new provider",
 			provider:      testProvider,
-			index:         shardIndex,
+			digests:       sliceMhs,
 			expectedCount: 7,
 			expectedErr:   nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
@@ -85,9 +67,9 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 		{
 			name:          "Cache provider already present",
 			provider:      testProvider,
-			index:         shardIndex,
+			digests:       sliceMhs,
 			initialStore:  evensFilled(),
-			expectedCount: 4,
+			expectedCount: 3,
 			expectedErr:   nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
 				require.Len(t, store, 7)
@@ -99,7 +81,7 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 		{
 			name:          "Cache another provider on top",
 			provider:      testProvider2,
-			index:         shardIndex,
+			digests:       sliceMhs,
 			initialStore:  evensFilled(),
 			expectedCount: 7,
 			expectedErr:   nil,
@@ -133,13 +115,16 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			// Create SimpleProviderCacher instance
 			cacher := providercacher.NewSimpleProviderCacher(mockStore)
 
-			count, err := cacher.CacheProviderForIndexRecords(ctx, tc.provider, tc.index)
+			err := cacher.Queue(ctx, providercacher.CacheProviderMessage{
+				Provider: tc.provider,
+				Digests:  slices.Values(tc.digests),
+			})
 			if tc.expectedErr == nil {
 				require.NoError(t, err)
 			} else {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			}
-			require.Equal(t, tc.expectedCount, count)
+			require.Equal(t, tc.expectedCount, mockStore.written)
 			if tc.testStore != nil {
 				tc.testStore(t, mockStore.store)
 			}
@@ -154,9 +139,7 @@ func TestSimpleProviderCacher_10kNFT(t *testing.T) {
 
 	prov := testutil.RandomProviderResult()
 	root := testutil.RandomCID()
-	idx := blobindex.NewShardedDagIndexView(root, 2)
 
-	shardDigests := testutil.RandomMultihashes(2)
 	// make 10_000 unique hashes
 	sliceDigests := make([]multihash.Multihash, 0, 10_000)
 	for range 10_000 {
@@ -170,20 +153,23 @@ func TestSimpleProviderCacher_10kNFT(t *testing.T) {
 		}
 	}
 
-	for i := range 2 {
-		for j := range 5_000 {
-			idx.SetSlice(shardDigests[i], sliceDigests[i*5_000+j], blobindex.Position{})
-		}
-	}
-	// the root block should be in the index also
-	idx.SetSlice(shardDigests[0], link.ToCID(root).Hash(), blobindex.Position{})
-
 	mockStore := &MockProviderStore{store: map[string][]model.ProviderResult{}}
-
 	cacher := providercacher.NewSimpleProviderCacher(mockStore)
-	n, err := cacher.Queue(ctx, prov, idx)
+	err := cacher.Queue(ctx, providercacher.CacheProviderMessage{
+		Provider: prov,
+		Digests: func(yield func(digest multihash.Multihash) bool) {
+			if !yield(link.ToCID(root).Hash()) {
+				return
+			}
+			for _, d := range sliceDigests {
+				if !yield(d) {
+					return
+				}
+			}
+		},
+	})
 	require.NoError(t, err)
-	require.Equal(t, 10_001, int(n))
+	require.Equal(t, 1+len(sliceDigests), len(mockStore.store))
 }
 
 // MockProviderStore is a mock implementation of the ProviderStore interface
@@ -191,6 +177,7 @@ type MockProviderStore struct {
 	setErr, getErr error
 	store          map[string][]model.ProviderResult
 	mutex          sync.RWMutex
+	written        uint64
 }
 
 var _ types.ProviderStore = &MockProviderStore{}
@@ -219,6 +206,7 @@ func (m *MockProviderStore) Add(ctx context.Context, hash multihash.Multihash, p
 			written++
 		}
 	}
+	m.written += written
 	return written, nil
 }
 

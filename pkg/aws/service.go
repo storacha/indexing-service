@@ -239,7 +239,7 @@ func Construct(cfg Config) (types.Service, error) {
 		indexesClient = telemetry.InstrumentRedisClient(indexesClient)
 	}
 
-	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
+	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
