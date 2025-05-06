@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"iter"
 	"net/url"
+	"os"
+	"runtime"
 	"slices"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/docker/go-connections/nat"
@@ -23,6 +26,10 @@ import (
 )
 
 func TestSqsCachingQueue(t *testing.T) {
+	if os.Getenv("CI") != "" && runtime.GOOS != "linux" {
+		t.SkipNow()
+	}
+
 	ctx := context.Background()
 	endpoint := createSQS(t)
 	sqsClient := newSqsClient(t, endpoint)
@@ -124,6 +131,12 @@ func createSQS(t *testing.T) url.URL {
 func newSqsClient(t *testing.T, endpoint url.URL) *sqs.Client {
 	cfg, err := config.LoadDefaultConfig(
 		context.Background(),
+		config.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+			Value: aws.Credentials{
+				AccessKeyID:     "DUMMYIDEXAMPLE",
+				SecretAccessKey: "DUMMYEXAMPLEKEY",
+			},
+		}),
 		func(o *config.LoadOptions) error {
 			o.Region = "elasticmq"
 			return nil
