@@ -36,8 +36,6 @@ func (s *simpleProviderCacher) Queue(ctx context.Context, msg CacheProviderMessa
 			if err != nil {
 				return err
 			}
-			mutex.Lock()
-			mutex.Unlock()
 			return nil
 		}),
 		jobqueue.WithConcurrency(cacherConcurrency),

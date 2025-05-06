@@ -57,9 +57,8 @@ type IndexingService struct {
 	claims          contentclaims.Service
 	providerIndex   providerindex.ProviderIndex
 	// provider is the peer info for this service, used when publishing claims.
-	provider            peer.AddrInfo
-	jobWalker           jobwalker.JobWalker[job, queryState]
-	asyncCacheThreshold int
+	provider  peer.AddrInfo
+	jobWalker jobwalker.JobWalker[job, queryState]
 }
 
 var _ types.Service = (*IndexingService)(nil)
