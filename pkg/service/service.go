@@ -18,12 +18,15 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/advertisement"
 	"github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/iterable"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/validator"
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
@@ -37,7 +40,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -407,7 +409,7 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 	}
 
 	digests := []multihash.Multihash{nb.Content.Hash()}
-	contextID, err := types.ContextID{Space: &nb.Space, Hash: nb.Content.Hash()}.ToEncoded()
+	contextID, err := advertisement.EncodeContextID(nb.Space, nb.Content.Hash())
 	if err != nil {
 		return fmt.Errorf("encoding advertisement context ID: %w", err)
 	}
@@ -422,8 +424,14 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 		rng = &metadata.Range{Offset: nb.Range.Offset, Length: nb.Range.Length}
 	}
 
+	shardCid, err := advertisement.ShardCID(provider, nb)
+	if err != nil {
+		return fmt.Errorf("failed to extract shard CID for provider: %s locationCommitment %s: %w", provider, capability, err)
+	}
+
 	meta := metadata.MetadataContext.New(
 		&metadata.LocationCommitmentMetadata{
+			Shard:      shardCid,
 			Expiration: int64(exp),
 			Claim:      link.ToCID(claim.Link()),
 			Range:      rng,
