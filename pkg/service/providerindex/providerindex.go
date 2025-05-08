@@ -327,7 +327,7 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 		jobqueue.JobHandler(func(ctx context.Context, digest mh.Multihash) error {
 			return addProviderResult(ctx, providerStore, digest, pr, expire)
 		}),
-		jobqueue.WithConcurrency(5),
+		jobqueue.WithConcurrency(500),
 		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
 	)
 	q.Startup()
