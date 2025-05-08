@@ -1,12 +1,19 @@
 package providercacher
 
 import (
-	"context"
+	"iter"
 
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/storacha/indexing-service/pkg/blobindex"
+	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
-type ProviderCacher interface {
-	CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) (written uint64, err error)
+// CacheProviderMessage instructs caching the provider result for each digest.
+type CacheProviderMessage struct {
+	Provider model.ProviderResult
+	Digests  iter.Seq[mh.Multihash]
 }
+
+// ProviderCachingQueue asynchronously caches provider information for the
+// passed digests in a [types.ProviderStore].
+type ProviderCachingQueue types.Queue[CacheProviderMessage]
