@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -288,5 +289,49 @@ func TestGetClaimsHandler(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, http.StatusBadRequest, res.StatusCode)
 		})
+	})
+}
+
+func TestGetDIDDocumentHandler(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		svr := httptest.NewServer(GetDIDDocument(testutil.Service))
+		defer svr.Close()
+
+		res, err := http.Get(svr.URL)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		bytes, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var doc Document
+		err = json.Unmarshal(bytes, &doc)
+		require.NoError(t, err)
+
+		require.Equal(t, doc.ID, testutil.Service.DID().String())
+	})
+
+	t.Run("did:web", func(t *testing.T) {
+		didweb, err := did.Parse("did:web:example.org")
+		require.NoError(t, err)
+
+		signer, err := signer.Wrap(testutil.Service, didweb)
+		require.NoError(t, err)
+
+		svr := httptest.NewServer(GetDIDDocument(signer))
+		defer svr.Close()
+
+		res, err := http.Get(svr.URL)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		bytes, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var doc Document
+		err = json.Unmarshal(bytes, &doc)
+		require.NoError(t, err)
+
+		require.Equal(t, doc.ID, didweb.DID().String())
 	})
 }
