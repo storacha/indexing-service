@@ -235,8 +235,6 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 
 // Document is a did document that describes a did subject.
 // See https://www.w3.org/TR/did-core/#dfn-did-documents.
-// TODO: Should we include the non-standard publicKey field for compatability reasons?
-// See https://w3c.github.io/did-spec-registries/#publickey
 type Document struct {
 	Context            []string             `json:"@context"` // https://w3id.org/did/v1
 	ID                 string               `json:"id"`
