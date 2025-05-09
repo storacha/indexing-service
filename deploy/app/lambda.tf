@@ -9,6 +9,9 @@ locals {
     getclaims = {
       name = "GETclaims"
     }
+    getdiddocument = {
+      name = "GETdiddocument"
+    }
     postclaims = {
       name = "POSTclaims"
       timeout = 300

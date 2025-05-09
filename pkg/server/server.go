@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -89,6 +90,7 @@ func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 	mux.HandleFunc("GET /claim/{claim}", GetClaimHandler(indexer))
 	mux.HandleFunc("POST /claims", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...))
 	mux.HandleFunc("GET /claims", GetClaimsHandler(indexer))
+	mux.HandleFunc("GET /.well-known/did.json", GetDIDDocument(c.id))
 	return mux
 }
 
@@ -228,5 +230,56 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 		if err != nil {
 			log.Errorf("sending claims response: %w", err)
 		}
+	}
+}
+
+// Document is a did document that describes a did subject.
+// See https://www.w3.org/TR/did-core/#dfn-did-documents.
+type Document struct {
+	Context            []string             `json:"@context"` // https://w3id.org/did/v1
+	ID                 string               `json:"id"`
+	Controller         []string             `json:"controller,omitempty"`
+	VerificationMethod []VerificationMethod `json:"verificationMethod,omitempty"`
+	Authentication     []string             `json:"authentication,omitempty"`
+	AssertionMethod    []string             `json:"assertionMethod,omitempty"`
+}
+
+// VerificationMethod describes how to authenticate or authorize interactions
+// with a did subject.
+// See https://www.w3.org/TR/did-core/#dfn-verification-method.
+type VerificationMethod struct {
+	ID                 string `json:"id,omitempty"`
+	Type               string `json:"type,omitempty"`
+	Controller         string `json:"controller,omitempty"`
+	PublicKeyMultibase string `json:"publicKeyMultibase,omitempty"`
+}
+
+// GetDIDDocument returns the DID document for did:web resolution.
+func GetDIDDocument(id principal.Signer) http.HandlerFunc {
+	doc := Document{
+		Context: []string{"https://w3id.org/did/v1"},
+		ID:      id.DID().String(),
+	}
+	if s, ok := id.(signer.WrappedSigner); ok {
+		vid := fmt.Sprintf("%s#owner", s.DID())
+		doc.VerificationMethod = []VerificationMethod{
+			{
+				ID:                 vid,
+				Type:               "Ed25519VerificationKey2020",
+				Controller:         s.DID().String(),
+				PublicKeyMultibase: strings.TrimPrefix(s.Unwrap().DID().String(), "did:key:"),
+			},
+		}
+		doc.Authentication = []string{vid}
+		doc.AssertionMethod = []string{vid}
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+		bytes, err := json.Marshal(doc)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Write(bytes)
 	}
 }

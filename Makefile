@@ -10,7 +10,7 @@ LAMBDA_GOARCH=arm64
 LAMBDA_GOCC?=go
 LAMBDA_GOFLAGS=-tags=lambda.norpc -ldflags="-s -w -X github.com/storacha/indexing-service/pkg/build.version=$(VERSION)"
 LAMBDA_CGO_ENABLED=0
-LAMBDADIRS=build/getclaim build/getclaims build/getroot build/notifier build/postclaims build/providercache build/remotesync
+LAMBDADIRS=build/getclaim build/getclaims build/getdiddocument build/getroot build/notifier build/postclaims build/providercache build/remotesync
 LAMBDAS=$(foreach dir, $(LAMBDADIRS), $(dir)/bootstrap)
 OTELCOL_CONFIG=otel-collector-config.yaml
 
