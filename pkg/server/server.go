@@ -261,12 +261,12 @@ func GetDIDDocument(id principal.Signer) http.HandlerFunc {
 		ID:      id.DID().String(),
 	}
 	if s, ok := id.(signer.WrappedSigner); ok {
-		vid := fmt.Sprintf("%s#owner", id.DID())
+		vid := fmt.Sprintf("%s#owner", s.DID())
 		doc.VerificationMethod = []VerificationMethod{
 			{
 				ID:                 vid,
 				Type:               "Ed25519VerificationKey2020",
-				Controller:         id.DID().String(),
+				Controller:         s.DID().String(),
 				PublicKeyMultibase: strings.TrimPrefix(s.Unwrap().DID().String(), "did:key:"),
 			},
 		}
