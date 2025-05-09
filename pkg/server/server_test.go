@@ -335,6 +335,6 @@ func TestGetDIDDocumentHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, doc.ID, didweb.DID().String())
-		require.True(t, strings.HasSuffix(testutil.Service.DID().String(), doc.VerificationMethod[0].PublicKeyMultibase))
+		require.Equal(t, strings.TrimPrefix(testutil.Service.DID().String(), "did:key:"), doc.VerificationMethod[0].PublicKeyMultibase)
 	})
 }
