@@ -22,6 +22,13 @@ resource "aws_apigatewayv2_route" "getclaims" {
   target = "integrations/${aws_apigatewayv2_integration.getclaims.id}"
 }
 
+resource "aws_apigatewayv2_route" "getdiddocument" {
+  api_id =  aws_apigatewayv2_api.api.id
+  route_key = "GET /.well-known/did.json"
+  authorization_type = "NONE"
+  target = "integrations/${aws_apigatewayv2_integration.getdiddocument.id}"
+}
+
 resource "aws_apigatewayv2_route" "getroot" {
   api_id =  aws_apigatewayv2_api.api.id
   route_key = "GET /"
@@ -52,6 +59,13 @@ resource "aws_apigatewayv2_integration" "getclaims" {
   connection_type = "INTERNET"
 }
 
+resource "aws_apigatewayv2_integration" "getdiddocument" {
+  api_id             = aws_apigatewayv2_api.api.id
+  integration_uri =  aws_lambda_function.lambda["getdiddocument"].invoke_arn
+  payload_format_version = "2.0"
+  integration_type    = "AWS_PROXY"
+  connection_type = "INTERNET"
+}
 
 resource "aws_apigatewayv2_integration" "getroot" {
   api_id             = aws_apigatewayv2_api.api.id
@@ -76,10 +90,12 @@ resource "aws_apigatewayv2_deployment" "deployment" {
     redeployment = sha1(join(",", [
       jsonencode(aws_apigatewayv2_integration.getclaim),
       jsonencode(aws_apigatewayv2_integration.getclaims),
+      jsonencode(aws_apigatewayv2_integration.getdiddocument),
       jsonencode(aws_apigatewayv2_integration.postclaims),
       jsonencode(aws_apigatewayv2_integration.getroot),
       jsonencode(aws_apigatewayv2_route.getclaim),
       jsonencode(aws_apigatewayv2_route.getclaims),
+      jsonencode(aws_apigatewayv2_route.getdiddocument),
       jsonencode(aws_apigatewayv2_route.getroot),
       jsonencode(aws_apigatewayv2_route.postclaims),
     ]))
