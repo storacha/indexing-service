@@ -189,7 +189,7 @@ type mockCachingQueue struct {
 	err error
 }
 
-// QueueProviderCaching implements blobindexlookup.ProviderCacher.
-func (m *mockCachingQueue) Queue(ctx context.Context, job providercacher.ProviderCachingJob) error {
+// QueueProviderCaching implements [providercacher.ProviderCachingQueue].
+func (m *mockCachingQueue) Queue(ctx context.Context, job providercacher.CacheProviderMessage) error {
 	return m.err
 }

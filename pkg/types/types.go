@@ -69,6 +69,13 @@ type ValueSetCache[Key, Value any] interface {
 	Members(ctx context.Context, key Key) ([]Value, error)
 }
 
+// Queue describes a generic queue interface.
+type Queue[Message any] interface {
+	// Queue sends a message to the queue and returns when the message has been
+	// sent. Messages sent to the queue are processed asynchronously.
+	Queue(ctx context.Context, message Message) error
+}
+
 // ProviderStore caches queries to IPNI
 type ProviderStore ValueSetCache[mh.Multihash, model.ProviderResult]
 
