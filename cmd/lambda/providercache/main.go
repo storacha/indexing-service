@@ -32,7 +32,7 @@ func makeHandler(cfg aws.Config) any {
 	}
 	providerStore := redis.NewProviderStore(providersRedis)
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
-	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
+	sqsCachingDecoder := aws.NewSQSCachingDecoder()
 
 	return func(ctx context.Context, sqsEvent events.SQSEvent) (events.SQSEventResponse, error) {
 		deadline, ok := ctx.Deadline()
@@ -80,16 +80,16 @@ func makeHandler(cfg aws.Config) any {
 	}
 }
 
-func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher providercacher.ProviderCacher, msg events.SQSMessage) error {
+func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher providercacher.ProviderCachingQueue, msg events.SQSMessage) error {
 	job, err := sqsCachingDecoder.DecodeMessage(ctx, msg.Body)
 	if err != nil {
 		return err
 	}
-	_, err = providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
+	err = providerCacher.Queue(ctx, job)
 	// Do not hold up the queue by re-attempting a cache job that times out. It is
 	// probably a big DAG and retrying is unlikely to subsequently succeed.
 	if errors.Is(err, context.DeadlineExceeded) {
-		log.Warnf("not retrying cache provider job for: %s error: %s", job.Index.Content(), err)
+		log.Warnf("not retrying cache provider job: %s", err)
 		return nil
 	}
 	if err != nil {
