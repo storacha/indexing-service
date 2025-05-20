@@ -19,22 +19,33 @@ import (
 )
 
 type BucketFallbackMapper struct {
-	id         principal.Signer
-	httpClient *http.Client
-	bucketURL  *url.URL
-	getOpts    func() []delegation.Option
+	id               principal.Signer
+	httpClient       *http.Client
+	bucketURL        *url.URL
+	allocationsStore AllocationsStore
+	getOpts          func() []delegation.Option
 }
 
-func NewBucketFallbackMapper(id principal.Signer, httpClient *http.Client, bucketURL *url.URL, getOpts func() []delegation.Option) BucketFallbackMapper {
+type AllocationsStore interface {
+	Has(ctx context.Context, digest multihash.Multihash) (bool, error)
+}
+
+func NewBucketFallbackMapper(id principal.Signer, httpClient *http.Client, bucketURL *url.URL, allocationsStore AllocationsStore, getOpts func() []delegation.Option) BucketFallbackMapper {
 	return BucketFallbackMapper{
-		id:         id,
-		httpClient: httpClient,
-		bucketURL:  bucketURL,
-		getOpts:    getOpts,
+		id:               id,
+		httpClient:       httpClient,
+		bucketURL:        bucketURL,
+		allocationsStore: allocationsStore,
+		getOpts:          getOpts,
 	}
 }
 
 func (cfm BucketFallbackMapper) GetClaims(ctx context.Context, contentHash multihash.Multihash) ([]cid.Cid, error) {
+	// precheck the allocations table before committing to an http request
+	has, err := cfm.allocationsStore.Has(ctx, contentHash)
+	if !has || err != nil {
+		return nil, types.ErrKeyNotFound
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, cfm.bucketURL.JoinPath(toBlobKey(contentHash)).String(), nil)
 	if err != nil {
 		return nil, err

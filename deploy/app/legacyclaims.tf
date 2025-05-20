@@ -29,11 +29,27 @@ variable "legacy_block_index_table_region" {
   default = "us-west-2"
 }
 
+
+
+variable "legacy_allocations_table_name" {
+  description = "The name of the legacy w3infra allocation DynamoDB table"
+  type = string
+  default = ""
+}
+
+variable "legacy_allocations_table_region" {
+  description = "The region where the legacy w3infra allocation DynamoDB table is provisioned"
+  type = string
+  default = ""
+}
+
 locals {
     inferred_legacy_claims_table_name = var.legacy_claims_table_name != "" ? var.legacy_claims_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-content-claims-claims-v1"
     inferred_legacy_claims_table_region = var.legacy_claims_table_region != "" ? var.legacy_claims_table_region : "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
     inferred_legacy_claims_bucket_name = var.legacy_claims_bucket_name != "" ? var.legacy_claims_bucket_name : "${terraform.workspace == "prod" ? "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8" : "staging-content-claims-buc-claimsv1bucketefd46802-1xx2brszve6t3"}"
     inferred_legacy_block_index_table_name = var.legacy_block_index_table_name != "" ? var.legacy_block_index_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
+    inferred_legacy_allocations_table_name = var.legacy_allocations_table_name != "" ? var.legacy_allocations_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-allocation"
+    inferred_legacy_allocations_table_region = var.legacy_allocations_table_region != "" ? var.legacy_allocations_table_region : "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
 }
 
 provider "aws" {
@@ -61,6 +77,18 @@ data "aws_dynamodb_table" "legacy_block_index_table" {
   name = local.inferred_legacy_block_index_table_name
 }
 
+
+provider "aws" {
+  alias = "allocations"
+  region = local.inferred_legacy_allocations_table_region
+}
+
+
+data "aws_dynamodb_table" "legacy_allocations_table" {
+  provider = aws.allocations
+  name = local.inferred_legacy_allocations_table_name
+}
+
 data "aws_iam_policy_document" "lambda_legacy_dynamodb_query_document" {
   statement {
     actions = [
@@ -68,7 +96,9 @@ data "aws_iam_policy_document" "lambda_legacy_dynamodb_query_document" {
     ]
     resources = [
       data.aws_dynamodb_table.legacy_claims_table.arn,
-      data.aws_dynamodb_table.legacy_block_index_table.arn
+      data.aws_dynamodb_table.legacy_block_index_table.arn,
+      data.aws_dynamodb_table.legacy_allocations_table.arn,
+      "${data.aws_dynamodb_table.legacy_allocations_table.arn}/index/*",
     ]
   }
 }
