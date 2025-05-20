@@ -37,7 +37,6 @@ variable "legacy_allocations_table_name" {
   default = ""
 }
 
-# the block index table is always deployed in us-west-2 for both prod and staging
 variable "legacy_allocations_table_region" {
   description = "The region where the legacy block index DynamoDB table is provisioned"
   type = string
