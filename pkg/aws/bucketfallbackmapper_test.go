@@ -2,6 +2,7 @@ package aws_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,21 +29,31 @@ import (
 func TestBucketFallbackMapper(t *testing.T) {
 	ctx := context.Background()
 	responses := bytemap.NewByteMap[multihash.Multihash, resp](-1)
+	hasResponses := bytemap.NewByteMap[multihash.Multihash, hasResp](-1)
 	signer := testutil.RandomSigner()
 
 	// set up test server
 	mux := http.NewServeMux()
 	mux.Handle("/{multihash1}/{multihash2}", mockServer{responses})
+
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	serverURL := testutil.Must(url.Parse(server.URL))(t)
 
+	errorOnReadAllocationsHash := testutil.RandomMultihash()
+	hasResponses.Set(errorOnReadAllocationsHash, hasResp{false, errors.New("something went wrong")})
+
+	nonHasHash := testutil.RandomMultihash()
+	hasResponses.Set(nonHasHash, hasResp{false, nil})
+
 	hasNonSuccessHash := testutil.RandomMultihash()
 	responses.Set(hasNonSuccessHash, resp{0, http.StatusInternalServerError})
+	hasResponses.Set(hasNonSuccessHash, hasResp{true, nil})
 
 	hasSuccessHash := testutil.RandomMultihash()
 	hasSuccessContentLength := uint64(500)
 	responses.Set(hasSuccessHash, resp{int64(hasSuccessContentLength), http.StatusOK})
+	hasResponses.Set(hasSuccessHash, hasResp{true, nil})
 	hasSuccessClaim := testutil.Must(cassert.Location.Delegate(
 		signer,
 		signer,
@@ -77,6 +88,16 @@ func TestBucketFallbackMapper(t *testing.T) {
 		expectedClaim delegation.Delegation
 	}{
 		{
+			name:        "error checking allocations store",
+			hash:        errorOnReadAllocationsHash,
+			expectedErr: types.ErrKeyNotFound,
+		},
+		{
+			name:        "allocations store does not have hash",
+			hash:        nonHasHash,
+			expectedErr: types.ErrKeyNotFound,
+		},
+		{
 			name:        "non 200 status code from fallback bucket",
 			hash:        hasNonSuccessHash,
 			expectedErr: types.ErrKeyNotFound,
@@ -90,7 +111,7 @@ func TestBucketFallbackMapper(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, http.DefaultClient, serverURL, func() []delegation.Option {
+			bucketFallbackMapper := aws.NewBucketFallbackMapper(signer, http.DefaultClient, serverURL, mockAllocationsStore{hasResponses}, func() []delegation.Option {
 				return []delegation.Option{delegation.WithNoExpiration()}
 			})
 			cids, err := bucketFallbackMapper.GetClaims(ctx, testCase.hash)
@@ -144,4 +165,21 @@ func (m mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resp := m.hashes.Get(mh)
 	w.Header().Add("Content-Length", strconv.FormatInt(resp.contentLength, 10))
 	w.WriteHeader(resp.status)
+}
+
+type hasResp struct {
+	has bool
+	err error
+}
+
+type mockAllocationsStore struct {
+	hashes bytemap.ByteMap[multihash.Multihash, hasResp]
+}
+
+func (m mockAllocationsStore) Has(ctx context.Context, mh multihash.Multihash) (bool, error) {
+	if !m.hashes.Has(mh) {
+		return false, types.ErrKeyNotFound
+	}
+	hasResp := m.hashes.Get(mh)
+	return hasResp.has, hasResp.err
 }

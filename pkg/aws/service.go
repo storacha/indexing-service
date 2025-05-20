@@ -87,6 +87,8 @@ type Config struct {
 	LegacyClaimsBucket                string
 	LegacyBlockIndexTableName         string
 	LegacyBlockIndexTableRegion       string
+	LegacyAllocationsTableName        string
+	LegacyAllocationsTableRegion      string
 	LegacyDataBucketURL               string
 	BaseTraceSampleRatio              float64
 	HoneycombAPIKey                   string
@@ -217,6 +219,8 @@ func FromEnv(ctx context.Context) Config {
 		LegacyClaimsBucket:                mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
 		LegacyBlockIndexTableName:         mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
 		LegacyBlockIndexTableRegion:       mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
+		LegacyAllocationsTableName:        mustGetEnv("LEGACY_ALLOCATIONS_TABLE_NAME"),
+		LegacyAllocationsTableRegion:      mustGetEnv("LEGACY_ALLOCATIONS_TABLE_REGION"),
 		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
 		BaseTraceSampleRatio:              mustGetFloat("BASE_TRACE_SAMPLE_RATIO"),
 		HoneycombAPIKey:                   os.Getenv("HONEYCOMB_API_KEY"),
@@ -251,21 +255,29 @@ func Construct(cfg Config) (types.Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing carpark url: %s", err)
 	}
+	// legacy claims mapper
 	legacyClaimsCfg := cfg.Config.Copy()
 	legacyClaimsCfg.Region = cfg.LegacyClaimsTableRegion
 	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName)
+
+	// bucket fallback mapper
+	allocationsCfg := cfg.Config.Copy()
+	allocationsCfg.Region = cfg.LegacyAllocationsTableRegion
+	legacyAllocationsStore := NewDynamoAllocationsTable(dynamodb.NewFromConfig(allocationsCfg), cfg.LegacyAllocationsTableName)
 	bucketFallbackMapper := NewBucketFallbackMapper(
 		cfg.Signer,
 		httpClient,
 		legacyDataBucketURL,
+		legacyAllocationsStore,
 		func() []delegation.Option {
 			return []delegation.Option{delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix()))}
 		},
 	)
+
+	// block index table mapper
 	blockIndexCfg := cfg.Config.Copy()
 	blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
 	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
-
 	// allow claims synthethized from the block index table to live longer after they are expired in the cache
 	// so that the service doesn't return cached but expired delegations
 	synthetizedClaimExp := time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second + 1*time.Hour
@@ -273,6 +285,7 @@ func Construct(cfg Config) (types.Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating block index table mapper: %w", err)
 	}
+
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(legacyClaimsCfg, cfg.LegacyClaimsBucket, ""))
 	legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
 

@@ -59,6 +59,10 @@ data "aws_region" "block_index" {
   provider = aws.block_index
 }
 
+data "aws_region" "allocations" {
+  provider = aws.allocations
+}
+
 # Define functions
 resource "aws_lambda_function" "lambda" {
   depends_on = [ aws_cloudwatch_log_group.lambda_log_group ]
@@ -113,6 +117,8 @@ resource "aws_lambda_function" "lambda" {
         LEGACY_CLAIMS_TABLE_NAME = data.aws_dynamodb_table.legacy_claims_table.id
         LEGACY_CLAIMS_TABLE_REGION = data.aws_region.legacy_claims.name
         LEGACY_CLAIMS_BUCKET_NAME = data.aws_s3_bucket.legacy_claims_bucket.id
+        LEGACY_ALLOCATIONS_TABLE_NAME = data.aws_dynamodb_table.legacy_allocations_table.id
+        LEGACY_ALLOCATIONS_TABLE_REGION = data.aws_region.allocations.name
         LEGACY_BLOCK_INDEX_TABLE_NAME = data.aws_dynamodb_table.legacy_block_index_table.id
         LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
         LEGACY_DATA_BUCKET_URL = var.legacy_data_bucket_url != "" ? var.legacy_data_bucket_url : "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"

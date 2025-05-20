@@ -110,22 +110,6 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 		}
 	}
 
-	// check if we already know there are no results
-	codes, err := pi.noProviderStore.Members(ctx, mh)
-	if err == nil {
-		missingClaims, _ := filter(targetClaims, func(targetCode multicodec.Code) (bool, error) {
-			return !slices.Contains(codes, targetCode), nil
-		})
-		if len(missingClaims) == 0 {
-			return nil, nil
-		}
-	} else {
-		if !errors.Is(err, types.ErrKeyNotFound) {
-			telemetry.Error(s, err, "fetching from cache")
-			return nil, err
-		}
-	}
-
 	type queryResult struct {
 		results []model.ProviderResult
 		err     error
@@ -142,7 +126,7 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	// Start IPNI query.
 	go func() {
 		s.AddEvent("fetching from IPNI")
-		r, err := pi.fetchFromIPNI(ctx, mh, targetClaims)
+		r, err := pi.fetchFromIPNI(ctx, s, mh, targetClaims)
 		s.AddEvent("fetched from IPNI", trace.WithAttributes(attribute.Bool("found", len(r) != 0)))
 		ipniCh <- queryResult{results: r, err: err}
 	}()
@@ -188,9 +172,6 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 	if legacyRes.err != nil {
 		queryError = errors.Join(queryError, fmt.Errorf("fetching from legacy services failed: %w", legacyRes.err))
 	}
-	if queryError == nil {
-		return pi.cacheNoProviderResults(ctx, s, mh, targetClaims)
-	}
 	return nil, queryError
 }
 
@@ -229,8 +210,24 @@ func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s tr
 	return nil, nil
 }
 
-func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, s trace.Span, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
 	var results []model.ProviderResult
+
+	// check if we already know there are no results in IPNI
+	codes, err := pi.noProviderStore.Members(ctx, mh)
+	if err == nil {
+		missingClaims, _ := filter(targetClaims, func(targetCode multicodec.Code) (bool, error) {
+			return !slices.Contains(codes, targetCode), nil
+		})
+		if len(missingClaims) == 0 {
+			return nil, nil
+		}
+	} else {
+		if !errors.Is(err, types.ErrKeyNotFound) {
+			telemetry.Error(s, err, "fetching from cache")
+			return nil, err
+		}
+	}
 
 	// IPNI will occassionally hang. If it does, don't wait for it.
 	ctx, cancel := pi.clock.WithTimeout(ctx, IPNITimeout)
@@ -249,7 +246,9 @@ func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, mh mh.Multiha
 	if err != nil {
 		return nil, err
 	}
-
+	if len(results) == 0 {
+		pi.cacheNoProviderResults(ctx, s, mh, targetClaims)
+	}
 	return results, nil
 }
 
