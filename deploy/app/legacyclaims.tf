@@ -32,13 +32,13 @@ variable "legacy_block_index_table_region" {
 
 
 variable "legacy_allocations_table_name" {
-  description = "The name of the legacy block index DynamoDB table"
+  description = "The name of the legacy w3infra allocations DynamoDB table"
   type = string
   default = ""
 }
 
 variable "legacy_allocations_table_region" {
-  description = "The region where the legacy block index DynamoDB table is provisioned"
+  description = "The region where the legacy w3infra allocations DynamoDB table is provisioned"
   type = string
   default = ""
 }
