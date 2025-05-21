@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -70,6 +71,11 @@ func main() {
 								Value:       "https://cid.contact",
 								Usage:       "HTTP endpoint of the IPNI instance used to discover providers.",
 							},
+							&cli.StringFlag{
+								Name:  "ipni-announce-urls",
+								Value: `["https://cid.contact/announce"]`,
+								Usage: "JSON array of IPNI node URLs to announce chain updates to.",
+							},
 						},
 						Action: func(cCtx *cli.Context) error {
 							addr := fmt.Sprintf(":%d", cCtx.Int("port"))
@@ -127,6 +133,17 @@ func main() {
 								Password: cCtx.String("redis-passwd"),
 							}
 							sc.IndexerURL = cCtx.String("ipni-endpoint")
+
+							if cCtx.String("ipni-announce-urls") != "" {
+								var urls []string
+								err := json.Unmarshal([]byte(cCtx.String("ipni-announce-urls")), &urls)
+								if err != nil {
+									return fmt.Errorf("parsing IPNI announce URLs JSON: %w", err)
+								}
+								sc.PublisherDirectAnnounceURLs = urls
+							} else {
+								sc.PublisherDirectAnnounceURLs = presets.IPNIAnnounceURLs
+							}
 
 							privKey, err := crypto.UnmarshalEd25519PrivateKey(id.Raw())
 							if err != nil {

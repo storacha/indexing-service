@@ -37,3 +37,15 @@ variable "legacy_data_bucket_url" {
   description = "URL to use when constructing synthesizing legacy claims"
   default = ""
 }
+
+variable "ipni_endpoint" {
+  type        = string
+  description = "Optional HTTP endpoint of the IPNI instance used to discover providers."
+  default     = "https://cid.contact"
+}
+
+variable "ipni_announce_urls" {
+  type        = string
+  description = "Optional JSON array of IPNI node URLs to announce chain updates to."
+  default     = "[\"https://cid.contact/announce\"]"
+}

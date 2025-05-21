@@ -78,6 +78,7 @@ type Config struct {
 	MetadataTableName                 string
 	IPNIStoreBucket                   string
 	IPNIStorePrefix                   string
+	IPNIAnnounceURLs                  []url.URL
 	NotifierHeadBucket                string
 	NotifierTopicArn                  string
 	ClaimStoreBucket                  string
@@ -155,6 +156,16 @@ func FromEnv(ctx context.Context) Config {
 		principalMapping = presets.PrincipalMapping
 	}
 
+	var ipniPublisherDirectAnnounceURLs []string
+	if os.Getenv("IPNI_ANNOUNCE_URLS") != "" {
+		err := json.Unmarshal([]byte(os.Getenv("IPNI_ANNOUNCE_URLS")), &ipniPublisherDirectAnnounceURLs)
+		if err != nil {
+			panic(fmt.Errorf("parsing IPNI announce URLs JSON: %w", err))
+		}
+	} else {
+		ipniPublisherDirectAnnounceURLs = presets.IPNIAnnounceURLs
+	}
+
 	return Config{
 		Config: awsConfig,
 		Signer: id,
@@ -197,8 +208,9 @@ func FromEnv(ctx context.Context) Config {
 					MinVersion: tls.VersionTLS12,
 				},
 			},
-			IndexerURL:             mustGetEnv("IPNI_ENDPOINT"),
-			PublisherAnnounceAddrs: []string{ipniPublisherAnnounceAddress},
+			IndexerURL:                  mustGetEnv("IPNI_ENDPOINT"),
+			PublisherAnnounceAddrs:      []string{ipniPublisherAnnounceAddress},
+			PublisherDirectAnnounceURLs: ipniPublisherDirectAnnounceURLs,
 		},
 		ProvidersCacheExpirationSeconds:   mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
 		NoProvidersCacheExpirationSeconds: mustGetInt("NO_PROVIDERS_CACHE_EXPIRATION_SECONDS"),

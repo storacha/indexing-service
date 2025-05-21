@@ -15,6 +15,12 @@ on:
       apply:
         required: true
         type: boolean
+      ipni-endpoint:
+        required: false
+        type: string
+      ipni-announce-urls:
+        required: false
+        type: string
     secrets:
       aws-account-id:
         required: true
@@ -37,6 +43,8 @@ env:
   TF_VAR_private_key: ${{ secrets.private-key }}
   TF_VAR_did: ${{ inputs.did }}
   TF_VAR_honeycomb_api_key: ${{ secrets.honeycomb-api-key }}
+  TF_VAR_ipni_endpoint: ${{ inputs.ipni-endpoint }}
+  TF_VAR_ipni_announce_urls: ${{ inputs.ipni-announce-urls }}
 
 permissions:
   id-token: write # This is required for requesting the JWT

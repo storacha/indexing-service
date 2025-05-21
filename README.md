@@ -94,6 +94,22 @@ Optional. JSON encoded mapping of did:web to did:key. e.g.
 TF_VAR_principal_mapping={"did:web:example.com":"did:key:z6MktkCXwNmpqejQxYd7JHPcw7d4Srjct7sX74VLfKqsPyAw"}
 ```
 
+#### `TF_VAR_ipni_endpoint`
+
+Optional. HTTP endpoint of the IPNI instance used to discover providers.
+
+```sh
+TF_VAR_ipni_endpoint="https://cid.contact"
+```
+
+#### `TF_VAR_ipni_announce_urls`
+
+Optional. JSON array of IPNI node URLs to announce chain updates to.
+
+```sh
+TF_VAR_ipni_announce_urls=["https://cid.contact/announce"]
+```
+
 ### Deployment commands
 
 Note that these commands will call needed prerequisites -- `make apply` will essentially do all of these start to finish.
