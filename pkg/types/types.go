@@ -69,8 +69,25 @@ type ValueSetCache[Key, Value any] interface {
 	Members(ctx context.Context, key Key) ([]Value, error)
 }
 
+type ValueSetCacheBatcher[Key, Value any] interface {
+	Add(ctx context.Context, key Key, values ...Value) error
+	SetExpirable(ctx context.Context, key Key, expires bool) error
+	Batcher
+}
+
+// BatchingValueSetCache is a value-set cache that can batch updates.
+// Note: a batch is not a transaction.
+type BatchingValueSetCache[Key, Value any] interface {
+	ValueSetCache[Key, Value]
+	Batch() ValueSetCacheBatcher[Key, Value]
+}
+
+type Batcher interface {
+	Commit(ctx context.Context) error
+}
+
 // ProviderStore caches queries to IPNI
-type ProviderStore ValueSetCache[mh.Multihash, model.ProviderResult]
+type ProviderStore BatchingValueSetCache[mh.Multihash, model.ProviderResult]
 
 // NoProviderStore caches which queries for providers returned no results
 type NoProviderStore ValueSetCache[mh.Multihash, multicodec.Code]

@@ -4,9 +4,7 @@ import (
 	"context"
 
 	"github.com/ipld/go-ipld-prime"
-	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/ipnipublisher/store"
-	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -30,17 +28,6 @@ func NewRemoteSyncer(providerStore types.ProviderStore, store Store) *RemoteSync
 func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Link) {
 	log.Infof("handling IPNI remote sync from %s to %s", prev, head)
 
-	q := jobqueue.NewJobQueue[mh.Multihash](
-		jobqueue.JobHandler(func(ctx context.Context, digest mh.Multihash) error {
-			return rs.providerStore.SetExpirable(ctx, digest, true)
-		}),
-		jobqueue.WithConcurrency(5),
-		jobqueue.WithErrorHandler(func(err error) {
-			log.Errorf("setting expirable: %w", err)
-		}),
-	)
-	q.Startup()
-
 	cur := head
 	for {
 		ad, err := rs.store.Advert(ctx, cur)
@@ -48,16 +35,22 @@ func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Li
 			log.Errorf("getting advert: %s: %w", cur, err)
 			return
 		}
+		batch := rs.providerStore.Batch()
 		for d, err := range rs.store.Entries(ctx, ad.Entries) {
 			if err != nil {
 				log.Errorf("iterating advert entries: %s (advert) -> %s (entries): %w", cur, ad.Entries, err)
 				return
 			}
-			err := q.Queue(ctx, d)
+			err := batch.SetExpirable(ctx, d, true)
 			if err != nil {
-				log.Errorf("adding digest to queue: %s: %w", d.B58String(), err)
+				log.Errorf("adding digest to batch: %s: %w", d.B58String(), err)
 				return
 			}
+		}
+		err = batch.Commit(ctx)
+		if err != nil {
+			log.Errorf("comitting batch: %s: %w", cur.String(), err)
+			return
 		}
 		if ad.PreviousID == nil || (prev != nil && ad.PreviousID.String() == prev.String()) {
 			break
@@ -65,9 +58,5 @@ func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Li
 		cur = ad.PreviousID
 	}
 
-	err := q.Shutdown(ctx)
-	if err != nil {
-		log.Errorf("shutting down IPNI remote sync job queue: %w", err)
-	}
 	log.Infof("handled IPNI remote sync from %s to %s", prev, head)
 }

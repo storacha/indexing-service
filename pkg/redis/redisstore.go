@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -154,4 +155,69 @@ func (rs *Store[Key, Value]) Add(ctx context.Context, key Key, values ...Value) 
 		return 0, fmt.Errorf("adding set member: %w", err)
 	}
 	return uint64(n), nil
+}
+
+type BatchingValueSetStore[K, V any] struct {
+	store          *Store[K, V]
+	pipeableClient redis.Pipeliner
+}
+
+// NewBatchingValueSetStore creates a new value-set store (a store whose values
+// are sets) that allows batching.
+//
+// Note: the underlying client MUST support pipelining by implementing
+// [redis.Pipeliner].
+func NewBatchingValueSetStore[K, V any](store *Store[K, V]) (*BatchingValueSetStore[K, V], error) {
+	if pipeableClient, ok := store.client.(redis.Pipeliner); ok {
+		return &BatchingValueSetStore[K, V]{store, pipeableClient}, nil
+	}
+	return nil, errors.New("client does not implement Pipeliner")
+}
+
+func (bvs *BatchingValueSetStore[K, V]) Add(ctx context.Context, key K, values ...V) (uint64, error) {
+	return bvs.store.Add(ctx, key, values...)
+}
+
+func (bvs *BatchingValueSetStore[K, V]) SetExpirable(ctx context.Context, key K, expires bool) error {
+	return bvs.store.SetExpirable(ctx, key, expires)
+}
+
+func (bvs *BatchingValueSetStore[K, V]) Members(ctx context.Context, key K) ([]V, error) {
+	return bvs.store.Members(ctx, key)
+}
+
+func (bvs *BatchingValueSetStore[K, V]) Batch() types.ValueSetCacheBatcher[K, V] {
+	return &PipelineBatcher[K, V]{pipeline: bvs.pipeableClient}
+}
+
+type PipelineBatcher[K, V any] struct {
+	store    *Store[K, V]
+	pipeline redis.Pipeliner
+}
+
+func (pb *PipelineBatcher[K, V]) Add(ctx context.Context, key K, values ...V) error {
+	var data []any
+	for _, v := range values {
+		d, err := pb.store.toRedis(v)
+		if err != nil {
+			return err
+		}
+		data = append(data, d)
+	}
+	pb.pipeline.SAdd(ctx, pb.store.keyString(key), data...)
+	return nil
+}
+
+func (pb *PipelineBatcher[K, V]) SetExpirable(ctx context.Context, key K, expires bool) error {
+	if expires {
+		pb.pipeline.Expire(ctx, pb.store.keyString(key), pb.store.config.expirationTime)
+	} else {
+		pb.pipeline.Persist(ctx, pb.store.keyString(key))
+	}
+	return nil
+}
+
+func (pb *PipelineBatcher[K, V]) Commit(ctx context.Context) error {
+	_, err := pb.pipeline.Exec(ctx)
+	return err
 }
