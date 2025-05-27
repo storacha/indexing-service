@@ -132,7 +132,7 @@ func main() {
 								Addrs:    []string{cCtx.String("redis-url")},
 								Password: cCtx.String("redis-passwd"),
 							}
-							sc.IndexerURL = cCtx.String("ipni-endpoint")
+							sc.IPNIFindURL = cCtx.String("ipni-endpoint")
 
 							if cCtx.String("ipni-announce-urls") != "" {
 								var urls []string
@@ -140,9 +140,9 @@ func main() {
 								if err != nil {
 									return fmt.Errorf("parsing IPNI announce URLs JSON: %w", err)
 								}
-								sc.PublisherDirectAnnounceURLs = urls
+								sc.IPNIDirectAnnounceURLs = urls
 							} else {
-								sc.PublisherDirectAnnounceURLs = presets.IPNIAnnounceURLs
+								sc.IPNIDirectAnnounceURLs = presets.IPNIAnnounceURLs
 							}
 
 							privKey, err := crypto.UnmarshalEd25519PrivateKey(id.Raw())

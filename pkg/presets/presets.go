@@ -1,5 +1,7 @@
 package presets
 
+var IPNIFindURL = "https://cid.contact"
+
 var IPNIAnnounceURLs = []string{"https://cid.contact/announce"}
 
 var PrincipalMapping = map[string]string{

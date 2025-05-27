@@ -21,7 +21,7 @@ func makeHandler(cfg aws.Config) any {
 	// setup IPNI
 	// TODO: switch to double hashed client for reader privacy?
 	headStore := aws.NewS3Store(cfg.Config, cfg.NotifierHeadBucket, "")
-	notifier, err := notifier.NewNotifierWithStorage(cfg.IndexerURL, cfg.PrivateKey, headStore)
+	notifier, err := notifier.NewNotifierWithStorage(cfg.IPNIFindURL, cfg.PrivateKey, headStore)
 	if err != nil {
 		panic(err)
 	}

@@ -156,6 +156,11 @@ func FromEnv(ctx context.Context) Config {
 		principalMapping = presets.PrincipalMapping
 	}
 
+	ipniFindURL := os.Getenv("IPNI_ENDPOINT")
+	if ipniFindURL == "" {
+		ipniFindURL = presets.IPNIFindURL
+	}
+
 	var ipniPublisherDirectAnnounceURLs []string
 	if os.Getenv("IPNI_ANNOUNCE_URLS") != "" {
 		err := json.Unmarshal([]byte(os.Getenv("IPNI_ANNOUNCE_URLS")), &ipniPublisherDirectAnnounceURLs)
@@ -208,9 +213,9 @@ func FromEnv(ctx context.Context) Config {
 					MinVersion: tls.VersionTLS12,
 				},
 			},
-			IndexerURL:                  mustGetEnv("IPNI_ENDPOINT"),
-			PublisherAnnounceAddrs:      []string{ipniPublisherAnnounceAddress},
-			PublisherDirectAnnounceURLs: ipniPublisherDirectAnnounceURLs,
+			IPNIFindURL:            ipniFindURL,
+			IPNIAnnounceAddrs:      []string{ipniPublisherAnnounceAddress},
+			IPNIDirectAnnounceURLs: ipniPublisherDirectAnnounceURLs,
 		},
 		ProvidersCacheExpirationSeconds:   mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
 		NoProvidersCacheExpirationSeconds: mustGetInt("NO_PROVIDERS_CACHE_EXPIRATION_SECONDS"),
