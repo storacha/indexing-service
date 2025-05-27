@@ -145,6 +145,7 @@ make indexer
 ```
 
 #### `./indexer query <CID>`
+
 Attempts to find the given CID in the Indexer node. The result can be multiple Location Claims, as there may be several storage nodes that store copies of the content, as well as potential indexes and the indexes themselves. If you want to query a specific node, you can use the following command:
 
 ```sh
