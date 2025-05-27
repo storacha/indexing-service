@@ -360,10 +360,7 @@ func TestBatchingValueSetStore(t *testing.T) {
 		valkey.WithSnapshotting(10, 1),
 		valkey.WithLogLevel(valkey.LogLevelVerbose),
 	)
-	defer func() {
-		err := testcontainers.TerminateContainer(container)
-		require.NoError(t, err)
-	}()
+	testcontainers.CleanupContainer(t, container)
 	require.NoError(t, err)
 
 	uri, err := container.ConnectionString(ctx)
