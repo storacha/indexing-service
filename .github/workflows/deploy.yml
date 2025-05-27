@@ -32,6 +32,8 @@ jobs:
       workspace: staging
       did: did:web:staging.indexer.storacha.network
       apply: ${{ github.event_name != 'pull_request' }}
+      ipni-endpoint: ${{ vars.STAGING_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.STAGING_IPNI_ANNOUNCE_URLS }}
     secrets:
       aws-account-id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.STAGING_AWS_REGION }}
@@ -46,6 +48,8 @@ jobs:
       workspace: prod
       did: did:web:indexer.storacha.network
       apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+      ipni-endpoint: ${{ vars.PROD_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.PROD_IPNI_ANNOUNCE_URLS }}
     secrets:
       aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.PROD_AWS_REGION }}

@@ -101,7 +101,8 @@ resource "aws_lambda_function" "lambda" {
         CLAIMS_REDIS_CACHE = local.claims_cache.id
         CLAIMS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 7 * 24 * 60 * 60 : 24 * 60 * 60}"
         REDIS_USER_ID = local.cache_iam_user.user_id
-        IPNI_ENDPOINT = "https://cid.contact"
+        IPNI_ENDPOINT = var.ipni_endpoint
+        IPNI_ANNOUNCE_URLS = var.ipni_announce_urls
         PROVIDER_CACHING_QUEUE_URL = aws_sqs_queue.caching.id
         PROVIDER_CACHING_BUCKET_NAME = aws_s3_bucket.caching_bucket.bucket
         CHUNK_LINKS_TABLE_NAME = aws_dynamodb_table.chunk_links.id

@@ -56,18 +56,19 @@ type ServiceConfig struct {
 	ClaimsRedis     goredis.ClusterOptions
 	IndexesRedis    goredis.ClusterOptions
 
-	// IndexerURL is the URL of an IPNI node to use for find queries.
-	IndexerURL string
+	// IPNIFindURL is the URL of an IPNI node to use for find queries.
+	IPNIFindURL string
 
-	// PublisherDirectAnnounceURLs are the URL(s) of IPNI nodes that advertisement
-	// announcements should be sent to. Defaults to IndexerURL if not set.
-	PublisherDirectAnnounceURLs []string
-	// PublisherListenAddr configures the HTTP address the publisher binds to.
+	// IPNIDirectAnnounceURLs are the URL(s) of IPNI nodes that
+	// advertisement announcements should be sent to. Defaults to IndexerURL if
+	// not set.
+	IPNIDirectAnnounceURLs []string
+	// IPNIListenAddr configures the HTTP address the publisher binds to.
 	// This allows a remote IPNI subscriber to fetch advertisements.
-	PublisherListenAddr string
-	// PublisherAnnounceAddrs configures the multiaddrs that are put into announce
+	IPNIListenAddr string
+	// IPNIAnnounceAddrs configures the multiaddrs that are put into announce
 	// messages to tell indexers the addresses to fetch advertisements from.
-	PublisherAnnounceAddrs []string
+	IPNIAnnounceAddrs []string
 }
 
 type config struct {
@@ -357,7 +358,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 	// setup IPNI
 	// TODO: switch to double hashed client for reader privacy?
-	findClient, err := ipnifind.New(sc.IndexerURL, ipnifind.WithClient(httpClient))
+	findClient, err := ipnifind.New(sc.IPNIFindURL, ipnifind.WithClient(httpClient))
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +381,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 			ds = initializeDatastore(&cfg)
 		}
 		notifierStore := store.SimpleStoreFromDatastore(namespace.Wrap(ds, providerIndexNamespace))
-		notifier, err := notifier.NewNotifierWithStorage(sc.IndexerURL, sc.PrivateKey, notifierStore)
+		notifier, err := notifier.NewNotifierWithStorage(sc.IPNIFindURL, sc.PrivateKey, notifierStore)
 		if err != nil {
 			return nil, fmt.Errorf("creating IPNI remote sync notifier: %w", err)
 		}
@@ -390,16 +391,16 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		notifier.Notify(providerindex.NewRemoteSyncer(providersCache, publisherStore).HandleRemoteSync)
 	}
 
-	directAnnounceURLs := sc.PublisherDirectAnnounceURLs
+	directAnnounceURLs := sc.IPNIDirectAnnounceURLs
 	if len(directAnnounceURLs) == 0 {
-		directAnnounceURLs = append(directAnnounceURLs, sc.IndexerURL)
+		directAnnounceURLs = append(directAnnounceURLs, sc.IPNIFindURL)
 	}
 
 	publisher, err := publisher.New(
 		sc.PrivateKey,
 		publisherStore,
 		publisher.WithDirectAnnounce(directAnnounceURLs...),
-		publisher.WithAnnounceAddrs(sc.PublisherAnnounceAddrs...),
+		publisher.WithAnnounceAddrs(sc.IPNIAnnounceAddrs...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating IPNI publisher: %w", err)
@@ -410,7 +411,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		if !ok {
 			return nil, fmt.Errorf("publisher store is incompatible with serving over HTTP (must implement store.EncodableStore)")
 		}
-		srv, err := server.NewServer(encodableStore, server.WithHTTPListenAddrs(sc.PublisherListenAddr))
+		srv, err := server.NewServer(encodableStore, server.WithHTTPListenAddrs(sc.IPNIListenAddr))
 		if err != nil {
 			return nil, fmt.Errorf("creating server for IPNI ads: %w", err)
 		}
