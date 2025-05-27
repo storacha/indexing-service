@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/storacha/indexing-service/pkg/types"
 )
+
+var log = logging.Logger("redis")
 
 // DefaultExpire is the expire time we set on Redis when Set/SetExpiration are called with expire=true
 const DefaultExpire = time.Hour
@@ -21,6 +24,20 @@ type Client interface {
 	SMembers(ctx context.Context, key string) *redis.StringSliceCmd
 	Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd
 	Persist(ctx context.Context, key string) *redis.BoolCmd
+}
+
+// Pipelineable allows pipelines to be created for batching of write commands.
+type Pipelineable interface {
+	Pipeline() Pipeliner
+}
+
+// Pipeliner is a subset of functions from [redis.Pipeliner] that we need to
+// implement pipelining for our cache.
+type Pipeliner interface {
+	SAdd(ctx context.Context, key string, members ...any) *redis.IntCmd
+	Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd
+	Persist(ctx context.Context, key string) *redis.BoolCmd
+	Exec(ctx context.Context) ([]redis.Cmder, error)
 }
 
 // Store wraps the go redis client to implement our general purpose cache interface,
@@ -158,20 +175,32 @@ func (rs *Store[Key, Value]) Add(ctx context.Context, key Key, values ...Value) 
 }
 
 type BatchingValueSetStore[K, V any] struct {
-	store          *Store[K, V]
-	pipeableClient redis.Pipeliner
+	store     *Store[K, V]
+	client    Client
+	toRedis   func(V) (string, error)
+	keyString func(K) string
+	opts      []Option
 }
 
 // NewBatchingValueSetStore creates a new value-set store (a store whose values
 // are sets) that allows batching.
 //
-// Note: the underlying client MUST support pipelining by implementing
-// [redis.Pipeliner].
-func NewBatchingValueSetStore[K, V any](store *Store[K, V]) (*BatchingValueSetStore[K, V], error) {
-	if pipeableClient, ok := store.client.(redis.Pipeliner); ok {
-		return &BatchingValueSetStore[K, V]{store, pipeableClient}, nil
+// Note: the provided client MUST implement [Pipelineable] or [redis.Client]
+// in order to use pipeline functionality.
+func NewBatchingValueSetStore[K, V any](
+	fromRedis func(string) (V, error),
+	toRedis func(V) (string, error),
+	keyString func(K) string,
+	client Client,
+	opts ...Option,
+) *BatchingValueSetStore[K, V] {
+	return &BatchingValueSetStore[K, V]{
+		store:     NewStore(fromRedis, toRedis, keyString, client, opts...),
+		client:    client,
+		toRedis:   toRedis,
+		keyString: keyString,
+		opts:      opts,
 	}
-	return nil, errors.New("client does not implement Pipeliner")
 }
 
 func (bvs *BatchingValueSetStore[K, V]) Add(ctx context.Context, key K, values ...V) (uint64, error) {
@@ -186,33 +215,60 @@ func (bvs *BatchingValueSetStore[K, V]) Members(ctx context.Context, key K) ([]V
 	return bvs.store.Members(ctx, key)
 }
 
-func (bvs *BatchingValueSetStore[K, V]) Batch() types.ValueSetCacheBatcher[K, V] {
-	return &PipelineBatcher[K, V]{pipeline: bvs.pipeableClient}
+func (bvs *BatchingValueSetStore[K, V]) Batch() (types.ValueSetCacheBatcher[K, V], error) {
+	return NewPipelineBatcher(bvs.client, bvs.toRedis, bvs.keyString, bvs.opts...)
 }
 
 type PipelineBatcher[K, V any] struct {
-	store    *Store[K, V]
-	pipeline redis.Pipeliner
+	client    Client
+	toRedis   func(V) (string, error)
+	keyString func(K) string
+	config    config
+	pipeline  Pipeliner
+}
+
+func NewPipelineBatcher[K, V any](
+	client Client,
+	toRedis func(V) (string, error),
+	keyString func(K) string,
+	opts ...Option,
+) (*PipelineBatcher[K, V], error) {
+	var pipeline Pipeliner
+	if rc, ok := client.(*redis.Client); ok {
+		pipeline = rc.Pipeline()
+	} else if pc, ok := client.(Pipelineable); ok {
+		pipeline = pc.Pipeline()
+	} else {
+		return nil, errors.New("client is not a Pipelineable")
+	}
+	batcher := PipelineBatcher[K, V]{
+		client:    client,
+		toRedis:   toRedis,
+		keyString: keyString,
+		config:    newConfig(opts),
+		pipeline:  pipeline,
+	}
+	return &batcher, nil
 }
 
 func (pb *PipelineBatcher[K, V]) Add(ctx context.Context, key K, values ...V) error {
 	var data []any
 	for _, v := range values {
-		d, err := pb.store.toRedis(v)
+		d, err := pb.toRedis(v)
 		if err != nil {
 			return err
 		}
 		data = append(data, d)
 	}
-	pb.pipeline.SAdd(ctx, pb.store.keyString(key), data...)
+	pb.pipeline.SAdd(ctx, pb.keyString(key), data...)
 	return nil
 }
 
 func (pb *PipelineBatcher[K, V]) SetExpirable(ctx context.Context, key K, expires bool) error {
 	if expires {
-		pb.pipeline.Expire(ctx, pb.store.keyString(key), pb.store.config.expirationTime)
+		pb.pipeline.Expire(ctx, pb.keyString(key), pb.config.expirationTime)
 	} else {
-		pb.pipeline.Persist(ctx, pb.store.keyString(key))
+		pb.pipeline.Persist(ctx, pb.keyString(key))
 	}
 	return nil
 }

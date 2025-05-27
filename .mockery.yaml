@@ -28,6 +28,7 @@ packages:
       ProviderStore:
       NoProviderStore:
       Service:
+      ValueSetCacheBatcher:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
     interfaces:
       QueryAPIClient:

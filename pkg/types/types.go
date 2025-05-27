@@ -69,20 +69,16 @@ type ValueSetCache[Key, Value any] interface {
 	Members(ctx context.Context, key Key) ([]Value, error)
 }
 
-type ValueSetCacheBatcher[Key, Value any] interface {
-	Add(ctx context.Context, key Key, values ...Value) error
-	SetExpirable(ctx context.Context, key Key, expires bool) error
-	Batcher
-}
-
 // BatchingValueSetCache is a value-set cache that can batch updates.
 // Note: a batch is not a transaction.
 type BatchingValueSetCache[Key, Value any] interface {
 	ValueSetCache[Key, Value]
-	Batch() ValueSetCacheBatcher[Key, Value]
+	Batch() (ValueSetCacheBatcher[Key, Value], error)
 }
 
-type Batcher interface {
+type ValueSetCacheBatcher[Key, Value any] interface {
+	Add(ctx context.Context, key Key, values ...Value) error
+	SetExpirable(ctx context.Context, key Key, expires bool) error
 	Commit(ctx context.Context) error
 }
 

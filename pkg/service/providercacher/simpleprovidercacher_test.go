@@ -59,22 +59,20 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 
 	// Define test cases
 	testCases := []struct {
-		name          string
-		provider      model.ProviderResult
-		index         blobindex.ShardedDagIndexView
-		getErr        error
-		setErr        error
-		initialStore  map[string][]model.ProviderResult
-		expectedCount uint64
-		expectedErr   error
-		testStore     func(t *testing.T, store map[string][]model.ProviderResult)
+		name         string
+		provider     model.ProviderResult
+		index        blobindex.ShardedDagIndexView
+		getErr       error
+		setErr       error
+		initialStore map[string][]model.ProviderResult
+		expectedErr  error
+		testStore    func(t *testing.T, store map[string][]model.ProviderResult)
 	}{
 		{
-			name:          "Cache new provider",
-			provider:      testProvider,
-			index:         shardIndex,
-			expectedCount: 7,
-			expectedErr:   nil,
+			name:        "Cache new provider",
+			provider:    testProvider,
+			index:       shardIndex,
+			expectedErr: nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
 				require.Len(t, store, 7)
 				for _, sliceMh := range sliceMhs {
@@ -83,12 +81,11 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			},
 		},
 		{
-			name:          "Cache provider already present",
-			provider:      testProvider,
-			index:         shardIndex,
-			initialStore:  evensFilled(),
-			expectedCount: 4,
-			expectedErr:   nil,
+			name:         "Cache provider already present",
+			provider:     testProvider,
+			index:        shardIndex,
+			initialStore: evensFilled(),
+			expectedErr:  nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
 				require.Len(t, store, 7)
 				for _, sliceMh := range sliceMhs {
@@ -97,12 +94,11 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			},
 		},
 		{
-			name:          "Cache another provider on top",
-			provider:      testProvider2,
-			index:         shardIndex,
-			initialStore:  evensFilled(),
-			expectedCount: 7,
-			expectedErr:   nil,
+			name:         "Cache another provider on top",
+			provider:     testProvider2,
+			index:        shardIndex,
+			initialStore: evensFilled(),
+			expectedErr:  nil,
 			testStore: func(t *testing.T, store map[string][]model.ProviderResult) {
 				require.Len(t, store, 7)
 				for i, sliceMh := range sliceMhs {
@@ -133,13 +129,12 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 			// Create SimpleProviderCacher instance
 			cacher := providercacher.NewSimpleProviderCacher(mockStore)
 
-			count, err := cacher.CacheProviderForIndexRecords(ctx, tc.provider, tc.index)
+			err := cacher.CacheProviderForIndexRecords(ctx, tc.provider, tc.index)
 			if tc.expectedErr == nil {
 				require.NoError(t, err)
 			} else {
 				require.EqualError(t, err, tc.expectedErr.Error())
 			}
-			require.Equal(t, tc.expectedCount, count)
 			if tc.testStore != nil {
 				tc.testStore(t, mockStore.store)
 			}
@@ -181,9 +176,8 @@ func TestSimpleProviderCacher_10kNFT(t *testing.T) {
 	mockStore := &MockProviderStore{store: map[string][]model.ProviderResult{}}
 
 	cacher := providercacher.NewSimpleProviderCacher(mockStore)
-	n, err := cacher.CacheProviderForIndexRecords(ctx, prov, idx)
+	err := cacher.CacheProviderForIndexRecords(ctx, prov, idx)
 	require.NoError(t, err)
-	require.Equal(t, 10_001, int(n))
 }
 
 // MockProviderStore is a mock implementation of the ProviderStore interface
@@ -224,5 +218,56 @@ func (m *MockProviderStore) Add(ctx context.Context, hash multihash.Multihash, p
 
 // SetExpirable implements types.ProviderStore.
 func (m *MockProviderStore) SetExpirable(ctx context.Context, key multihash.Multihash, expires bool) error {
+	return nil
+}
+
+func (m *MockProviderStore) Batch() (types.ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult], error) {
+	return &MockBatcher{store: m}, nil
+}
+
+type MockCommand struct {
+	op     string
+	key    multihash.Multihash
+	values []model.ProviderResult
+	expire bool
+}
+
+type MockBatcher struct {
+	store    *MockProviderStore
+	commands []MockCommand
+}
+
+func (mb *MockBatcher) Add(ctx context.Context, key multihash.Multihash, newProviders ...model.ProviderResult) error {
+	mb.commands = append(mb.commands, MockCommand{
+		op:     "add",
+		key:    key,
+		values: newProviders,
+	})
+	return nil
+}
+
+func (mb *MockBatcher) SetExpirable(ctx context.Context, key multihash.Multihash, expires bool) error {
+	mb.commands = append(mb.commands, MockCommand{
+		op:     "setExpirable",
+		key:    key,
+		expire: expires,
+	})
+	return nil
+}
+
+func (mb *MockBatcher) Commit(ctx context.Context) error {
+	for _, c := range mb.commands {
+		if c.op == "add" {
+			_, err := mb.store.Add(ctx, c.key, c.values...)
+			if err != nil {
+				return err
+			}
+		} else if c.op == "setExpirable" {
+			err := mb.store.SetExpirable(ctx, c.key, c.expire)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }

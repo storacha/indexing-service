@@ -2,6 +2,7 @@ package providercacher
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/indexing-service/pkg/blobindex"
@@ -17,18 +18,21 @@ func NewSimpleProviderCacher(providerStore types.ProviderStore) ProviderCacher {
 	return &simpleProviderCacher{providerStore: providerStore}
 }
 
-func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) (uint64, error) {
-	batch := s.providerStore.Batch()
+func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error {
+	batch, err := s.providerStore.Batch()
+	if err != nil {
+		return fmt.Errorf("creating batch: %w", err)
+	}
 
 	// Prioritize the root
 	rootDigest := link.ToCID(index.Content()).Hash()
-	err := batch.Add(ctx, rootDigest, provider)
+	err = batch.Add(ctx, rootDigest, provider)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("batch adding provider for root: %w", err)
 	}
 	err = batch.SetExpirable(ctx, rootDigest, true)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("batch setting provider expirable for root: %w", err)
 	}
 
 	for _, shardIndex := range index.Shards().Iterator() {
@@ -38,19 +42,14 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 			}
 			err := batch.Add(ctx, hash, provider)
 			if err != nil {
-				return 0, err
+				return fmt.Errorf("batch adding provider: %w", err)
 			}
 			err = batch.SetExpirable(ctx, hash, true)
 			if err != nil {
-				return 0, err
+				return fmt.Errorf("batch setting provider expirable: %w", err)
 			}
 		}
 	}
 
-	err = batch.Commit(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	return 0, nil
+	return batch.Commit(ctx)
 }

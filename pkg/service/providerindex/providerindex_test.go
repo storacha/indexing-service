@@ -615,6 +615,7 @@ func TestGetProviderResults(t *testing.T) {
 func TestPublish(t *testing.T) {
 	t.Run("allow skip publish existing advert", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
+		mockBatcher := types.NewMockValueSetCacheBatcher[multihash.Multihash, model.ProviderResult](t)
 		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
 		mockIpniPublisher := extmocks.NewMockIpniPublisher(t)
@@ -633,8 +634,10 @@ func TestPublish(t *testing.T) {
 		err := meta.UnmarshalBinary(result.Metadata)
 		require.NoError(t, err)
 
-		mockStore.EXPECT().Add(testutil.AnyContext, digest, result).Return(1, nil)
-		mockStore.EXPECT().SetExpirable(testutil.AnyContext, digest, false).Return(nil)
+		mockStore.EXPECT().Batch().Return(mockBatcher, nil)
+		mockBatcher.EXPECT().Add(testutil.AnyContext, digest, result).Return(nil)
+		mockBatcher.EXPECT().SetExpirable(testutil.AnyContext, digest, false).Return(nil)
+		mockBatcher.EXPECT().Commit(testutil.AnyContext).Return(nil)
 		mockIpniPublisher.EXPECT().Publish(testutil.AnyContext, provider, contextID, anyDigestSeq, meta).Return(testutil.RandomCID(), publisher.ErrAlreadyAdvertised)
 
 		err = providerIndex.Publish(context.Background(), provider, contextID, slices.Values([]multihash.Multihash{digest}), meta)
