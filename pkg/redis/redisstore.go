@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/storacha/indexing-service/pkg/types"
 )
-
-var log = logging.Logger("redis")
 
 // DefaultExpire is the expire time we set on Redis when Set/SetExpiration are called with expire=true
 const DefaultExpire = time.Hour

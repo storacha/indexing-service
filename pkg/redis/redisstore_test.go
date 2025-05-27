@@ -349,7 +349,7 @@ func (m *MockRedis) SMembers(ctx context.Context, key string) *goredis.StringSli
 	return cmd
 }
 
-func TestRedisStoreBatching(t *testing.T) {
+func TestBatchingValueSetStore(t *testing.T) {
 	if os.Getenv("CI") != "" && runtime.GOOS != "linux" {
 		t.SkipNow()
 	}
@@ -367,6 +367,8 @@ func TestRedisStoreBatching(t *testing.T) {
 	require.NoError(t, err)
 
 	uri, err := container.ConnectionString(ctx)
+	require.NoError(t, err)
+
 	opts := &goredis.Options{Addr: strings.TrimPrefix(uri, "redis://")}
 	client := goredis.NewClient(opts)
 
@@ -397,7 +399,9 @@ func TestRedisStoreBatching(t *testing.T) {
 		err = batch.SetExpirable(ctx, d.key, false)
 		require.NoError(t, err)
 	}
+
 	err = batch.Commit(ctx)
+	require.NoError(t, err)
 
 	// verify everything was set
 	for _, d := range testdata {
