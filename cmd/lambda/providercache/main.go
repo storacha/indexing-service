@@ -30,7 +30,7 @@ func makeHandler(cfg aws.Config) any {
 	if cfg.HoneycombAPIKey != "" {
 		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
 	}
-	providerStore := redis.NewProviderStore(providersRedis)
+	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
 
@@ -85,7 +85,7 @@ func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder
 	if err != nil {
 		return err
 	}
-	_, err = providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
+	err = providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
 	// Do not hold up the queue by re-attempting a cache job that times out. It is
 	// probably a big DAG and retrying is unlikely to subsequently succeed.
 	if errors.Is(err, context.DeadlineExceeded) {

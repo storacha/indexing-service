@@ -26,7 +26,7 @@ func makeHandler(cfg aws.Config) any {
 	if cfg.HoneycombAPIKey != "" {
 		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
 	}
-	providerStore := redis.NewProviderStore(providersRedis)
+	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
 	ipniStore := aws.NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)

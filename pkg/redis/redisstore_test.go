@@ -3,8 +3,12 @@ package redis_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
+	"os"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +17,8 @@ import (
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	valkey "github.com/testcontainers/testcontainers-go/modules/valkey"
 )
 
 func TestRedisStore(t *testing.T) {
@@ -341,4 +347,67 @@ func (m *MockRedis) SMembers(ctx context.Context, key string) *goredis.StringSli
 		cmd.SetVal(values)
 	}
 	return cmd
+}
+
+func (m *MockRedis) Pipeline() redis.Pipeliner {
+	panic("not implemented")
+}
+
+func TestBatchingValueSetStore(t *testing.T) {
+	if os.Getenv("CI") != "" && runtime.GOOS != "linux" {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+	container, err := valkey.Run(ctx,
+		"valkey/valkey:7.2.5",
+		valkey.WithSnapshotting(10, 1),
+		valkey.WithLogLevel(valkey.LogLevelVerbose),
+	)
+	testcontainers.CleanupContainer(t, container)
+	require.NoError(t, err)
+
+	uri, err := container.ConnectionString(ctx)
+	require.NoError(t, err)
+
+	opts := &goredis.Options{Addr: strings.TrimPrefix(uri, "redis://")}
+	client := redis.NewClientAdapter(goredis.NewClient(opts))
+
+	store := redis.NewBatchingValueSetStore(
+		func(s string) (string, error) { return s, nil },
+		func(s string) (string, error) { return s, nil },
+		func(s string) string { return s },
+		client,
+	)
+	type TestData struct {
+		key   string
+		value string
+	}
+	var testdata []TestData
+	for i := range 1000 {
+		testdata = append(testdata, TestData{
+			key:   fmt.Sprintf("key%d", i),
+			value: fmt.Sprintf("val%d", i),
+		})
+	}
+
+	batch := store.Batch()
+	for _, d := range testdata {
+		err := batch.Add(ctx, d.key, d.value)
+		require.NoError(t, err)
+
+		err = batch.SetExpirable(ctx, d.key, false)
+		require.NoError(t, err)
+	}
+
+	err = batch.Commit(ctx)
+	require.NoError(t, err)
+
+	// verify everything was set
+	for _, d := range testdata {
+		vals, err := store.Members(ctx, d.key)
+		require.NoError(t, err)
+		require.Len(t, vals, 1)
+		require.Equal(t, d.value, vals[0])
+	}
 }

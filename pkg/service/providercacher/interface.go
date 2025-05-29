@@ -8,5 +8,5 @@ import (
 )
 
 type ProviderCacher interface {
-	CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) (written uint64, err error)
+	CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error
 }

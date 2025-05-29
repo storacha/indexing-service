@@ -182,4 +182,57 @@ func (m *mockProviderStore) SetExpirable(ctx context.Context, key multihash.Mult
 	return nil
 }
 
+func (m *mockProviderStore) Batch() types.ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult] {
+	return &mockBatcher{store: m}
+}
+
+type mockCommand struct {
+	op     string
+	key    multihash.Multihash
+	values []model.ProviderResult
+	expire bool
+}
+
+type mockBatcher struct {
+	store    *mockProviderStore
+	commands []mockCommand
+}
+
+func (mb *mockBatcher) Add(ctx context.Context, key multihash.Multihash, newProviders ...model.ProviderResult) error {
+	mb.commands = append(mb.commands, mockCommand{
+		op:     "add",
+		key:    key,
+		values: newProviders,
+	})
+	return nil
+}
+
+func (mb *mockBatcher) SetExpirable(ctx context.Context, key multihash.Multihash, expires bool) error {
+	mb.commands = append(mb.commands, mockCommand{
+		op:     "setExpirable",
+		key:    key,
+		expire: expires,
+	})
+	return nil
+}
+
+func (mb *mockBatcher) Commit(ctx context.Context) error {
+	for _, c := range mb.commands {
+		if c.op == "add" {
+			_, err := mb.store.Add(ctx, c.key, c.values...)
+			if err != nil {
+				return err
+			}
+		} else if c.op == "setExpirable" {
+			err := mb.store.SetExpirable(ctx, c.key, c.expire)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+var _ types.ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult] = (*mockBatcher)(nil)
+
 var _ types.ProviderStore = (*mockProviderStore)(nil)

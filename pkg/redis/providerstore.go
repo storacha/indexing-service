@@ -15,11 +15,11 @@ var (
 )
 
 // ProviderStore is a RedisStore for storing IPNI data that implements types.ProviderStore
-type ProviderStore = Store[multihash.Multihash, model.ProviderResult]
+type ProviderStore = BatchingValueSetStore[multihash.Multihash, model.ProviderResult]
 
 // NewProviderStore returns a new instance of an IPNI store using the given redis client
-func NewProviderStore(client Client, opts ...Option) *ProviderStore {
-	return NewStore(providerResultFromRedis, providerResultToRedis, multihashKeyString, client, opts...)
+func NewProviderStore(client PipelineClient, opts ...Option) *ProviderStore {
+	return NewBatchingValueSetStore(providerResultFromRedis, providerResultToRedis, multihashKeyString, client, opts...)
 }
 
 func providerResultFromRedis(data string) (model.ProviderResult, error) {

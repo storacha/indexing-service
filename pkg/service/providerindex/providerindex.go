@@ -19,7 +19,6 @@ import (
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
-	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/indexing-service/pkg/telemetry"
@@ -28,7 +27,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const IPNITimeout = 1500 * time.Millisecond
+const (
+	// MaxBatchSize is the maximum number of items that'll be added to a batch.
+	MaxBatchSize = 10_000
+	IPNITimeout  = 1500 * time.Millisecond
+)
 
 var log = logging.Logger("providerindex")
 
@@ -321,32 +324,39 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 		Provider:  &provider,
 	}
 
-	var joberr error
-	q := jobqueue.NewJobQueue[mh.Multihash](
-		jobqueue.JobHandler(func(ctx context.Context, digest mh.Multihash) error {
-			return addProviderResult(ctx, providerStore, digest, pr, expire)
-		}),
-		jobqueue.WithConcurrency(500),
-		jobqueue.WithErrorHandler(func(err error) { joberr = err }),
-	)
-	q.Startup()
-	i := 0
+	batch := providerStore.Batch()
+	size := 0
+	total := 0
 	for d := range digests {
-		err := q.Queue(ctx, d)
+		err := batch.Add(ctx, d, pr)
 		if err != nil {
 			return err
 		}
-		i++
-	}
-	err = q.Shutdown(ctx)
-	if err != nil {
-		return fmt.Errorf("shutting down job queue: %w", err)
-	}
-	if joberr != nil {
-		return fmt.Errorf("appending provider result: %w", joberr)
+		err = batch.SetExpirable(ctx, d, expire)
+		if err != nil {
+			return err
+		}
+		total++
+
+		size++
+		if size >= MaxBatchSize {
+			err := batch.Commit(ctx)
+			if err != nil {
+				return fmt.Errorf("batch commiting: %w", err)
+			}
+			batch = providerStore.Batch()
+			size = 0
+		}
 	}
 
-	log.Infof("cached %d provider results", i)
+	if size > 0 {
+		err = batch.Commit(ctx)
+		if err != nil {
+			return fmt.Errorf("comitting batch: %w", err)
+		}
+	}
+
+	log.Infof("cached %d provider results", total)
 	return nil
 }
 
@@ -380,18 +390,6 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 		return fmt.Errorf("publishing advert: %w", err)
 	}
 	log.Infof("published IPNI advert: %s", id)
-	return nil
-}
-
-func addProviderResult(ctx context.Context, providerStore types.ProviderStore, digest mh.Multihash, meta model.ProviderResult, expire bool) error {
-	_, err := providerStore.Add(ctx, digest, meta)
-	if err != nil {
-		return fmt.Errorf("adding provider result for digest: %s: %w", digest.B58String(), err)
-	}
-	err = providerStore.SetExpirable(ctx, digest, expire)
-	if err != nil {
-		return fmt.Errorf("setting expirable for digest: %s: %w", digest.B58String(), err)
-	}
 	return nil
 }
 

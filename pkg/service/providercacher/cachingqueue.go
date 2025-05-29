@@ -29,6 +29,5 @@ func NewJobHandler(providerCacher ProviderCacher) *JobHandler {
 }
 
 func (j *JobHandler) Handle(ctx context.Context, job ProviderCachingJob) error {
-	_, err := j.providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
-	return err
+	return j.providerCacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
 }
