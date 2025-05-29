@@ -27,7 +27,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const IPNITimeout = 1500 * time.Millisecond
+const (
+	// MaxBatchSize is the maximum number of items that'll be added to a batch.
+	MaxBatchSize = 10_000
+	IPNITimeout  = 1500 * time.Millisecond
+)
 
 var log = logging.Logger("providerindex")
 
@@ -324,7 +328,8 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 	if err != nil {
 		return fmt.Errorf("creating batch: %w", err)
 	}
-	i := 0
+	size := 0
+	total := 0
 	for d := range digests {
 		err := batch.Add(ctx, d, pr)
 		if err != nil {
@@ -334,14 +339,31 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 		if err != nil {
 			return err
 		}
-		i++
-	}
-	err = batch.Commit(ctx)
-	if err != nil {
-		return fmt.Errorf("comitting batch: %w", err)
+		total++
+
+		size++
+		if size >= MaxBatchSize {
+			err := batch.Commit(ctx)
+			if err != nil {
+				return fmt.Errorf("batch commiting: %w", err)
+			}
+			b, err := providerStore.Batch()
+			if err != nil {
+				return fmt.Errorf("creating batch: %w", err)
+			}
+			batch = b
+			size = 0
+		}
 	}
 
-	log.Infof("cached %d provider results", i)
+	if size > 0 {
+		err = batch.Commit(ctx)
+		if err != nil {
+			return fmt.Errorf("comitting batch: %w", err)
+		}
+	}
+
+	log.Infof("cached %d provider results", total)
 	return nil
 }
 

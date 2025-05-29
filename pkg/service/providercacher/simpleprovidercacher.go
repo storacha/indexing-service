@@ -10,6 +10,9 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
+// MaxBatchSize is the maximum number of items that'll be added to a batch.
+const MaxBatchSize = 10_000
+
 type simpleProviderCacher struct {
 	providerStore types.ProviderStore
 }
@@ -35,6 +38,7 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 		return fmt.Errorf("batch setting provider expirable for root: %w", err)
 	}
 
+	size := 1
 	for _, shardIndex := range index.Shards().Iterator() {
 		for hash := range shardIndex.Iterator() {
 			if string(hash) == string(rootDigest) {
@@ -48,8 +52,24 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 			if err != nil {
 				return fmt.Errorf("batch setting provider expirable: %w", err)
 			}
+
+			size++
+			if size >= MaxBatchSize {
+				err := batch.Commit(ctx)
+				if err != nil {
+					return fmt.Errorf("batch commiting: %w", err)
+				}
+				b, err := s.providerStore.Batch()
+				if err != nil {
+					return fmt.Errorf("creating batch: %w", err)
+				}
+				batch = b
+				size = 0
+			}
 		}
 	}
-
+	if size == 0 {
+		return nil
+	}
 	return batch.Commit(ctx)
 }
