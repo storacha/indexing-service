@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -35,6 +34,12 @@ type Pipeliner interface {
 	Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd
 	Persist(ctx context.Context, key string) *redis.BoolCmd
 	Exec(ctx context.Context) ([]redis.Cmder, error)
+}
+
+// PipelineClient is a client that also supports pipelining.
+type PipelineClient interface {
+	Client
+	Pipelineable
 }
 
 // Store wraps the go redis client to implement our general purpose cache interface,
@@ -173,7 +178,7 @@ func (rs *Store[Key, Value]) Add(ctx context.Context, key Key, values ...Value) 
 
 type BatchingValueSetStore[K, V any] struct {
 	store     *Store[K, V]
-	client    Client
+	client    PipelineClient
 	toRedis   func(V) (string, error)
 	keyString func(K) string
 	opts      []Option
@@ -181,14 +186,11 @@ type BatchingValueSetStore[K, V any] struct {
 
 // NewBatchingValueSetStore creates a new value-set store (a store whose values
 // are sets) that allows batching.
-//
-// Note: the provided client MUST implement [Pipelineable] or [redis.Client]
-// in order to use pipeline functionality.
 func NewBatchingValueSetStore[K, V any](
 	fromRedis func(string) (V, error),
 	toRedis func(V) (string, error),
 	keyString func(K) string,
-	client Client,
+	client PipelineClient,
 	opts ...Option,
 ) *BatchingValueSetStore[K, V] {
 	return &BatchingValueSetStore[K, V]{
@@ -212,12 +214,11 @@ func (bvs *BatchingValueSetStore[K, V]) Members(ctx context.Context, key K) ([]V
 	return bvs.store.Members(ctx, key)
 }
 
-func (bvs *BatchingValueSetStore[K, V]) Batch() (types.ValueSetCacheBatcher[K, V], error) {
-	return NewPipelineBatcher(bvs.client, bvs.toRedis, bvs.keyString, bvs.opts...)
+func (bvs *BatchingValueSetStore[K, V]) Batch() types.ValueSetCacheBatcher[K, V] {
+	return NewPipelineBatcher(bvs.client.Pipeline(), bvs.toRedis, bvs.keyString, bvs.opts...)
 }
 
 type PipelineBatcher[K, V any] struct {
-	client    Client
 	toRedis   func(V) (string, error)
 	keyString func(K) string
 	config    config
@@ -225,27 +226,18 @@ type PipelineBatcher[K, V any] struct {
 }
 
 func NewPipelineBatcher[K, V any](
-	client Client,
+	pipeline Pipeliner,
 	toRedis func(V) (string, error),
 	keyString func(K) string,
 	opts ...Option,
-) (*PipelineBatcher[K, V], error) {
-	var pipeline Pipeliner
-	if rc, ok := client.(*redis.Client); ok {
-		pipeline = rc.Pipeline()
-	} else if pc, ok := client.(Pipelineable); ok {
-		pipeline = pc.Pipeline()
-	} else {
-		return nil, errors.New("client is not a Pipelineable")
-	}
+) *PipelineBatcher[K, V] {
 	batcher := PipelineBatcher[K, V]{
-		client:    client,
 		toRedis:   toRedis,
 		keyString: keyString,
 		config:    newConfig(opts),
 		pipeline:  pipeline,
 	}
-	return &batcher, nil
+	return &batcher
 }
 
 func (pb *PipelineBatcher[K, V]) Add(ctx context.Context, key K, values ...V) error {
@@ -274,3 +266,81 @@ func (pb *PipelineBatcher[K, V]) Commit(ctx context.Context) error {
 	_, err := pb.pipeline.Exec(ctx)
 	return err
 }
+
+// NewClientAdapter converts a [redis.Client] into a [PipelineClient].
+func NewClientAdapter(client *redis.Client) PipelineClient {
+	return &clientAdapter{client}
+}
+
+type clientAdapter struct {
+	client *redis.Client
+}
+
+func (a *clientAdapter) Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd {
+	return a.client.Expire(ctx, key, expiration)
+}
+
+func (a *clientAdapter) Get(ctx context.Context, key string) *redis.StringCmd {
+	return a.client.Get(ctx, key)
+}
+
+func (a *clientAdapter) Persist(ctx context.Context, key string) *redis.BoolCmd {
+	return a.client.Persist(ctx, key)
+}
+
+func (a *clientAdapter) Pipeline() Pipeliner {
+	return a.client.Pipeline()
+}
+
+func (a *clientAdapter) SAdd(ctx context.Context, key string, members ...interface{}) *redis.IntCmd {
+	return a.client.SAdd(ctx, key, members...)
+}
+
+func (a *clientAdapter) SMembers(ctx context.Context, key string) *redis.StringSliceCmd {
+	return a.client.SMembers(ctx, key)
+}
+
+func (a *clientAdapter) Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd {
+	return a.client.Set(ctx, key, value, expiration)
+}
+
+var _ PipelineClient = (*clientAdapter)(nil)
+
+// NewClientAdapter converts a [redis.ClusterClient] into a [PipelineClient].
+func NewClusterClientAdapter(client *redis.ClusterClient) PipelineClient {
+	return &clusterClientAdapter{client}
+}
+
+type clusterClientAdapter struct {
+	client *redis.ClusterClient
+}
+
+func (a *clusterClientAdapter) Expire(ctx context.Context, key string, expiration time.Duration) *redis.BoolCmd {
+	return a.client.Expire(ctx, key, expiration)
+}
+
+func (a *clusterClientAdapter) Get(ctx context.Context, key string) *redis.StringCmd {
+	return a.client.Get(ctx, key)
+}
+
+func (a *clusterClientAdapter) Persist(ctx context.Context, key string) *redis.BoolCmd {
+	return a.client.Persist(ctx, key)
+}
+
+func (a *clusterClientAdapter) Pipeline() Pipeliner {
+	return a.client.Pipeline()
+}
+
+func (a *clusterClientAdapter) SAdd(ctx context.Context, key string, members ...interface{}) *redis.IntCmd {
+	return a.client.SAdd(ctx, key, members...)
+}
+
+func (a *clusterClientAdapter) SMembers(ctx context.Context, key string) *redis.StringSliceCmd {
+	return a.client.SMembers(ctx, key)
+}
+
+func (a *clusterClientAdapter) Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd {
+	return a.client.Set(ctx, key, value, expiration)
+}
+
+var _ PipelineClient = (*clientAdapter)(nil)

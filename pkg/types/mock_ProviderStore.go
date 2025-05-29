@@ -97,7 +97,7 @@ func (_c *MockProviderStore_Add_Call) RunAndReturn(run func(context.Context, mul
 }
 
 // Batch provides a mock function with no fields
-func (_m *MockProviderStore) Batch() (ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult], error) {
+func (_m *MockProviderStore) Batch() ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult] {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
@@ -105,10 +105,6 @@ func (_m *MockProviderStore) Batch() (ValueSetCacheBatcher[multihash.Multihash, 
 	}
 
 	var r0 ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult]
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult], error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult]); ok {
 		r0 = rf()
 	} else {
@@ -117,13 +113,7 @@ func (_m *MockProviderStore) Batch() (ValueSetCacheBatcher[multihash.Multihash, 
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // MockProviderStore_Batch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Batch'
@@ -143,12 +133,12 @@ func (_c *MockProviderStore_Batch_Call) Run(run func()) *MockProviderStore_Batch
 	return _c
 }
 
-func (_c *MockProviderStore_Batch_Call) Return(_a0 ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult], _a1 error) *MockProviderStore_Batch_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockProviderStore_Batch_Call) Return(_a0 ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult]) *MockProviderStore_Batch_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockProviderStore_Batch_Call) RunAndReturn(run func() (ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult], error)) *MockProviderStore_Batch_Call {
+func (_c *MockProviderStore_Batch_Call) RunAndReturn(run func() ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult]) *MockProviderStore_Batch_Call {
 	_c.Call.Return(run)
 	return _c
 }

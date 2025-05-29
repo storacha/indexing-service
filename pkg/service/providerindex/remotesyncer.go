@@ -35,11 +35,7 @@ func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Li
 			log.Errorf("getting advert: %s: %w", cur, err)
 			return
 		}
-		batch, err := rs.providerStore.Batch()
-		if err != nil {
-			log.Errorf("creating batch: %w", err)
-			return
-		}
+		batch := rs.providerStore.Batch()
 		for d, err := range rs.store.Entries(ctx, ad.Entries) {
 			if err != nil {
 				log.Errorf("iterating advert entries: %s (advert) -> %s (entries): %w", cur, ad.Entries, err)

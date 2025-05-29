@@ -73,7 +73,7 @@ type ValueSetCache[Key, Value any] interface {
 // Note: a batch is not a transaction.
 type BatchingValueSetCache[Key, Value any] interface {
 	ValueSetCache[Key, Value]
-	Batch() (ValueSetCacheBatcher[Key, Value], error)
+	Batch() ValueSetCacheBatcher[Key, Value]
 }
 
 type ValueSetCacheBatcher[Key, Value any] interface {

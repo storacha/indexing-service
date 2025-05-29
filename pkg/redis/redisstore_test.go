@@ -349,6 +349,10 @@ func (m *MockRedis) SMembers(ctx context.Context, key string) *goredis.StringSli
 	return cmd
 }
 
+func (m *MockRedis) Pipeline() redis.Pipeliner {
+	panic("not implemented")
+}
+
 func TestBatchingValueSetStore(t *testing.T) {
 	if os.Getenv("CI") != "" && runtime.GOOS != "linux" {
 		t.SkipNow()
@@ -367,7 +371,7 @@ func TestBatchingValueSetStore(t *testing.T) {
 	require.NoError(t, err)
 
 	opts := &goredis.Options{Addr: strings.TrimPrefix(uri, "redis://")}
-	client := goredis.NewClient(opts)
+	client := redis.NewClientAdapter(goredis.NewClient(opts))
 
 	store := redis.NewBatchingValueSetStore(
 		func(s string) (string, error) { return s, nil },
@@ -387,8 +391,7 @@ func TestBatchingValueSetStore(t *testing.T) {
 		})
 	}
 
-	batch, err := store.Batch()
-	require.NoError(t, err)
+	batch := store.Batch()
 	for _, d := range testdata {
 		err := batch.Add(ctx, d.key, d.value)
 		require.NoError(t, err)

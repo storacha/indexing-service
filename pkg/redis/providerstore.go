@@ -18,7 +18,7 @@ var (
 type ProviderStore = BatchingValueSetStore[multihash.Multihash, model.ProviderResult]
 
 // NewProviderStore returns a new instance of an IPNI store using the given redis client
-func NewProviderStore(client Client, opts ...Option) *ProviderStore {
+func NewProviderStore(client PipelineClient, opts ...Option) *ProviderStore {
 	return NewBatchingValueSetStore(providerResultFromRedis, providerResultToRedis, multihashKeyString, client, opts...)
 }
 

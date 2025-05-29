@@ -30,7 +30,7 @@ func makeHandler(cfg aws.Config) any {
 	if cfg.HoneycombAPIKey != "" {
 		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
 	}
-	providerStore := redis.NewProviderStore(providersRedis)
+	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 	sqsCachingDecoder := aws.NewSQSCachingDecoder(cfg.Config, cfg.CachingBucket)
 

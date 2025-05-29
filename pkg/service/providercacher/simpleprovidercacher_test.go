@@ -221,8 +221,8 @@ func (m *MockProviderStore) SetExpirable(ctx context.Context, key multihash.Mult
 	return nil
 }
 
-func (m *MockProviderStore) Batch() (types.ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult], error) {
-	return &MockBatcher{store: m}, nil
+func (m *MockProviderStore) Batch() types.ValueSetCacheBatcher[multihash.Multihash, model.ProviderResult] {
+	return &MockBatcher{store: m}
 }
 
 type MockCommand struct {

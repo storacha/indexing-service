@@ -324,10 +324,7 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 		Provider:  &provider,
 	}
 
-	batch, err := providerStore.Batch()
-	if err != nil {
-		return fmt.Errorf("creating batch: %w", err)
-	}
+	batch := providerStore.Batch()
 	size := 0
 	total := 0
 	for d := range digests {
@@ -347,11 +344,7 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 			if err != nil {
 				return fmt.Errorf("batch commiting: %w", err)
 			}
-			b, err := providerStore.Batch()
-			if err != nil {
-				return fmt.Errorf("creating batch: %w", err)
-			}
-			batch = b
+			batch = providerStore.Batch()
 			size = 0
 		}
 	}

@@ -634,7 +634,7 @@ func TestPublish(t *testing.T) {
 		err := meta.UnmarshalBinary(result.Metadata)
 		require.NoError(t, err)
 
-		mockStore.EXPECT().Batch().Return(mockBatcher, nil)
+		mockStore.EXPECT().Batch().Return(mockBatcher)
 		mockBatcher.EXPECT().Add(testutil.AnyContext, digest, result).Return(nil)
 		mockBatcher.EXPECT().SetExpirable(testutil.AnyContext, digest, false).Return(nil)
 		mockBatcher.EXPECT().Commit(testutil.AnyContext).Return(nil)

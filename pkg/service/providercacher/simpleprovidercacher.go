@@ -22,14 +22,11 @@ func NewSimpleProviderCacher(providerStore types.ProviderStore) ProviderCacher {
 }
 
 func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error {
-	batch, err := s.providerStore.Batch()
-	if err != nil {
-		return fmt.Errorf("creating batch: %w", err)
-	}
+	batch := s.providerStore.Batch()
 
 	// Prioritize the root
 	rootDigest := link.ToCID(index.Content()).Hash()
-	err = batch.Add(ctx, rootDigest, provider)
+	err := batch.Add(ctx, rootDigest, provider)
 	if err != nil {
 		return fmt.Errorf("batch adding provider for root: %w", err)
 	}
@@ -59,11 +56,7 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 				if err != nil {
 					return fmt.Errorf("batch commiting: %w", err)
 				}
-				b, err := s.providerStore.Batch()
-				if err != nil {
-					return fmt.Errorf("creating batch: %w", err)
-				}
-				batch = b
+				batch = s.providerStore.Batch()
 				size = 0
 			}
 		}

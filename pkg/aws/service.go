@@ -298,7 +298,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithClaimsStore(claimBucketStore),
 		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
-		construct.WithProvidersClient(providersClient),
+		construct.WithProvidersClient(redis.NewClusterClientAdapter(providersClient)),
 		construct.WithNoProvidersClient(noProvidersClient),
 		construct.WithClaimsClient(claimsClient),
 		construct.WithIndexesClient(indexesClient),

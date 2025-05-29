@@ -78,7 +78,7 @@ type config struct {
 	startIPNIServer      bool
 	publisherStore       store.PublisherStore
 	claimsStore          types.ContentClaimsStore
-	providersClient      redis.Client
+	providersClient      redis.PipelineClient
 	noProvidersClient    redis.Client
 	claimsClient         redis.Client
 	indexesClient        redis.Client
@@ -182,7 +182,7 @@ func WithDatastore(ds datastore.Batching) Option {
 }
 
 // WithProvidersClient configures the redis client used for caching providers.
-func WithProvidersClient(client redis.Client) Option {
+func WithProvidersClient(client redis.PipelineClient) Option {
 	return func(cfg *config) error {
 		cfg.providersClient = client
 		return nil
@@ -311,7 +311,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 	// connect to redis
 	providersClient := cfg.providersClient
 	if providersClient == nil {
-		providersClient = goredis.NewClusterClient(&sc.ProvidersRedis)
+		providersClient = redis.NewClusterClientAdapter(goredis.NewClusterClient(&sc.ProvidersRedis))
 	}
 	noProvidersClient := cfg.noProvidersClient
 	if noProvidersClient == nil {
