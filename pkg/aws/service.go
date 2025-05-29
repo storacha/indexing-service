@@ -73,7 +73,6 @@ type Config struct {
 	ClaimsCacheExpirationSeconds      int64
 	IndexesCacheExpirationSeconds     int64
 	SQSCachingQueueURL                string
-	CachingBucket                     string
 	ChunkLinksTableName               string
 	MetadataTableName                 string
 	IPNIStoreBucket                   string
@@ -222,7 +221,6 @@ func FromEnv(ctx context.Context) Config {
 		ClaimsCacheExpirationSeconds:      mustGetInt("CLAIMS_CACHE_EXPIRATION_SECONDS"),
 		IndexesCacheExpirationSeconds:     mustGetInt("INDEXES_CACHE_EXPIRATION_SECONDS"),
 		SQSCachingQueueURL:                mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
-		CachingBucket:                     mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
 		ChunkLinksTableName:               mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
 		MetadataTableName:                 mustGetEnv("METADATA_TABLE_NAME"),
 		IPNIStoreBucket:                   mustGetEnv("IPNI_STORE_BUCKET_NAME"),
@@ -262,7 +260,7 @@ func Construct(cfg Config) (types.Service, error) {
 		indexesClient = telemetry.InstrumentRedisClient(indexesClient)
 	}
 
-	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
+	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
@@ -309,7 +307,7 @@ func Construct(cfg Config) (types.Service, error) {
 	service, err := construct.Construct(
 		cfg.ServiceConfig,
 		construct.SkipNotification(),
-		construct.WithCachingQueue(cachingQueue),
+		construct.WithProviderCachingQueue(cachingQueue),
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
