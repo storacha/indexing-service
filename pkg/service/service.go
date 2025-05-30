@@ -489,7 +489,7 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	var digests []multihash.Multihash
 	digests = append(digests, nb.Content.Hash())
 	digests = append(digests, nb.Equals.(cidlink.Link).Cid.Hash())
-	contextID := nb.Equals.Binary()
+	contextID := string(nb.Content.Hash())
 	err = provIndex.Publish(ctx, provider, contextID, slices.Values(digests), meta)
 	if err != nil {
 		return fmt.Errorf("publishing equals claim: %w", err)
