@@ -277,7 +277,7 @@ func (ls LegacyClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCa
 
 func (ls LegacyClaimsStore) synthetizeEqualsProviderResult(caveats assert.EqualsCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
 	equalsCid := link.ToCID(caveats.Equals)
-	contextID := []byte(caveats.Equals.Binary())
+	contextID := caveats.Content.Hash()
 
 	meta := metadata.EqualsClaimMetadata{
 		Equals:     equalsCid,
