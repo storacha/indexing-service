@@ -1,6 +1,6 @@
 locals {
   # Only prod and staging get a CloudFront distribution
-  should_create_cloudfront = terraform.workspace == "prod" || terraform.workspace == "staging"
+  should_create_cloudfront = local.is_production || local.is_staging
 }
 
 resource "aws_cloudfront_distribution" "indexer" {

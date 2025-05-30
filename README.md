@@ -60,7 +60,7 @@ You need to first generate a .env with relevant vars. Copy `.env.local` to `.env
 
 #### `TF_WORKSPACE`
 
-Best to set this to your name. "prod" and "staging" are reserved for shared deployments.
+Best to set this to your name. "prod", "staging", "warm-prod", and "warm-staging" are reserved for shared deployments.
 
 #### `TF_VAR_private_key`
 

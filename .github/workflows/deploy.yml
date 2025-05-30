@@ -40,6 +40,21 @@ jobs:
       private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
       honeycomb-api-key: ${{ secrets.STAGING_HONEYCOMB_API_KEY }}
 
+  warm-staging:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      env: warm-staging
+      workspace: warm-staging
+      did: did:web:staging.warm.indexer.storacha.network
+      apply: ${{ github.event_name != 'pull_request' }}
+      ipni-endpoint: ${{ vars.WARM_STAGING_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.WARM_STAGING_IPNI_ANNOUNCE_URLS }}
+    secrets:
+      aws-account-id: ${{ secrets.WARM_STAGING_AWS_ACCOUNT_ID }}
+      aws-region: ${{ secrets.WARM_STAGING_AWS_REGION }}
+      private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
+      honeycomb-api-key: ${{ secrets.WARM_STAGING_HONEYCOMB_API_KEY }}
+
   # apply prod on successful release, plan otherwise
   production:
     uses: ./.github/workflows/terraform.yml
