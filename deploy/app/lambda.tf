@@ -29,7 +29,7 @@ locals {
   }
 
   # use dedicated VPC and caches for prod and staging, and shared resources otherwise
-  dedicated_resources = terraform.workspace == "prod" || terraform.workspace == "staging"
+  dedicated_resources = local.is_production || local.is_staging
   vpc_id = local.dedicated_resources ? module.vpc[0].id : data.terraform_remote_state.shared.outputs.dev_vpc.id
   private_subnet_ids = local.dedicated_resources ? module.vpc[0].subnet_ids.private : data.terraform_remote_state.shared.outputs.dev_vpc.subnet_ids.private
   providers_cache = local.dedicated_resources ? module.caches[0].providers : data.terraform_remote_state.shared.outputs.dev_caches.providers
@@ -74,7 +74,7 @@ resource "aws_lambda_function" "lambda" {
   architectures = [ "arm64" ]
   role          = aws_iam_role.lambda_exec.arn
   timeout          = try(each.value.timeout, 30)
-  memory_size      = try(each.value.memory_size, terraform.workspace == "prod" ? 1024 : 128)
+  memory_size      = try(each.value.memory_size, local.is_production ? 1024 : 128)
   reserved_concurrent_executions = try(each.value.concurrency, -1)
   source_code_hash = data.archive_file.function_archive[each.key].output_base64sha256
   filename      = data.archive_file.function_archive[each.key].output_path # Path to your Lambda zip files
@@ -90,16 +90,16 @@ resource "aws_lambda_function" "lambda" {
     variables = {
       	PROVIDERS_REDIS_URL = "${local.providers_cache.address}:${local.providers_cache.port}"
         PROVIDERS_REDIS_CACHE = local.providers_cache.id
-        PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 30 * 24 * 60 * 60 : 24 * 60 * 60}"
+        PROVIDERS_CACHE_EXPIRATION_SECONDS = local.is_production ? 30 * 24 * 60 * 60 : 24 * 60 * 60
         NO_PROVIDERS_REDIS_URL = "${local.no_providers_cache.address}:${local.no_providers_cache.port}"
         NO_PROVIDERS_REDIS_CACHE = local.no_providers_cache.id
-        NO_PROVIDERS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
+        NO_PROVIDERS_CACHE_EXPIRATION_SECONDS = local.is_production ? 24 * 60 * 60 : 60 * 60
         INDEXES_REDIS_URL = "${local.indexes_cache.address}:${local.indexes_cache.port}"
         INDEXES_REDIS_CACHE = local.indexes_cache.id
-        INDEXES_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 24 * 60 * 60 : 60 * 60}"
+        INDEXES_CACHE_EXPIRATION_SECONDS = local.is_production ? 24 * 60 * 60 : 60 * 60
         CLAIMS_REDIS_URL = "${local.claims_cache.address}:${local.claims_cache.port}"
         CLAIMS_REDIS_CACHE = local.claims_cache.id
-        CLAIMS_CACHE_EXPIRATION_SECONDS = "${terraform.workspace == "prod" ? 7 * 24 * 60 * 60 : 24 * 60 * 60}"
+        CLAIMS_CACHE_EXPIRATION_SECONDS = local.is_production ? 7 * 24 * 60 * 60 : 24 * 60 * 60
         REDIS_USER_ID = local.cache_iam_user.user_id
         IPNI_ENDPOINT = var.ipni_endpoint
         IPNI_ANNOUNCE_URLS = var.ipni_announce_urls
@@ -123,14 +123,14 @@ resource "aws_lambda_function" "lambda" {
         LEGACY_BLOCK_INDEX_TABLE_NAME = data.aws_dynamodb_table.legacy_block_index_table.id
         LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
         LEGACY_DATA_BUCKET_URL = var.legacy_data_bucket_url != "" ? var.legacy_data_bucket_url : "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
-        GOLOG_LOG_LEVEL = terraform.workspace == "prod" ? "error" : "debug"
+        GOLOG_LOG_LEVEL = local.is_production ? "error" : "debug"
         OTEL_PROPAGATORS = "tracecontext"
         OTEL_SERVICE_NAME = "${terraform.workspace}-${var.app}"
         OPENTELEMETRY_COLLECTOR_CONFIG_URI = "/var/task/otel-collector-config.yaml"
         HONEYCOMB_OTLP_ENDPOINT = "api.honeycomb.io:443"
         HONEYCOMB_API_KEY = "${var.honeycomb_api_key}"
         PRINCIPAL_MAPPING = var.principal_mapping
-        BASE_TRACE_SAMPLE_RATIO = terraform.workspace == "prod" ? "0.0001" : "1.0"
+        BASE_TRACE_SAMPLE_RATIO = local.is_production ? "0.0001" : "1.0"
     }
   }
 
@@ -381,7 +381,7 @@ resource "aws_lambda_event_source_mapping" "event_source_mapping" {
   event_source_arn = aws_sqs_queue.caching.arn
   enabled          = true
   function_name    = aws_lambda_function.lambda["providercache"].arn
-  batch_size       = terraform.workspace == "prod" ? 10 : 1
+  batch_size       = local.is_production ? 10 : 1
   function_response_types = ["ReportBatchItemFailures"]
 }
 
