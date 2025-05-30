@@ -268,7 +268,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 
 		require.NoError(t, err)
 
-		equalsContextID := []byte(equalsLink.Binary())
+		equalsContextID := []byte(contentHash)
 		require.Equal(t, equalsContextID, result.ContextID)
 
 		md := metadata.MetadataContext.New()
