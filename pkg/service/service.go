@@ -184,7 +184,12 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					}
 				} else {
 					// lookup was the equals hash, queue the content hash
-					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, types.QueryTypeLocation}); err != nil {
+					contentCid, err := cid.Cast(result.ContextID)
+					if err != nil {
+						telemetry.Error(s, err, "decoding context ID as CID")
+						return err
+					}
+					if err := spawn(job{contentCid.Hash(), nil, nil, types.QueryTypeLocation}); err != nil {
 						telemetry.Error(s, err, "queuing job for content hash")
 						return err
 					}
