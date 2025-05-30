@@ -184,12 +184,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					}
 				} else {
 					// lookup was the equals hash, queue the content hash
-					contentCid, err := cid.Cast(result.ContextID)
-					if err != nil {
-						telemetry.Error(s, err, "decoding context ID as CID")
-						return err
-					}
-					if err := spawn(job{contentCid.Hash(), nil, nil, types.QueryTypeLocation}); err != nil {
+					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, types.QueryTypeLocation}); err != nil {
 						telemetry.Error(s, err, "queuing job for content hash")
 						return err
 					}
@@ -494,7 +489,7 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	var digests []multihash.Multihash
 	digests = append(digests, nb.Content.Hash())
 	digests = append(digests, nb.Equals.(cidlink.Link).Cid.Hash())
-	contextID := nb.Equals.Binary()
+	contextID := string(nb.Content.Hash())
 	err = provIndex.Publish(ctx, provider, contextID, slices.Values(digests), meta)
 	if err != nil {
 		return fmt.Errorf("publishing equals claim: %w", err)
