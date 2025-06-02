@@ -45,7 +45,7 @@ jobs:
     with:
       env: warm-staging
       workspace: warm-staging
-      did: did:web:staging.warm.indexer.storacha.network
+      did: did:web:staging.indexer.warm.storacha.network
       apply: ${{ github.event_name != 'pull_request' }}
       ipni-endpoint: ${{ vars.WARM_STAGING_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.WARM_STAGING_IPNI_ANNOUNCE_URLS }}

@@ -27,5 +27,5 @@ provider "aws" {
 }
 
 resource "aws_route53_zone" "primary" {
-  name = "${var.app}.storacha.network"
+  name = "${var.app}.${local.network}"
 }

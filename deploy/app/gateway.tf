@@ -1,5 +1,7 @@
 locals {
-    domain_name = terraform.workspace == "prod" ? "${var.app}.storacha.network" : terraform.workspace == "warm-prod" ? "warm.${var.app}.storacha.network" : terraform.workspace == "warm-staging" ? "staging.warm.${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
+  is_warm = startswith(terraform.workspace, "warm-")
+  network = local.is_warm ? "warm.storacha.network" : "storacha.network"
+  domain_name = local.is_production ? "${var.app}.${local.network}" : "${terraform.workspace}.${var.app}.${local.network}"
 }
 
 resource "aws_apigatewayv2_api" "api" {
