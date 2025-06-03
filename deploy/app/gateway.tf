@@ -1,5 +1,8 @@
 locals {
-    domain_name = terraform.workspace == "prod" ? "${var.app}.storacha.network" : "${terraform.workspace}.${var.app}.storacha.network"
+  is_warm = startswith(terraform.workspace, "warm-")
+  network = local.is_warm ? "warm.storacha.network" : "storacha.network"
+  domain_base = "${var.app}.${local.network}"
+  domain_name = local.is_production ? local.domain_base : local.is_staging ? "staging.${local.domain_base}" : "${terraform.workspace}.${local.domain_base}"
 }
 
 resource "aws_apigatewayv2_api" "api" {
@@ -157,8 +160,8 @@ resource "aws_route53_record" "api_gateway" {
   type    = "A"
 
   alias {
-    name                   = terraform.workspace == "prod" || terraform.workspace == "staging" ? aws_cloudfront_distribution.indexer[0].domain_name : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].target_domain_name
-    zone_id                = terraform.workspace == "prod" || terraform.workspace == "staging" ? aws_cloudfront_distribution.indexer[0].hosted_zone_id : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
+    name                   = local.is_production || local.is_staging ? aws_cloudfront_distribution.indexer[0].domain_name : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].target_domain_name
+    zone_id                = local.is_production || local.is_staging ? aws_cloudfront_distribution.indexer[0].hosted_zone_id : aws_apigatewayv2_domain_name.custom_domain.domain_name_configuration[0].hosted_zone_id
     evaluate_target_health = false
   }
 }

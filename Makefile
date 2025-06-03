@@ -65,7 +65,7 @@ otel-config: otel-collector-config.yaml
 	echo $(LAMBDADIRS) | xargs -n 1 cp $(OTELCOL_CONFIG)
 
 deploy/app/.terraform:
-	tofu -chdir=deploy/app init
+	TF_WORKSPACE=default tofu -chdir=deploy/app init
 
 .tfworkspace:
 	tofu -chdir=deploy/app workspace new $(TF_WORKSPACE)
