@@ -33,6 +33,7 @@ provider "aws" {
 # access state for shared resources (primary DNS zone, dev VPC and dev caches)
 data "terraform_remote_state" "shared" {
   backend = "s3"
+  workspace = terraform.workspace
   config = {
     bucket = "storacha-terraform-state"
     key    = "storacha/indexing-service/shared.tfstate"
