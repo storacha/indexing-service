@@ -111,7 +111,7 @@ func (rs *Store[Key, Value]) Set(ctx context.Context, key Key, value Value, expi
 	}
 	duration := time.Duration(0)
 	if expires {
-		duration = DefaultExpire
+		duration = rs.config.expirationTime
 	}
 	err = rs.client.Set(ctx, rs.keyString(key), data, duration).Err()
 	if err != nil {
