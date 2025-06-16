@@ -53,6 +53,8 @@ var awsCmd = &cli.Command{
 				panic(err)
 			}
 			defer telemetryShutdown(cCtx.Context)
+
+			srvOpts = append(srvOpts, server.WithTelemetry())
 		}
 
 		indexer, err := aws.Construct(cfg)
