@@ -17,6 +17,7 @@ func main() {
 		Usage: "Manage running the indexing service.",
 		Commands: []*cli.Command{
 			serverCmd,
+			awsCmd,
 			queryCmd,
 		},
 	}
