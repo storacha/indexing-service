@@ -3,11 +3,17 @@ package main
 import (
 	"fmt"
 
+	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/go-libstoracha/metadata"
 	userver "github.com/storacha/go-ucanto/server"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/principalresolver"
+	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/server"
+	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/telemetry"
+	"github.com/storacha/ipni-publisher/pkg/notifier"
+	"github.com/storacha/ipni-publisher/pkg/store"
 	"github.com/urfave/cli/v2"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -62,6 +68,37 @@ var awsCmd = &cli.Command{
 			return err
 		}
 
+		notifier, err := setupIPNIPipeline(cfg)
+		if err != nil {
+			return err
+		}
+		notifier.Start()
+		defer notifier.Stop()
+
 		return server.ListenAndServe(addr, indexer, srvOpts...)
 	},
+}
+
+func setupIPNIPipeline(cfg aws.Config) (*notifier.Notifier, error) {
+	// setup remote IPNI syncer
+	providersRedis := goredis.NewClusterClient(&cfg.ProvidersRedis)
+	if cfg.HoneycombAPIKey != "" {
+		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
+	}
+	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
+	ipniStore := aws.NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
+	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
+	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
+	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
+	remoteSyncer := providerindex.NewRemoteSyncer(providerStore, publisherStore)
+
+	// setup notifier to periodically check IPNI and notify remote syncer if updates are required
+	headStore := aws.NewS3Store(cfg.Config, cfg.NotifierHeadBucket, "")
+	notifier, err := notifier.NewNotifierWithStorage(cfg.IPNIFindURL, cfg.PrivateKey, headStore)
+	if err != nil {
+		return nil, fmt.Errorf("creating notifier: %w", err)
+	}
+
+	notifier.Notify(remoteSyncer.HandleRemoteSync)
+	return notifier, nil
 }
