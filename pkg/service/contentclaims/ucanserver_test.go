@@ -95,7 +95,7 @@ func TestServer(t *testing.T) {
 
 	for _, inv := range invs {
 		t.Run(inv.Capabilities()[0].Can(), func(t *testing.T) {
-			resp, err := client.Execute([]invocation.Invocation{inv}, conn)
+			resp, err := client.Execute(t.Context(), []invocation.Invocation{inv}, conn)
 			require.NoError(t, err)
 
 			rcptlnk, ok := resp.Get(inv.Link())
@@ -159,7 +159,7 @@ func TestPrincipalResolver(t *testing.T) {
 	conn, err := client.NewConnection(testutil.Service, server)
 	require.NoError(t, err)
 
-	resp, err := client.Execute([]invocation.Invocation{inv}, conn)
+	resp, err := client.Execute(t.Context(), []invocation.Invocation{inv}, conn)
 	require.NoError(t, err)
 
 	rcptlnk, ok := resp.Get(inv.Link())
