@@ -30,8 +30,8 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/extra/redisotel/v9 v9.10.0
 	github.com/redis/go-redis/v9 v9.10.0
-	github.com/storacha/go-libstoracha v0.0.8-0.20250618092544-0cc6e2d3f0f2
-	github.com/storacha/go-ucanto v0.4.1-0.20250618105850-65be934bc471
+	github.com/storacha/go-libstoracha v0.1.0
+	github.com/storacha/go-ucanto v0.4.1
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.37.0
