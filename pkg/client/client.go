@@ -58,8 +58,8 @@ type Client struct {
 	connection       client.Connection
 }
 
-func (c *Client) execute(inv invocation.Invocation) error {
-	resp, err := client.Execute([]invocation.Invocation{inv}, c.connection)
+func (c *Client) execute(ctx context.Context, inv invocation.Invocation) error {
+	resp, err := client.Execute(ctx, []invocation.Invocation{inv}, c.connection)
 	if err != nil {
 		return fmt.Errorf("sending invocation: %w", err)
 	}
@@ -87,7 +87,7 @@ func (c *Client) PublishIndexClaim(ctx context.Context, issuer principal.Signer,
 	if err != nil {
 		return fmt.Errorf("generating invocation: %w", err)
 	}
-	return c.execute(inv)
+	return c.execute(ctx, inv)
 }
 
 func (c *Client) PublishEqualsClaim(ctx context.Context, issuer principal.Signer, caveats assert.EqualsCaveats, options ...delegation.Option) error {
@@ -95,7 +95,7 @@ func (c *Client) PublishEqualsClaim(ctx context.Context, issuer principal.Signer
 	if err != nil {
 		return fmt.Errorf("generating invocation: %w", err)
 	}
-	return c.execute(inv)
+	return c.execute(ctx, inv)
 }
 
 func (c *Client) CacheClaim(ctx context.Context, issuer principal.Signer, cacheClaim delegation.Delegation, provider claim.Provider, options ...delegation.Option) error {
@@ -116,7 +116,7 @@ func (c *Client) CacheClaim(ctx context.Context, issuer principal.Signer, cacheC
 		}
 	}
 
-	return c.execute(inv)
+	return c.execute(ctx, inv)
 }
 
 func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.QueryResult, error) {
