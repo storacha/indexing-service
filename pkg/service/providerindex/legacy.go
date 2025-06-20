@@ -201,7 +201,6 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 		encodedCtxID = contextID
 	}
 
-	contentCid := cid.NewCidV1(cid.Raw, caveats.Content.Hash())
 	var rng *metadata.Range
 	if caveats.Range != nil {
 		rng = &metadata.Range{
@@ -210,7 +209,6 @@ func (ls LegacyClaimsStore) synthetizeLocationProviderResult(caveats assert.Loca
 		}
 	}
 	meta := metadata.LocationCommitmentMetadata{
-		Shard:      &contentCid,
 		Range:      rng,
 		Expiration: expiration,
 		Claim:      claimCid,

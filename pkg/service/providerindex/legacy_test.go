@@ -176,7 +176,7 @@ func TestSynthetizeProviderResult(t *testing.T) {
 		md := metadata.MetadataContext.New()
 		require.NoError(t, md.UnmarshalBinary(result.Metadata))
 		locMeta := md.Get(metadata.LocationCommitmentID).(*metadata.LocationCommitmentMetadata)
-		require.Equal(t, contentCid, *locMeta.Shard)
+		require.Nil(t, locMeta.Shard)
 		require.Nil(t, locMeta.Range)
 		require.Equal(t, int64(*locationDelegation.Expiration()), locMeta.Expiration)
 		require.Equal(t, link.ToCID(locationDelegation.Link()), locMeta.Claim)
