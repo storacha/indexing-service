@@ -8,13 +8,25 @@ import (
 )
 
 type (
-	ProviderCachingJob struct {
-		Provider model.ProviderResult
-		Index    blobindex.ShardedDagIndexView
+	CachingQueueQueuer interface {
+		Queue(ctx context.Context, job ProviderCachingJob) error
+	}
+	CachingQueueReader interface {
+		ReadJobs(ctx context.Context, maxJobs int) ([]ProviderCachingJob, error)
+	}
+	CachingQueueDeleter interface {
+		DeleteJob(ctx context.Context, jobID string) error
+	}
+	CachingQueue interface {
+		CachingQueueQueuer
+		CachingQueueReader
+		CachingQueueDeleter
 	}
 
-	JobQueue interface {
-		Queue(ctx context.Context, j ProviderCachingJob) error
+	ProviderCachingJob struct {
+		ID       string
+		Provider model.ProviderResult
+		Index    blobindex.ShardedDagIndexView
 	}
 
 	JobHandler struct {

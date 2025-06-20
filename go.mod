@@ -32,6 +32,7 @@ require (
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/storacha/go-libstoracha v0.0.3
 	github.com/storacha/go-ucanto v0.3.0
+	github.com/storacha/ipni-publisher v0.0.0-20250211095024-8c9199a49c0d
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.34.0

@@ -21,6 +21,10 @@ packages:
       ContentToClaimsMapper:
       LegacyClaimsFinder:
       ProviderIndex:
+  github.com/storacha/indexing-service/pkg/service/providercacher:
+    interfaces:
+      CachingQueue:
+      ProviderCacher:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
       ContentClaimsCache:

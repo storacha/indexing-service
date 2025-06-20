@@ -10,6 +10,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/principalresolver"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/server"
+	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/ipni-publisher/pkg/notifier"
@@ -72,8 +73,12 @@ var awsCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		notifier.Start()
+		notifier.Start(cCtx.Context)
 		defer notifier.Stop()
+
+		cacher := setupProviderCacher(cfg)
+		cacher.Start()
+		defer cacher.Stop()
 
 		return server.ListenAndServe(addr, indexer, srvOpts...)
 	},
@@ -101,4 +106,18 @@ func setupIPNIPipeline(cfg aws.Config) (*notifier.Notifier, error) {
 
 	notifier.Notify(remoteSyncer.HandleRemoteSync)
 	return notifier, nil
+}
+
+func setupProviderCacher(cfg aws.Config) *providercacher.CachingQueuePoller {
+	cachingQueue := aws.NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
+
+	providersRedis := goredis.NewClusterClient(&cfg.ProvidersRedis)
+	if cfg.HoneycombAPIKey != "" {
+		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
+	}
+	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
+	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
+
+	cachingQueuePoller := providercacher.NewCachingQueuePoller(cachingQueue, providerCacher)
+	return cachingQueuePoller
 }
