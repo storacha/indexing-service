@@ -13,6 +13,12 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
+// Some blocks are in MANY CARs. The blockIndexQueryLimit here is set to the same blockIndexQueryLimit that
+// was previously applied in the legacy content claims service when fetching
+// items from this same table.
+// https://github.com/storacha/content-claims/blob/d837231389d60fa50c3d36b421bf3062cc7350ce/packages/infra/src/lib/store/block-index.js#L16C7-L16C12
+const blockIndexQueryLimit = 25
+
 type DynamoProviderBlockIndexTable struct {
 	client    dynamodb.QueryAPIClient
 	tableName string
@@ -44,6 +50,7 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 		ExpressionAttributeValues: expr.Values(),
 		KeyConditionExpression:    expr.KeyCondition(),
 		ProjectionExpression:      expr.Projection(),
+		Limit:                     aws.Int32(blockIndexQueryLimit),
 	})
 
 	for queryPaginator.HasMorePages() {
@@ -60,6 +67,10 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 
 		for _, item := range items {
 			records = append(records, BlockIndexRecord(item))
+
+			if len(records) >= blockIndexQueryLimit {
+				return records, nil
+			}
 		}
 	}
 
