@@ -119,6 +119,27 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, errors.Is(err, istypes.ErrKeyNotFound))
 	})
+
+	t.Run("limits results", func(t *testing.T) {
+		digest := testutil.RandomMultihash()
+		length := 100
+		for i := range blockIndexQueryLimit + 1 {
+			_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+				TableName: aws.String(tableName),
+				Item: map[string]types.AttributeValue{
+					"blockmultihash": &types.AttributeValueMemberS{Value: digestutil.Format(digest)},
+					"carpath":        &types.AttributeValueMemberS{Value: fmt.Sprintf("/%d/%s.car", i, digestutil.Format(digest))},
+					"offset":         &types.AttributeValueMemberN{Value: fmt.Sprint(i * length)},
+					"length":         &types.AttributeValueMemberN{Value: fmt.Sprint(length)},
+				},
+			})
+			require.NoError(t, err)
+		}
+		store := NewDynamoProviderBlockIndexTable(dynamoClient, tableName)
+		items, err := store.Query(ctx, digest)
+		require.NoError(t, err)
+		require.Len(t, items, blockIndexQueryLimit)
+	})
 }
 
 func createDynamo(t *testing.T) *url.URL {
