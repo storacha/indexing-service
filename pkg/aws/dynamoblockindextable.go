@@ -67,10 +67,10 @@ func (d *DynamoProviderBlockIndexTable) Query(ctx context.Context, digest multih
 
 		for _, item := range items {
 			records = append(records, BlockIndexRecord(item))
-		}
 
-		if len(records) >= blockIndexQueryLimit {
-			break
+			if len(records) >= blockIndexQueryLimit {
+				return records, nil
+			}
 		}
 	}
 
