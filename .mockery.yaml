@@ -58,7 +58,7 @@ packages:
           outpkg: "extmocks"
           filename: mock_IpniPublisher.go
           mockname: MockIpniPublisher
-  github.com/ipfs/go-log:
+  github.com/ipfs/go-log/v2:
     interfaces:
       EventLogger:
         config:
