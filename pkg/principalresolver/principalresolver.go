@@ -1,6 +1,7 @@
 package principalresolver
 
 import (
+	"context"
 	"errors"
 
 	"github.com/storacha/go-ucanto/did"
@@ -11,7 +12,7 @@ type resolver struct {
 	mapping map[did.DID]did.DID
 }
 
-func (r *resolver) ResolveDIDKey(input did.DID) (did.DID, validator.UnresolvedDID) {
+func (r *resolver) ResolveDIDKey(ctx context.Context, input did.DID) (did.DID, validator.UnresolvedDID) {
 	dk, ok := r.mapping[input]
 	if !ok {
 		return did.Undef, validator.NewDIDKeyResolutionError(input, errors.New("not found in mapping"))

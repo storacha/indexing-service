@@ -25,8 +25,8 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 	return map[ucan.Ability]server.ServiceMethod[ok.Unit]{
 		assert.EqualsAbility: server.Provide(
 			assert.Equals,
-			func(cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, fx.Effects, error) {
-				err := service.Publish(context.TODO(), inv)
+			func(ctx context.Context, cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
+				err := service.Publish(ctx, inv)
 				if err != nil {
 					log.Errorf("publishing equals claim: %w", err)
 				}
@@ -35,8 +35,8 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 		),
 		assert.IndexAbility: server.Provide(
 			assert.Index,
-			func(cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, fx.Effects, error) {
-				err := service.Publish(context.TODO(), inv)
+			func(ctx context.Context, cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
+				err := service.Publish(ctx, inv)
 				if err != nil {
 					log.Errorf("publishing index claim: %w", err)
 				}
@@ -45,7 +45,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 		),
 		claim.CacheAbility: server.Provide(
 			claim.Cache,
-			func(cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ctx server.InvocationContext) (ok.Unit, fx.Effects, error) {
+			func(ctx context.Context, cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
 				peerid, err := toPeerID(inv.Issuer())
 				if err != nil {
 					return ok.Unit{}, nil, err
@@ -71,7 +71,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 					return ok.Unit{}, nil, err
 				}
 
-				err = service.Cache(context.TODO(), provider, claim)
+				err = service.Cache(ctx, provider, claim)
 				if err != nil {
 					log.Errorf("caching claim: %w", err)
 				}

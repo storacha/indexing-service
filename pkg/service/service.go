@@ -603,7 +603,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 			return
 		}
 
-		_, err = validateLocationCommitment(dlg)
+		_, err = validateLocationCommitment(ctx, dlg)
 		if err != nil {
 			validateErr = err
 			return
@@ -626,7 +626,7 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 
 // validateLocationCommitment ensures that the delegation is a valid UCAN (signed,
 // not expired etc.) and is a location commitment.
-func validateLocationCommitment(claim delegation.Delegation) (validator.Authorization[assert.LocationCaveats], error) {
+func validateLocationCommitment(ctx context.Context, claim delegation.Delegation) (validator.Authorization[assert.LocationCaveats], error) {
 	// We use the delegation issuer as the authority, since this should be a self
 	// issued UCAN to assert location.
 	// TODO: support verifiers for other key types?
@@ -640,13 +640,13 @@ func validateLocationCommitment(claim delegation.Delegation) (validator.Authoriz
 		assert.Location,
 		validator.IsSelfIssued,
 		// TODO: plug in revocation service?
-		func(auth validator.Authorization[any]) validator.Revoked { return nil },
+		func(ctx context.Context, auth validator.Authorization[any]) validator.Revoked { return nil },
 		validator.ProofUnavailable,     // probably don't want to resolve proofs...
 		verifier.Parse,                 // TODO: support verifiers for other key types?
 		validator.FailDIDKeyResolution, // probably don't want to resolve DID methods either
 	)
 
-	auth, err := validator.Access(claim, vctx)
+	auth, err := validator.Access(ctx, claim, vctx)
 	if err != nil {
 		return nil, err
 	}

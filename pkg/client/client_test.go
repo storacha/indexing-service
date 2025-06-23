@@ -258,7 +258,7 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 			cassert.EqualsAbility,
 			ucanserver.Provide(
 				cassert.Equals,
-				func(cap ucan.Capability[cassert.EqualsCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[cassert.EqualsCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
 					notifyInvocation(inv)
 					return ok.Unit{}, nil, nil
 				},
@@ -268,7 +268,7 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 			cassert.IndexAbility,
 			ucanserver.Provide(
 				cassert.Index,
-				func(cap ucan.Capability[cassert.IndexCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[cassert.IndexCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
 					notifyInvocation(inv)
 					return ok.Unit{}, nil, nil
 				},
@@ -278,7 +278,7 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 			claim.CacheAbility,
 			ucanserver.Provide(
 				claim.Cache,
-				func(cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ctx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
 					notifyInvocation(inv)
 					return ok.Unit{}, nil, nil
 				},
