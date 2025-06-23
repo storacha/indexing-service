@@ -1,0 +1,18 @@
+{
+  "app": "indexer",
+  "privateKeyEnvVar": "",
+  "didEnvVar": "",
+  "port": 0,
+  "js": null,
+  "domainBase": "",
+  "cloudflare": false,
+  "createDB": false,
+  "caches": null,
+  "topics": null,
+  "queues": null,
+  "buckets": null,
+  "secrets": null,
+  "tables": null,
+  "networks": null,
+  "writeToContainer": false
+}

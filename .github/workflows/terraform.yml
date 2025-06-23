@@ -9,18 +9,16 @@ on:
       workspace:
         required: true
         type: string
+      network:
+        required: false
+        default: "hot"
+        type: string
       did:
         required: true
         type: string
       apply:
         required: true
         type: boolean
-      ipni-endpoint:
-        required: false
-        type: string
-      ipni-announce-urls:
-        required: false
-        type: string
     secrets:
       aws-account-id:
         required: true
@@ -28,11 +26,9 @@ on:
         required: true
       private-key:
         required: true
-      honeycomb-api-key:
-        required: false
-      sentry-dsn:
-        required: false
-
+      region:
+        required: true
+        
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.workspace }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -42,12 +38,14 @@ env:
   AWS_REGION: ${{ secrets.aws-region }}
   ENV: ${{ inputs.env }}
   TF_WORKSPACE: ${{ inputs.workspace }}
+  TF_VAR_network: ${{ inputs.network }}
   TF_VAR_private_key: ${{ secrets.private-key }}
   TF_VAR_did: ${{ inputs.did }}
-  TF_VAR_honeycomb_api_key: ${{ secrets.honeycomb-api-key }}
-  TF_VAR_sentry_dsn: ${{ secrets.sentry-dsn }}
-  TF_VAR_ipni_endpoint: ${{ inputs.ipni-endpoint }}
-  TF_VAR_ipni_announce_urls: ${{ inputs.ipni-announce-urls }}
+  TF_VAR_app: indexer
+  TF_VAR_domain_base: 
+  TF_VAR_allowed_account_id: ${{ secrets.aws-account-id }}
+  TF_VAR_region: ${{ secrets.region }}
+  DEPLOY_ENV: ci
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -55,34 +53,50 @@ permissions:
 
 jobs:
   terraform:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v3
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/terraform-ci
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
       - uses: opentofu/setup-opentofu@v1
-      - uses: actions/setup-go@v5
 
       - name: Tofu Init
         run: |
-          tofu -chdir="deploy/app" init
+          touch .tfworkspace
+          make init
+        working-directory: deploy
 
-      - name: Build Go Apps
+      - name: Build + Push Docker ECR
         run: |
-          touch .env
-          make lambdas
+          make docker-push
+        working-directory: deploy
 
       - name: Terraform Plan
         if: ${{ !inputs.apply }}
         run: |
-          tofu -chdir="deploy/app" plan
+          make plan
+        working-directory: deploy
 
       - name: Terraform Apply
         if: ${{ inputs.apply }}
         run: |
-          tofu -chdir="deploy/app" apply -input=false --auto-approve
+          make apply
+        working-directory: deploy
+
+      - name: Wait For Deployment
+        if: ${{ inputs.apply }}
+        run: |
+          make wait-deploy
+        working-directory: deploy
+      
+      
+      
+          
