@@ -20,6 +20,18 @@ variable "did" {
   type = string
 }
 
+variable "sentry_dsn" {
+  type        = string
+  description = "DSN for Sentry (get it from your Sentry project's properties). Leave unset to disable error reporting."
+  default     = ""
+}
+
+variable "sentry_environment" {
+  type        = string
+  description = "Environment name for Sentry"
+  default     = ""
+}
+
 variable "honeycomb_api_key" {
   description = "Ingestion API key to send traces to Honeycomb"
   type = string

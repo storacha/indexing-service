@@ -31,6 +31,8 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/legacy"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/remotesyncer"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -88,10 +90,11 @@ type config struct {
 	claimsCacheOpts      []redis.Option
 	indexesCacheOpts     []redis.Option
 
-	legacyClaimsMappers []providerindex.ContentToClaimsMapper
+	legacyClaimsMappers []legacy.ContentToClaimsMapper
 	legacyClaimsBucket  types.ContentClaimsStore
 	legacyClaimsUrl     string
 	httpClient          *http.Client
+	provIndexLog        logging.EventLogger
 }
 
 // DefaultHTTPClient creates a HTTP client with sensible defaults
@@ -215,7 +218,7 @@ func WithIndexesClient(client redis.Client) Option {
 }
 
 // WithLegacyClaims configures the service to find claims on legacy systems and storage
-func WithLegacyClaims(legacyClaimsMappers []providerindex.ContentToClaimsMapper, legacyClaimsBucket types.ContentClaimsStore, legacyClaimsUrl string) Option {
+func WithLegacyClaims(legacyClaimsMappers []legacy.ContentToClaimsMapper, legacyClaimsBucket types.ContentClaimsStore, legacyClaimsUrl string) Option {
 	return func(cfg *config) error {
 		cfg.legacyClaimsMappers = legacyClaimsMappers
 		cfg.legacyClaimsBucket = legacyClaimsBucket
@@ -260,6 +263,13 @@ func WithClaimsCacheOptions(opts ...redis.Option) Option {
 func WithIndexesCacheOptions(opts ...redis.Option) Option {
 	return func(cfg *config) error {
 		cfg.indexesCacheOpts = opts
+		return nil
+	}
+}
+
+func WithProviderIndexLogger(log logging.EventLogger) Option {
+	return func(cfg *config) error {
+		cfg.provIndexLog = log
 		return nil
 	}
 }
@@ -388,7 +398,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		s.startupFuncs = append(s.startupFuncs, func(ctx context.Context) error { notifier.Start(ctx); return nil })
 		s.shutdownFuncs = append(s.shutdownFuncs, func(context.Context) error { notifier.Stop(); return nil })
 		// Setup handling ipni remote sync notifications
-		notifier.Notify(providerindex.NewRemoteSyncer(providersCache, publisherStore).HandleRemoteSync)
+		notifier.Notify(remotesyncer.New(providersCache, publisherStore).HandleRemoteSync)
 	}
 
 	directAnnounceURLs := sc.IPNIDirectAnnounceURLs
@@ -421,21 +431,21 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 	// build read through fetchers
 	// TODO: add sender / publisher / linksystem
-	var legacyClaims providerindex.LegacyClaimsFinder
+	var legacyClaims legacy.ClaimsFinder
 	if len(cfg.legacyClaimsMappers) > 0 && cfg.legacyClaimsBucket != nil {
 		if !strings.Contains(cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder) {
 			return nil, fmt.Errorf("legacy claims url %s must contain the claim placeholder %s", cfg.legacyClaimsUrl, service.ClaimUrlPlaceholder)
 		}
 		legacyFinder := contentclaims.WithIdentityCids(contentclaims.WithCache(contentclaims.WithStore(contentclaims.NewNotFoundFinder(), cfg.legacyClaimsBucket), claimsCache))
-		legacyClaims, err = providerindex.NewLegacyClaimsStore(cfg.legacyClaimsMappers, legacyFinder, cfg.legacyClaimsUrl)
+		legacyClaims, err = legacy.NewClaimsStore(cfg.legacyClaimsMappers, legacyFinder, cfg.legacyClaimsUrl)
 		if err != nil {
 			return nil, fmt.Errorf("creating legacy claims store: %w", err)
 		}
 	} else {
-		legacyClaims = providerindex.NewNoResultsLegacyClaimsFinder()
+		legacyClaims = legacy.NewNoResultsClaimsFinder()
 	}
 
-	providerIndex := providerindex.New(providersCache, noProvidersCache, findClient, publisher, legacyClaims)
+	providerIndex := providerindex.New(providersCache, noProvidersCache, findClient, publisher, legacyClaims, providerindex.WithLogger(cfg.provIndexLog))
 
 	claimsStore := cfg.claimsStore
 	if claimsStore == nil {

@@ -16,6 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.59.3
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/benbjohnson/clock v1.3.5
+	github.com/getsentry/sentry-go v0.33.0
 	github.com/google/uuid v1.6.0
 	github.com/ipfs/go-cid v0.5.0
 	github.com/ipfs/go-datastore v0.8.2

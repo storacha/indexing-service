@@ -30,6 +30,8 @@ on:
         required: true
       honeycomb-api-key:
         required: false
+      sentry-dsn:
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.workspace }}-${{ github.event.pull_request.number || github.ref }}
@@ -43,6 +45,7 @@ env:
   TF_VAR_private_key: ${{ secrets.private-key }}
   TF_VAR_did: ${{ inputs.did }}
   TF_VAR_honeycomb_api_key: ${{ secrets.honeycomb-api-key }}
+  TF_VAR_sentry_dsn: ${{ secrets.sentry-dsn }}
   TF_VAR_ipni_endpoint: ${{ inputs.ipni-endpoint }}
   TF_VAR_ipni_announce_urls: ${{ inputs.ipni-announce-urls }}
 
