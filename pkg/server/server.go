@@ -25,6 +25,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var log = logging.Logger("server")
@@ -32,6 +33,7 @@ var log = logging.Logger("server")
 type config struct {
 	id                   principal.Signer
 	contentClaimsOptions []server.Option
+	enableTelemetry      bool
 }
 
 type Option func(*config)
@@ -46,6 +48,12 @@ func WithIdentity(s principal.Signer) Option {
 func WithContentClaimsOptions(options ...server.Option) Option {
 	return func(c *config) {
 		c.contentClaimsOptions = options
+	}
+}
+
+func WithTelemetry() Option {
+	return func(c *config) {
+		c.enableTelemetry = true
 	}
 }
 
@@ -86,12 +94,21 @@ func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", GetRootHandler(c.id))
-	mux.HandleFunc("GET /claim/{claim}", GetClaimHandler(indexer))
-	mux.HandleFunc("POST /claims", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...))
-	mux.HandleFunc("GET /claims", GetClaimsHandler(indexer))
-	mux.HandleFunc("GET /.well-known/did.json", GetDIDDocument(c.id))
+	maybeInstrumentAndAdd(mux, "GET /", GetRootHandler(c.id), c.enableTelemetry)
+	maybeInstrumentAndAdd(mux, "GET /claim/{claim}", GetClaimHandler(indexer), c.enableTelemetry)
+	maybeInstrumentAndAdd(mux, "POST /claims", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...), c.enableTelemetry)
+	maybeInstrumentAndAdd(mux, "GET /claims", GetClaimsHandler(indexer), c.enableTelemetry)
+	maybeInstrumentAndAdd(mux, "GET /.well-known/did.json", GetDIDDocument(c.id), c.enableTelemetry)
+
 	return mux
+}
+
+func maybeInstrumentAndAdd(mux *http.ServeMux, route string, handler http.HandlerFunc, enableTelemetry bool) {
+	if enableTelemetry {
+		mux.Handle(route, otelhttp.NewHandler(handler, route, otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents)))
+	} else {
+		mux.HandleFunc(route, handler)
+	}
 }
 
 // GetRootHandler displays version info when a GET request is sent to "/".
