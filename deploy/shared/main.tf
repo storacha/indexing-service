@@ -35,10 +35,10 @@ provider "aws" {
 module "shared" {
   source = "github.com/storacha/storoku//shared?ref=v0.2.44"
   create_db = false
-  caches = []
-  networks = []
+  caches = ["providers","no-providers","indexes","claims",]
+  networks = ["warm",]
   app = var.app
-  zone_id = ""
+  zone_id = var.cloudflare_zone_id
   domain_base = var.domain_base
-  setup_cloudflare = false
+  setup_cloudflare = true
 }
