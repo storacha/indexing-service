@@ -13,3 +13,7 @@ variable "domain_base" {
   default = ""
 }
 
+
+variable "cloudflare_zone_id" {
+  type = string
+}

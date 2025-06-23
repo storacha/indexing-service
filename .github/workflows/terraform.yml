@@ -28,6 +28,10 @@ on:
         required: true
       region:
         required: true
+      cloudflare-zone-id:
+        required: true
+      cloudflare-api-token:
+        required: true
         
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.workspace }}-${{ github.event.pull_request.number || github.ref }}
@@ -45,6 +49,8 @@ env:
   TF_VAR_domain_base: 
   TF_VAR_allowed_account_id: ${{ secrets.aws-account-id }}
   TF_VAR_region: ${{ secrets.region }}
+  TF_VAR_cloudflare_zone_id: ${{ secrets.cloudflare-zone-id }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.cloudflare-api-token }}
   DEPLOY_ENV: ci
 
 permissions:

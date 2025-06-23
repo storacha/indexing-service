@@ -41,6 +41,8 @@ jobs:
       aws-region: ${{ secrets.STAGING_AWS_REGION }}
       region: ${{ secrets.STAGING_AWS_REGION }}
       private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
 
   # apply prod on successful release, plan otherwise
   production:
@@ -59,4 +61,6 @@ jobs:
       aws-region: ${{ secrets.PROD_AWS_REGION }}
       region: ${{ secrets.PROD_AWS_REGION }}
       private-key: ${{ secrets.PROD_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}
       

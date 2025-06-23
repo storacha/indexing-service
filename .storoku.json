@@ -2,17 +2,77 @@
   "app": "indexer",
   "privateKeyEnvVar": "",
   "didEnvVar": "",
-  "port": 0,
+  "port": 8080,
   "js": null,
   "domainBase": "",
-  "cloudflare": false,
+  "cloudflare": true,
   "createDB": false,
-  "caches": null,
+  "caches": [
+    "providers",
+    "no-providers",
+    "indexes",
+    "claims"
+  ],
   "topics": null,
-  "queues": null,
-  "buckets": null,
+  "queues": [
+    {
+      "name": "provider-caching",
+      "fifo": false
+    }
+  ],
+  "buckets": [
+    {
+      "name": "provider-caching",
+      "public": false
+    },
+    {
+      "name": "ipni-store",
+      "public": true
+    },
+    {
+      "name": "notifier-head",
+      "public": false
+    },
+    {
+      "name": "claim-store",
+      "public": false
+    }
+  ],
   "secrets": null,
-  "tables": null,
-  "networks": null,
+  "tables": [
+    {
+      "name": "metadata",
+      "attributes": [
+        {
+          "name": "provider",
+          "type": "S"
+        },
+        {
+          "name": "contextID",
+          "type": "B"
+        }
+      ],
+      "hashKey": "provider",
+      "rangeKey": "contextID"
+    },
+    {
+      "name": "chunk-links",
+      "attributes": [
+        {
+          "name": "provider",
+          "type": "S"
+        },
+        {
+          "name": "contextID",
+          "type": "B"
+        }
+      ],
+      "hashKey": "provider",
+      "rangeKey": "contextID"
+    }
+  ],
+  "networks": [
+    "warm"
+  ],
   "writeToContainer": false
 }

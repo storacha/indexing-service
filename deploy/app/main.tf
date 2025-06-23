@@ -43,6 +43,7 @@ provider "aws" {
 module "app" {
   source = "github.com/storacha/storoku//app?ref=v0.2.44"
   private_key = var.private_key
+  httpport = 8080
   principal_mapping = var.principal_mapping
   did = var.did
   app = var.app
@@ -61,12 +62,67 @@ module "app" {
   secrets = { 
   }
   # enter any sqs queues you want to create here
-  queues = []
-  caches = []
+  queues = [
+    {
+      name = "provider-caching"
+      fifo = false
+    },
+  ]
+  caches = ["providers","no-providers","indexes","claims",]
   topics = []
   tables = [
+    {
+      name = "metadata"
+      attributes = [
+        {
+          name = "provider"
+          type = "S"
+        },
+        {
+          name = "contextID"
+          type = "B"
+        },
+      ]
+      hash_key = "provider"
+      range_key ="contextID"
+    },
+    {
+      name = "chunk-links"
+      attributes = [
+        {
+          name = "provider"
+          type = "S"
+        },
+        {
+          name = "contextID"
+          type = "B"
+        },
+      ]
+      hash_key = "provider"
+      range_key ="contextID"
+    },
   ]
-  buckets = []
+  buckets = [
+    {
+      name = "provider-caching"
+      public = false
+    },
+  
+    {
+      name = "ipni-store"
+      public = true
+    },
+  
+    {
+      name = "notifier-head"
+      public = false
+    },
+  
+    {
+      name = "claim-store"
+      public = false
+    },
+  ]
   providers = {
     aws = aws
     aws.acm = aws.acm
