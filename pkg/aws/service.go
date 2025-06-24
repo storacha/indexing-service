@@ -75,7 +75,7 @@ type Config struct {
 	NoProvidersCacheExpirationSeconds int64
 	ClaimsCacheExpirationSeconds      int64
 	IndexesCacheExpirationSeconds     int64
-	SQSCachingQueueURL                string
+	SQSCachingQueueID                 string
 	CachingBucket                     string
 	ChunkLinksTableName               string
 	MetadataTableName                 string
@@ -183,37 +183,37 @@ func FromEnv(ctx context.Context) Config {
 			PrivateKey: cryptoPrivKey,
 			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
 			ProvidersRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("PROVIDERS_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("PROVIDERS_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("PROVIDERS_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
 			NoProviderRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("NO_PROVIDERS_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("NO-PROVIDERS_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("NO_PROVIDERS_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("NO-PROVIDERS_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
 			ClaimsRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("CLAIMS_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("CLAIMS_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("CLAIMS_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("CLAIMS_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
 			IndexesRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("INDEXES_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("INDEXES_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("INDEXES_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("INDEXES_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
@@ -223,19 +223,19 @@ func FromEnv(ctx context.Context) Config {
 			IPNIDirectAnnounceURLs: ipniPublisherDirectAnnounceURLs,
 		},
 		ProvidersCacheExpirationSeconds:   mustGetInt("PROVIDERS_CACHE_EXPIRATION_SECONDS"),
-		NoProvidersCacheExpirationSeconds: mustGetInt("NO_PROVIDERS_CACHE_EXPIRATION_SECONDS"),
+		NoProvidersCacheExpirationSeconds: mustGetInt("NO-PROVIDERS_CACHE_EXPIRATION_SECONDS"),
 		ClaimsCacheExpirationSeconds:      mustGetInt("CLAIMS_CACHE_EXPIRATION_SECONDS"),
 		IndexesCacheExpirationSeconds:     mustGetInt("INDEXES_CACHE_EXPIRATION_SECONDS"),
-		SQSCachingQueueURL:                mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
-		CachingBucket:                     mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
-		ChunkLinksTableName:               mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
-		MetadataTableName:                 mustGetEnv("METADATA_TABLE_NAME"),
-		IPNIStoreBucket:                   mustGetEnv("IPNI_STORE_BUCKET_NAME"),
+		SQSCachingQueueID:                 mustGetEnv("PROVIDER-CACHING_QUEUE_ID"),
+		CachingBucket:                     mustGetEnv("PROVIDER-CACHING_BUCKET_NAME"),
+		ChunkLinksTableName:               mustGetEnv("CHUNK-LINKS_TABLE_ID"),
+		MetadataTableName:                 mustGetEnv("METADATA_TABLE_ID"),
+		IPNIStoreBucket:                   mustGetEnv("IPNI-STORE_BUCKET_NAME"),
 		IPNIStorePrefix:                   ipniStoreKeyPrefix,
-		NotifierHeadBucket:                mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
+		NotifierHeadBucket:                mustGetEnv("NOTIFIER-HEAD_BUCKET_NAME"),
 		NotifierTopicArn:                  mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
-		ClaimStoreBucket:                  mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
-		ClaimStorePrefix:                  os.Getenv("CLAIM_STORE_KEY_REFIX"),
+		ClaimStoreBucket:                  mustGetEnv("CLAIM-STORE_BUCKET_NAME"),
+		ClaimStorePrefix:                  os.Getenv("CLAIM_STORE_KEY_PREFIX"),
 		LegacyClaimsTableName:             mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
 		LegacyClaimsTableRegion:           mustGetEnv("LEGACY_CLAIMS_TABLE_REGION"),
 		LegacyClaimsBucket:                mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
@@ -269,7 +269,7 @@ func Construct(cfg Config) (types.Service, error) {
 		indexesClient = telemetry.InstrumentRedisClient(indexesClient)
 	}
 
-	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
+	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueID, cfg.CachingBucket)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
