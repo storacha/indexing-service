@@ -8,30 +8,19 @@ on:
       - main
   pull_request:
     branches: [main]
+  workflow_run:
+    workflows: [Releaser]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    if: ${{ github.ref == 'refs/heads/main' }}
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-    steps:
-      - name: Release Please
-        uses: googleapis/release-please-action@v4
-        id: release
-        with:
-          release-type: node
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
+permissions:
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
 
+jobs:
   # apply staging on pushes to main, plan otherwise
   staging:
-    permissions:
-      id-token: write # This is required for requesting the JWT
-      contents: read # This is required for actions/checkout
     uses: ./.github/workflows/terraform.yml
     with:
       env: staging
@@ -49,6 +38,25 @@ jobs:
       cloudflare-api-token: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
       honeycomb-api-key: ${{ secrets.STAGING_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.STAGING_SENTRY_DSN }}
+
+  warm-staging:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      env: warm-staging
+      workspace: warm-staging
+      did: did:web:staging.indexer.warm.storacha.network
+      ipni-endpoint: ${{ vars.WARM_STAGING_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.WARM_STAGING_IPNI_ANNOUNCE_URLS }}
+      apply: ${{ github.event_name != 'pull_request' }}
+    secrets:
+      aws-account-id: ${{ secrets.WARM_STAGING_AWS_ACCOUNT_ID }}
+      aws-region: ${{ secrets.WARM_STAGING_AWS_REGION }}
+      region: ${{ secrets.WARM_STAGING_AWS_REGION }}
+      private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.WARM_STAGING_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
+      honeycomb-api-key: ${{ secrets.WARM_STAGING_HONEYCOMB_API_KEY }}
+      sentry-dsn: ${{ secrets.WARM_STAGING_SENTRY_DSN }}
 
   # apply prod on successful release, plan otherwise
   production:
