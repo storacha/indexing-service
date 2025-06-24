@@ -1,3 +1,5 @@
+# storoku:ignore
+
 name: Deploy
 
 on:
@@ -35,6 +37,8 @@ jobs:
       env: staging
       workspace: staging
       did: did:web:staging.indexer.storacha.network
+      ipni-endpoint: ${{ vars.STAGING_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.STAGING_IPNI_ANNOUNCE_URLS }}
       apply: ${{ github.event_name != 'pull_request' }}
     secrets:
       aws-account-id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
@@ -43,6 +47,8 @@ jobs:
       private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
       cloudflare-zone-id: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+      honeycomb-api-key: ${{ secrets.STAGING_HONEYCOMB_API_KEY }}
+      sentry-dsn: ${{ secrets.STAGING_SENTRY_DSN }}
 
   # apply prod on successful release, plan otherwise
   production:
@@ -55,6 +61,8 @@ jobs:
       env: production
       workspace: prod
       did: did:web:indexer.storacha.network
+      ipni-endpoint: ${{ vars.PROD_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.PROD_IPNI_ANNOUNCE_URLS }}
       apply: ${{ needs.release.outputs.release_created == 'true' }}
     secrets:
       aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
@@ -63,4 +71,5 @@ jobs:
       private-key: ${{ secrets.PROD_PRIVATE_KEY }}
       cloudflare-zone-id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}
-      
+      honeycomb-api-key: ${{ secrets.PROD_HONEYCOMB_API_KEY }}
+      sentry-dsn: ${{ secrets.PROD_SENTRY_DSN }}

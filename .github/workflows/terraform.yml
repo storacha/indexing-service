@@ -1,3 +1,5 @@
+# storoku:ignore
+
 name: Terraform
 
 on:
@@ -16,6 +18,12 @@ on:
       did:
         required: true
         type: string
+      ipni-endpoint:
+        required: false
+        type: string
+      ipni-announce-urls:
+        required: false
+        type: string
       apply:
         required: true
         type: boolean
@@ -32,7 +40,11 @@ on:
         required: true
       cloudflare-api-token:
         required: true
-        
+      honeycomb-api-key:
+        required: false
+      sentry-dsn:
+        required: false
+
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.workspace }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -43,14 +55,18 @@ env:
   ENV: ${{ inputs.env }}
   TF_WORKSPACE: ${{ inputs.workspace }}
   TF_VAR_network: ${{ inputs.network }}
-  TF_VAR_private_key: ${{ secrets.private-key }}
-  TF_VAR_did: ${{ inputs.did }}
   TF_VAR_app: indexer
+  TF_VAR_did: ${{ inputs.did }}
+  TF_VAR_private_key: ${{ secrets.private-key }}
   TF_VAR_domain_base: 
   TF_VAR_allowed_account_id: ${{ secrets.aws-account-id }}
   TF_VAR_region: ${{ secrets.region }}
   TF_VAR_cloudflare_zone_id: ${{ secrets.cloudflare-zone-id }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.cloudflare-api-token }}
+  IPNI_ENDPOINT: ${{ inputs.ipni-endpoint }}
+  IPNI_ANNOUNCE_URLS: ${{ inputs.ipni-announce-urls }}
+  HONEYCOMB_API_KEY: ${{ secrets.honeycomb-api-key }}
+  SENTRY_DSN: ${{ secrets.sentry-dsn }}
   DEPLOY_ENV: ci
 
 permissions:

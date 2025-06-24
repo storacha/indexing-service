@@ -112,7 +112,7 @@ func setupIPNIPipeline(cfg aws.Config) (*notifier.Notifier, error) {
 }
 
 func setupProviderCacher(cfg aws.Config) (*providercacher.CachingQueuePoller, error) {
-	cachingQueue := aws.NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
+	cachingQueue := aws.NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueID, cfg.CachingBucket)
 
 	providersRedis := goredis.NewClusterClient(&cfg.ProvidersRedis)
 	if cfg.HoneycombAPIKey != "" {
