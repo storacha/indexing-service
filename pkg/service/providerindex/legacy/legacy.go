@@ -57,7 +57,7 @@ type config struct {
 	log logging.EventLogger
 }
 
-// Option configures the RemoteSyncer.
+// Option configures the ClaimsStore.
 type Option func(conf *config)
 
 // WithLogger configures the service to use the passed logger instead of the
