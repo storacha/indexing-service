@@ -66,6 +66,7 @@ module "app" {
     {
       name = "provider-caching"
       fifo = false
+      message_retention_seconds = 86400
     },
   ]
   caches = ["providers","no-providers","indexes","claims",]
