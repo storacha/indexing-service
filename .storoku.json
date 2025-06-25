@@ -17,7 +17,8 @@
   "queues": [
     {
       "name": "provider-caching",
-      "fifo": false
+      "fifo": false,
+      "messageRetentionSeconds": 86400
     }
   ],
   "buckets": [
