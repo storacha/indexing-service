@@ -13,7 +13,7 @@ import (
 	"github.com/storacha/indexing-service/cmd/lambda"
 	"github.com/storacha/indexing-service/pkg/aws"
 	"github.com/storacha/indexing-service/pkg/redis"
-	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/remotesyncer"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 )
 
@@ -31,7 +31,7 @@ func makeHandler(cfg aws.Config) any {
 	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
-	remoteSyncer := providerindex.NewRemoteSyncer(providerStore, publisherStore)
+	remoteSyncer := remotesyncer.New(providerStore, publisherStore)
 
 	return func(ctx context.Context, snsEvent events.SNSEvent) error {
 		for _, record := range snsEvent.Records {

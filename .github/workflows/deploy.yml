@@ -39,6 +39,7 @@ jobs:
       aws-region: ${{ secrets.STAGING_AWS_REGION }}
       private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
       honeycomb-api-key: ${{ secrets.STAGING_HONEYCOMB_API_KEY }}
+      sentry-dsn: ${{ secrets.STAGING_SENTRY_DSN }}
 
   warm-staging:
     uses: ./.github/workflows/terraform.yml
@@ -54,6 +55,7 @@ jobs:
       aws-region: ${{ secrets.WARM_STAGING_AWS_REGION }}
       private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
       honeycomb-api-key: ${{ secrets.WARM_STAGING_HONEYCOMB_API_KEY }}
+      sentry-dsn: ${{ secrets.WARM_STAGING_SENTRY_DSN }}
 
   # apply prod on successful release, plan otherwise
   production:
@@ -70,3 +72,4 @@ jobs:
       aws-region: ${{ secrets.PROD_AWS_REGION }}
       private-key: ${{ secrets.PROD_PRIVATE_KEY }}
       honeycomb-api-key: ${{ secrets.PROD_HONEYCOMB_API_KEY }}
+      sentry-dsn: ${{ secrets.PROD_SENTRY_DSN }}
