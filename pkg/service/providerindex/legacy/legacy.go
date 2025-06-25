@@ -103,9 +103,9 @@ func NewClaimsStore(contentToClaimsMappers []ContentToClaimsMapper, claimStore c
 // Find will look for relevant claims (as indicated by targetClaims) in content-to-claims mappers in the order they
 // were specified when this LegacyClaimsStore was created (see NewLegacyClaimsStore). As soon as a mapper returns
 // relevant claims, these will be returned and no more mappers will be checked.
-func (ls ClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
-	for _, mapper := range ls.mappers {
-		results, err := ls.findInMapper(ctx, contentHash, targetClaims, mapper)
+func (cs ClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
+	for _, mapper := range cs.mappers {
+		results, err := cs.findInMapper(ctx, contentHash, targetClaims, mapper)
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func (ls ClaimsStore) Find(ctx context.Context, contentHash multihash.Multihash,
 	return []model.ProviderResult{}, nil
 }
 
-func (ls ClaimsStore) findInMapper(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code, mapper ContentToClaimsMapper) ([]model.ProviderResult, error) {
+func (cs ClaimsStore) findInMapper(ctx context.Context, contentHash multihash.Multihash, targetClaims []multicodec.Code, mapper ContentToClaimsMapper) ([]model.ProviderResult, error) {
 	claimsCids, err := mapper.GetClaims(ctx, contentHash)
 	if err != nil {
 		if errors.Is(err, types.ErrKeyNotFound) {
@@ -131,7 +131,7 @@ func (ls ClaimsStore) findInMapper(ctx context.Context, contentHash multihash.Mu
 	results := []model.ProviderResult{}
 
 	for _, claimCid := range claimsCids {
-		claim, err := ls.claimsStore.Find(ctx, cidlink.Link{Cid: claimCid}, &url.URL{})
+		claim, err := cs.claimsStore.Find(ctx, cidlink.Link{Cid: claimCid}, &url.URL{})
 		if err != nil {
 			if errors.Is(err, types.ErrKeyNotFound) {
 				continue
@@ -140,10 +140,10 @@ func (ls ClaimsStore) findInMapper(ctx context.Context, contentHash multihash.Mu
 			return nil, err
 		}
 
-		pr, err := ls.synthetizeProviderResult(claimCid, claim, targetClaims)
+		pr, err := cs.synthetizeProviderResult(claimCid, claim, targetClaims)
 		if err != nil {
 			if !errors.Is(err, ErrIgnoreFiltered) {
-				ls.log.Warnf("error synthetizing provider result for claim %s: %s", claimCid, err)
+				cs.log.Warnf("error synthetizing provider result for claim %s: %s", claimCid, err)
 			}
 			continue
 		}
@@ -155,7 +155,7 @@ func (ls ClaimsStore) findInMapper(ctx context.Context, contentHash multihash.Mu
 }
 
 // synthetizeProviderResult synthetizes a provider result, including metadata, from a given claim
-func (ls ClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegation.Delegation, targetClaims []multicodec.Code) (model.ProviderResult, error) {
+func (cs ClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegation.Delegation, targetClaims []multicodec.Code) (model.ProviderResult, error) {
 	expiration := int64(0)
 	if claim.Expiration() != nil {
 		expiration = int64(*claim.Expiration())
@@ -175,7 +175,7 @@ func (ls ClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegatio
 		if err != nil {
 			return model.ProviderResult{}, err
 		}
-		return ls.synthetizeLocationProviderResult(caveats, claimCid, expiration)
+		return cs.synthetizeLocationProviderResult(caveats, claimCid, expiration)
 
 	case assert.IndexAbility:
 		if !slices.Contains(targetClaims, metadata.IndexClaimID) {
@@ -185,7 +185,7 @@ func (ls ClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegatio
 		if err != nil {
 			return model.ProviderResult{}, err
 		}
-		return ls.synthetizeIndexProviderResult(caveats, claimCid, expiration)
+		return cs.synthetizeIndexProviderResult(caveats, claimCid, expiration)
 
 	case assert.EqualsAbility:
 		if !slices.Contains(targetClaims, metadata.EqualsClaimID) {
@@ -195,14 +195,14 @@ func (ls ClaimsStore) synthetizeProviderResult(claimCid cid.Cid, claim delegatio
 		if err != nil {
 			return model.ProviderResult{}, err
 		}
-		return ls.synthetizeEqualsProviderResult(caveats, claimCid, expiration)
+		return cs.synthetizeEqualsProviderResult(caveats, claimCid, expiration)
 
 	default:
 		return model.ProviderResult{}, fmt.Errorf("unsupported capability: %s", cap.Can())
 	}
 }
 
-func (ls ClaimsStore) synthetizeLocationProviderResult(caveats assert.LocationCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
+func (cs ClaimsStore) synthetizeLocationProviderResult(caveats assert.LocationCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
 	var encodedCtxID types.EncodedContextID
 	if caveats.Space != did.Undef {
 		spaceDid := caveats.Space
@@ -257,7 +257,7 @@ func (ls ClaimsStore) synthetizeLocationProviderResult(caveats assert.LocationCa
 	}
 
 	// the URL to fetch claims from is also needed
-	providerAddrs = append(providerAddrs, ls.claimsAddr)
+	providerAddrs = append(providerAddrs, cs.claimsAddr)
 
 	providerAddrInfo := &peer.AddrInfo{
 		ID:    ProviderID,
@@ -271,7 +271,7 @@ func (ls ClaimsStore) synthetizeLocationProviderResult(caveats assert.LocationCa
 	}, nil
 }
 
-func (ls ClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
+func (cs ClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
 	indexCid := link.ToCID(caveats.Index)
 	contextID := []byte(caveats.Index.Binary())
 
@@ -288,7 +288,7 @@ func (ls ClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCaveats,
 	// the index claim is fetchable from the legacy claims store
 	providerAddrInfo := &peer.AddrInfo{
 		ID:    ProviderID,
-		Addrs: []ma.Multiaddr{ls.claimsAddr},
+		Addrs: []ma.Multiaddr{cs.claimsAddr},
 	}
 
 	return model.ProviderResult{
@@ -298,7 +298,7 @@ func (ls ClaimsStore) synthetizeIndexProviderResult(caveats assert.IndexCaveats,
 	}, nil
 }
 
-func (ls ClaimsStore) synthetizeEqualsProviderResult(caveats assert.EqualsCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
+func (cs ClaimsStore) synthetizeEqualsProviderResult(caveats assert.EqualsCaveats, claimCid cid.Cid, expiration int64) (model.ProviderResult, error) {
 	equalsCid := link.ToCID(caveats.Equals)
 	contextID := caveats.Content.Hash()
 
@@ -315,7 +315,7 @@ func (ls ClaimsStore) synthetizeEqualsProviderResult(caveats assert.EqualsCaveat
 	// the equals claim is fetchable from the legacy claims store
 	providerAddrInfo := &peer.AddrInfo{
 		ID:    ProviderID,
-		Addrs: []ma.Multiaddr{ls.claimsAddr},
+		Addrs: []ma.Multiaddr{cs.claimsAddr},
 	}
 
 	return model.ProviderResult{
