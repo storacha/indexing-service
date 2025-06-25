@@ -130,7 +130,7 @@ resource "aws_lambda_function" "lambda" {
         HONEYCOMB_OTLP_ENDPOINT = "api.honeycomb.io:443"
         HONEYCOMB_API_KEY = "${var.honeycomb_api_key}"
         SENTRY_DSN = var.sentry_dsn
-        SENTRY_ENVIRONMENT = var.sentry_environment == "" ? terraform.workspace : var.sentry_environment
+        SENTRY_ENVIRONMENT = var.sentry_environment != "" ? var.sentry_environment : terraform.workspace
         PRINCIPAL_MAPPING = var.principal_mapping
         BASE_TRACE_SAMPLE_RATIO = local.is_production ? "0.0001" : "1.0"
     }
