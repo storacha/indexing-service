@@ -2,7 +2,6 @@ package providercacher
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -80,7 +79,7 @@ func (p *CachingQueuePoller) Start() {
 				close(p.stopped)
 				return
 			case <-ticker.C:
-				p.pollJobs()
+				p.processJobs()
 			}
 		}
 	}()
@@ -98,50 +97,62 @@ func (p *CachingQueuePoller) Stop() {
 	<-p.stopped
 }
 
-// pollJobs reads and processes a batch of caching jobs from the queue
-func (p *CachingQueuePoller) pollJobs() {
+// processJobs reads and processes all available jobs from the queue in batches
+func (p *CachingQueuePoller) processJobs() {
 	ctx := context.Background()
-
-	// Read a batch of jobs
-	jobs, err := p.queue.ReadJobs(ctx, p.jobBatchSize)
-	if err != nil {
-		return
-	}
-
-	if len(jobs) == 0 {
-		// No new jobs this time, will retry on next interval
-		return
-	}
-
-	// process jobs in parallel
-	errs := make(chan error, len(jobs))
 	var wg sync.WaitGroup
-	for _, job := range jobs {
+
+	// Keep processing batches until the queue is empty
+	for {
+		// Read a batch of jobs
+		jobs, err := p.queue.ReadJobs(ctx, p.jobBatchSize)
+		if err != nil {
+			log.Errorf("Error reading jobs from queue: %v", err)
+			break
+		}
+
+		if len(jobs) == 0 {
+			// No more jobs in the queue
+			break
+		}
+
+		log.Debugf("Processing batch of %d jobs", len(jobs))
+
+		// Process this batch in a new goroutine
 		wg.Add(1)
-		go func(job ProviderCachingJob) {
+		go func(batch []ProviderCachingJob) {
 			defer wg.Done()
-			err := p.cacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
-			if err != nil {
-				errs <- err
+			p.processBatch(ctx, batch)
+		}(jobs)
+	}
+
+	// Wait for all batches to complete
+	wg.Wait()
+}
+
+// processBatch processes a single batch of jobs in parallel
+func (p *CachingQueuePoller) processBatch(ctx context.Context, batch []ProviderCachingJob) {
+	var wg sync.WaitGroup
+
+	// Process each job in the batch in parallel
+	for _, job := range batch {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Process the job
+			if err := p.cacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index); err != nil {
+				log.Errorf("Failed to cache provider %s: %v", job.Provider, err)
 				return
 			}
 
 			// Delete the job if processing was successful
 			if err := p.queue.DeleteJob(ctx, job.ID); err != nil {
-				errs <- err
-				return
+				log.Errorf("Failed to delete job %s: %v", job.ID, err)
 			}
-		}(job)
+		}()
 	}
+
+	// Wait for all jobs in this batch to complete
 	wg.Wait()
-
-	// collect errors
-	close(errs)
-	for e := range errs {
-		err = errors.Join(err, e)
-	}
-
-	if err != nil {
-		log.Errorf("Failed to process messages: %v", err)
-	}
 }
