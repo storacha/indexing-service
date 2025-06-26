@@ -11,6 +11,8 @@ import (
 const (
 	defaultPollInterval = 5 * time.Second
 	defaultJobBatchSize = 10
+
+	maxParallelBatches = 100
 )
 
 var log = logging.Logger("service/providercacher")
@@ -101,9 +103,13 @@ func (p *CachingQueuePoller) Stop() {
 func (p *CachingQueuePoller) processJobs() {
 	ctx := context.Background()
 	var wg sync.WaitGroup
+	maxGoroutines := make(chan struct{}, maxParallelBatches) // Semaphore to limit concurrent batches
 
 	// Keep processing batches until the queue is empty
 	for {
+		// Acquire semaphore before reading to prevent reading when at max concurrency
+		maxGoroutines <- struct{}{}
+
 		// Read a batch of jobs
 		jobs, err := p.queue.ReadJobs(ctx, p.jobBatchSize)
 		if err != nil {
@@ -121,7 +127,12 @@ func (p *CachingQueuePoller) processJobs() {
 		// Process this batch in a new goroutine
 		wg.Add(1)
 		go func(batch []ProviderCachingJob) {
-			defer wg.Done()
+			defer func() {
+				// Release semaphore when done
+				<-maxGoroutines
+				wg.Done()
+			}()
+
 			p.processBatch(ctx, batch)
 		}(jobs)
 	}
