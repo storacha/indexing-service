@@ -82,16 +82,17 @@ func (p *CachingQueuePoller) Start() {
 
 	// Start the polling loop in a goroutine
 	go func() {
-		ticker := time.NewTicker(p.interval)
+		timer := time.NewTimer(p.interval)
 
 		for {
 			select {
+			case <-timer.C:
+				p.processJobs()
+				timer.Reset(p.interval)
 			case <-p.done:
 				log.Info("Stopping caching queue poller")
 				close(p.stopped)
 				return
-			case <-ticker.C:
-				p.processJobs()
 			}
 		}
 	}()
