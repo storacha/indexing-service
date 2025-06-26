@@ -30,6 +30,8 @@ type CachingQueuePoller struct {
 	done chan struct{}
 	// Channel to confirm the poller has stopped
 	stopped chan struct{}
+	// Ensures the poller is started only once
+	startOnce sync.Once
 }
 
 // Option configures the CachingQueuePoller
@@ -78,36 +80,38 @@ func NewCachingQueuePoller(queue CachingQueue, cacher ProviderCacher, opts ...Op
 
 // Start begins polling the queue for caching jobs.
 func (p *CachingQueuePoller) Start() {
-	log.Info("Starting caching queue poller")
+	p.startOnce.Do(func() {
+		log.Info("Starting caching queue poller")
+		go func() {
+			timer := time.NewTimer(p.interval)
 
-	// Start the polling loop in a goroutine
-	go func() {
-		timer := time.NewTimer(p.interval)
-
-		for {
-			select {
-			case <-timer.C:
-				p.processJobs()
-				timer.Reset(p.interval)
-			case <-p.done:
-				log.Info("Stopping caching queue poller")
-				close(p.stopped)
-				return
+			for {
+				select {
+				case <-timer.C:
+					p.processJobs()
+					timer.Reset(p.interval)
+				case <-p.done:
+					log.Info("Stopping caching queue poller")
+					close(p.stopped)
+					return
+				}
 			}
-		}
-	}()
+		}()
+	})
 }
 
-// Stop gracefully shuts down the poller.
+// Stop stops the polling loop and waits for it to finish.
 func (p *CachingQueuePoller) Stop() {
-	if p.done == nil {
+	select {
+	case <-p.done:
+		// Already stopped
 		return
+	default:
+		// Signal the poller to stop
+		close(p.done)
+		// Wait for the poller to stop
+		<-p.stopped
 	}
-
-	// Signal the poller to stop
-	close(p.done)
-	// Wait for the poller to stop
-	<-p.stopped
 }
 
 // processJobs reads and processes all available jobs from the queue in batches
