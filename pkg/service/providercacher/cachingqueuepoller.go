@@ -11,7 +11,7 @@ import (
 
 const (
 	defaultPollInterval = 5 * time.Second
-	maxJobBatchSize     = 10
+	defaultJobBatchSize = 10
 )
 
 var log = logging.Logger("service/providercacher")
@@ -19,10 +19,10 @@ var log = logging.Logger("service/providercacher")
 // CachingQueuePoller polls a queue for provider caching jobs and processes them
 // using the provided ProviderCacher and SQSCachingDecoder.
 type CachingQueuePoller struct {
-	queue           CachingQueue
-	cacher          ProviderCacher
-	interval        time.Duration
-	maxJobBatchSize int
+	queue        CachingQueue
+	cacher       ProviderCacher
+	interval     time.Duration
+	jobBatchSize int
 	// Channel to signal the poller to stop
 	done chan struct{}
 	// Channel to confirm the poller has stopped
@@ -42,19 +42,19 @@ func WithPollInterval(interval time.Duration) Option {
 // WithJobBatchSize sets the maximum number of jobs to process in a batch
 func WithJobBatchSize(size int) Option {
 	return func(p *CachingQueuePoller) {
-		p.maxJobBatchSize = size
+		p.jobBatchSize = size
 	}
 }
 
 // NewCachingQueuePoller creates a new CachingQueuePoller instance.
 func NewCachingQueuePoller(queue CachingQueue, cacher ProviderCacher, opts ...Option) *CachingQueuePoller {
 	poller := &CachingQueuePoller{
-		queue:           queue,
-		cacher:          cacher,
-		interval:        defaultPollInterval,
-		maxJobBatchSize: maxJobBatchSize,
-		done:            make(chan struct{}),
-		stopped:         make(chan struct{}),
+		queue:        queue,
+		cacher:       cacher,
+		interval:     defaultPollInterval,
+		jobBatchSize: defaultJobBatchSize,
+		done:         make(chan struct{}),
+		stopped:      make(chan struct{}),
 	}
 
 	// Apply options
@@ -103,7 +103,7 @@ func (p *CachingQueuePoller) pollJobs() {
 	ctx := context.Background()
 
 	// Read a batch of jobs
-	jobs, err := p.queue.ReadJobs(ctx, maxJobBatchSize)
+	jobs, err := p.queue.ReadJobs(ctx, p.jobBatchSize)
 	if err != nil {
 		return
 	}
