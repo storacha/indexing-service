@@ -107,18 +107,16 @@ module "app" {
     {
       name = "provider-caching"
       public = false
+      object_expiration_days = 14
     },
-  
     {
       name = "ipni-store"
       public = true
     },
-  
     {
       name = "notifier-head"
       public = false
     },
-  
     {
       name = "claim-store"
       public = false

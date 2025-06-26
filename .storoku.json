@@ -24,7 +24,8 @@
   "buckets": [
     {
       "name": "provider-caching",
-      "public": false
+      "public": false,
+      "objectExpirationDays": 14
     },
     {
       "name": "ipni-store",
