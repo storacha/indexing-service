@@ -120,7 +120,8 @@ func (p *CachingQueuePoller) pollJobs() {
 		wg.Add(1)
 		go func(job ProviderCachingJob) {
 			defer wg.Done()
-			if err := p.processJob(ctx, job); err != nil {
+			err := p.cacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
+			if err != nil {
 				errs <- err
 				return
 			}
@@ -143,21 +144,4 @@ func (p *CachingQueuePoller) pollJobs() {
 	if err != nil {
 		log.Errorf("Failed to process messages: %v", err)
 	}
-}
-
-// processJob processes a single caching job from the queue.
-func (p *CachingQueuePoller) processJob(ctx context.Context, job ProviderCachingJob) error {
-	err := p.cacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index)
-	if err != nil {
-		// Do not hold up the queue by re-attempting a cache job that times out. It is
-		// probably a big DAG and retrying is unlikely to subsequently succeed.
-		if errors.Is(err, context.DeadlineExceeded) {
-			log.Warnf("not retrying cache provider job for: %s error: %s", job.Index.Content(), err)
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
 }
