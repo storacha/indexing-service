@@ -2,6 +2,7 @@ package providercacher
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ const (
 	defaultPollInterval = 5 * time.Second
 	defaultJobBatchSize = 10
 
+	maxJobBatchSize    = 10
 	maxParallelBatches = 100
 )
 
@@ -48,7 +50,7 @@ func WithJobBatchSize(size int) Option {
 }
 
 // NewCachingQueuePoller creates a new CachingQueuePoller instance.
-func NewCachingQueuePoller(queue CachingQueue, cacher ProviderCacher, opts ...Option) *CachingQueuePoller {
+func NewCachingQueuePoller(queue CachingQueue, cacher ProviderCacher, opts ...Option) (*CachingQueuePoller, error) {
 	poller := &CachingQueuePoller{
 		queue:        queue,
 		cacher:       cacher,
@@ -63,7 +65,15 @@ func NewCachingQueuePoller(queue CachingQueue, cacher ProviderCacher, opts ...Op
 		opt(poller)
 	}
 
-	return poller
+	if poller.interval <= 0 {
+		return nil, fmt.Errorf("poll interval %v must be positive", poller.interval)
+	}
+
+	if poller.jobBatchSize > maxJobBatchSize {
+		return nil, fmt.Errorf("job batch size %d exceeds maximum allowed %d", poller.jobBatchSize, maxJobBatchSize)
+	}
+
+	return poller, nil
 }
 
 // Start begins polling the queue for caching jobs.

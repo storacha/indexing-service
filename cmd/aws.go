@@ -76,7 +76,10 @@ var awsCmd = &cli.Command{
 		notifier.Start(cCtx.Context)
 		defer notifier.Stop()
 
-		cacher := setupProviderCacher(cfg)
+		cacher, err := setupProviderCacher(cfg)
+		if err != nil {
+			return err
+		}
 		cacher.Start()
 		defer cacher.Stop()
 
@@ -108,7 +111,7 @@ func setupIPNIPipeline(cfg aws.Config) (*notifier.Notifier, error) {
 	return notifier, nil
 }
 
-func setupProviderCacher(cfg aws.Config) *providercacher.CachingQueuePoller {
+func setupProviderCacher(cfg aws.Config) (*providercacher.CachingQueuePoller, error) {
 	cachingQueue := aws.NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
 
 	providersRedis := goredis.NewClusterClient(&cfg.ProvidersRedis)
@@ -118,6 +121,5 @@ func setupProviderCacher(cfg aws.Config) *providercacher.CachingQueuePoller {
 	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 
-	cachingQueuePoller := providercacher.NewCachingQueuePoller(cachingQueue, providerCacher)
-	return cachingQueuePoller
+	return providercacher.NewCachingQueuePoller(cachingQueue, providerCacher)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCachingQueuePoller_StartStop(t *testing.T) {
@@ -20,11 +21,12 @@ func TestCachingQueuePoller_StartStop(t *testing.T) {
 	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil)
 
 	// Create poller with short poll interval for faster tests
-	poller := providercacher.NewCachingQueuePoller(
+	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,
 		mockCacher,
 		providercacher.WithPollInterval(10*time.Millisecond),
 	)
+	require.NoError(t, err)
 
 	// Start the poller
 	poller.Start()
@@ -73,11 +75,12 @@ func TestCachingQueuePoller_ProcessJobs(t *testing.T) {
 	// Adding no explicit expectation here ensures that the test will fail if DeleteJob is called.
 
 	// Create poller
-	poller := providercacher.NewCachingQueuePoller(
+	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,
 		mockCacher,
 		providercacher.WithPollInterval(10*time.Millisecond),
 	)
+	require.NoError(t, err)
 
 	// Start the poller
 	poller.Start()
