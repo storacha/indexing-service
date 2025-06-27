@@ -7,7 +7,9 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/indexing-service/pkg/blobindex"
 	"github.com/storacha/indexing-service/pkg/internal/link"
+	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // MaxBatchSize is the maximum number of items that'll be added to a batch.
@@ -22,6 +24,9 @@ func NewSimpleProviderCacher(providerStore types.ProviderStore) ProviderCacher {
 }
 
 func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context, provider model.ProviderResult, index blobindex.ShardedDagIndexView) error {
+	ctx, span := telemetry.StartSpan(ctx, "ProviderCacher.CacheProviderForIndexRecords")
+	defer span.End()
+
 	batch := s.providerStore.Batch()
 
 	// Prioritize the root
@@ -35,6 +40,7 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 		return fmt.Errorf("batch setting provider expirable for root: %w", err)
 	}
 
+	total := 0
 	size := 1
 	for _, shardIndex := range index.Shards().Iterator() {
 		for hash := range shardIndex.Iterator() {
@@ -49,9 +55,10 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 			if err != nil {
 				return fmt.Errorf("batch setting provider expirable: %w", err)
 			}
-
+			total++
 			size++
 			if size >= MaxBatchSize {
+				span.AddEvent("commit batch")
 				err := batch.Commit(ctx)
 				if err != nil {
 					return fmt.Errorf("batch commiting: %w", err)
@@ -61,8 +68,10 @@ func (s *simpleProviderCacher) CacheProviderForIndexRecords(ctx context.Context,
 			}
 		}
 	}
+	span.SetAttributes(attribute.KeyValue{Key: "total", Value: attribute.IntValue(total)})
 	if size == 0 {
 		return nil
 	}
+	span.AddEvent("commit batch")
 	return batch.Commit(ctx)
 }

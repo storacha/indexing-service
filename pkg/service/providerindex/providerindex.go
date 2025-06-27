@@ -342,6 +342,8 @@ func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInf
 
 func Cache(ctx context.Context, log logging.EventLogger, providerStore types.ProviderStore, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata, expire bool) error {
 	log.Infof("caching provider results for context: %s, provider: %s", contextID, provider.ID)
+	ctx, s := telemetry.StartSpan(ctx, "ProviderIndexService.Cache")
+	defer s.End()
 
 	mdb, err := meta.MarshalBinary()
 	if err != nil {
@@ -370,6 +372,7 @@ func Cache(ctx context.Context, log logging.EventLogger, providerStore types.Pro
 
 		size++
 		if size >= MaxBatchSize {
+			s.AddEvent("commit batch")
 			err := batch.Commit(ctx)
 			if err != nil {
 				return fmt.Errorf("comitting batch: %w", err)
@@ -380,12 +383,14 @@ func Cache(ctx context.Context, log logging.EventLogger, providerStore types.Pro
 	}
 
 	if size > 0 {
+		s.AddEvent("commit batch")
 		err = batch.Commit(ctx)
 		if err != nil {
 			return fmt.Errorf("comitting batch: %w", err)
 		}
 	}
 
+	s.SetAttributes(attribute.KeyValue{Key: "total", Value: attribute.IntValue(total)})
 	log.Infof("cached %d provider results for context: %s", total, contextID)
 	return nil
 }
