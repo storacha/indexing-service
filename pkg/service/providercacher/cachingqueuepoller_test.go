@@ -1,7 +1,9 @@
 package providercacher_test
 
 import (
+	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,7 +22,6 @@ func TestCachingQueuePoller_StartStop(t *testing.T) {
 
 	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil)
 
-	// Create poller with short poll interval for faster tests
 	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,
 		mockCacher,
@@ -38,7 +39,75 @@ func TestCachingQueuePoller_StartStop(t *testing.T) {
 	poller.Stop()
 }
 
-func TestCachingQueuePoller_ProcessJobs(t *testing.T) {
+func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
+	const (
+		numJobs       = 11
+		batchSize     = 2
+		fullBatches   = numJobs / batchSize
+		lastBatchSize = numJobs % batchSize
+	)
+
+	// Create a single test job that will be used for all batches
+	testJob := providercacher.ProviderCachingJob{
+		ID:       "test-job",
+		Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("test-peer")}},
+		Index:    blobindex.NewShardedDagIndexView(nil, 0),
+	}
+
+	// Setup mocks
+	mockQueue := providercacher.NewMockCachingQueue(t)
+	mockCacher := providercacher.NewMockProviderCacher(t)
+
+	// Set up ReadJobs to return batches of the same job
+	batch := make([]providercacher.ProviderCachingJob, batchSize)
+	for i := range batchSize {
+		batch[i] = testJob
+	}
+	// Return a number of full batches...
+	mockQueue.EXPECT().ReadJobs(mock.Anything, batchSize).Return(batch, nil).Times(fullBatches)
+	// ...a final partial batch...
+	mockQueue.EXPECT().ReadJobs(mock.Anything, batchSize).Return(batch[:lastBatchSize], nil).Once()
+	// ...and finally no more jobs
+	mockQueue.EXPECT().ReadJobs(mock.Anything, batchSize).Return([]providercacher.ProviderCachingJob{}, nil).Once()
+
+	// Set up processing barrier to ensure jobs run concurrently
+	var wg sync.WaitGroup
+	wg.Add(numJobs)
+
+	// Expect CacheProviderForIndexRecords for each job
+	mockCacher.EXPECT().
+		CacheProviderForIndexRecords(mock.Anything, testJob.Provider, testJob.Index).
+		Run(func(ctx context.Context, _ model.ProviderResult, _ blobindex.ShardedDagIndexView) {
+			defer wg.Done() // Signal that this job completed processing
+		}).
+		Return(nil).
+		Times(numJobs) // Expect this to be called numJobs times
+
+	// Expect DeleteJob for each job
+	mockQueue.EXPECT().
+		DeleteJob(mock.Anything, testJob.ID).
+		Return(nil).
+		Times(numJobs) // Expect this to be called numJobs times
+
+	poller, err := providercacher.NewCachingQueuePoller(
+		mockQueue,
+		mockCacher,
+		providercacher.WithPollInterval(10*time.Millisecond),
+		providercacher.WithJobBatchSize(batchSize),
+	)
+	require.NoError(t, err)
+
+	// Start the poller
+	poller.Start()
+
+	// Wait for all jobs to start processing
+	wg.Wait()
+
+	// Stop the poller
+	poller.Stop()
+}
+
+func TestCachingQueuePoller_FailedJobsAreNotDeleted(t *testing.T) {
 	// Setup test data
 	successfulJob := providercacher.ProviderCachingJob{
 		ID:       "successful-job",
@@ -74,7 +143,6 @@ func TestCachingQueuePoller_ProcessJobs(t *testing.T) {
 	// DeleteJob should NOT be called when processing fails.
 	// Adding no explicit expectation here ensures that the test will fail if DeleteJob is called.
 
-	// Create poller
 	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,
 		mockCacher,
@@ -90,4 +158,61 @@ func TestCachingQueuePoller_ProcessJobs(t *testing.T) {
 
 	// Stop the poller
 	poller.Stop()
+}
+
+func TestCachingQueuePoller_StopCancelsProcessing(t *testing.T) {
+	// Create a job that will be canceled
+	job := providercacher.ProviderCachingJob{
+		ID:       "test-job",
+		Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("test-peer")}},
+		Index:    blobindex.NewShardedDagIndexView(nil, 0),
+	}
+
+	// Setup mocks
+	mockQueue := providercacher.NewMockCachingQueue(t)
+	mockCacher := providercacher.NewMockProviderCacher(t)
+
+	// Expect ReadJobs to return the job and then no more jobs
+	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{job}, nil).Once()
+	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).Once()
+
+	// Channel to coordinate the test
+	workStarted := make(chan struct{})
+	workDone := make(chan struct{})
+
+	// Set up the mock to check context cancellation
+	mockCacher.EXPECT().
+		CacheProviderForIndexRecords(mock.Anything, job.Provider, job.Index).
+		Run(func(ctx context.Context, _ model.ProviderResult, _ blobindex.ShardedDagIndexView) {
+			close(workStarted) // Signal that processing started
+			// Wait for the context to be canceled
+			<-ctx.Done()
+			close(workDone) // Signal that context was canceled
+		}).
+		Return(errors.New("context canceled")).Once()
+
+	// Create poller with a short poll interval
+	poller, err := providercacher.NewCachingQueuePoller(
+		mockQueue,
+		mockCacher,
+		providercacher.WithPollInterval(time.Millisecond),
+	)
+	require.NoError(t, err)
+
+	// Start the poller
+	poller.Start()
+
+	// Wait for the job to start processing
+	<-workStarted
+
+	// Stop the poller - this should cancel the context
+	poller.Stop()
+
+	// Verify the context was canceled
+	select {
+	case <-workDone:
+		// Success - context was canceled
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("context was not canceled in time")
+	}
 }
