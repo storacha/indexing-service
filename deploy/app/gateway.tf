@@ -1,5 +1,4 @@
 locals {
-  is_warm = startswith(terraform.workspace, "warm-")
   network = local.is_warm ? "warm.storacha.network" : "storacha.network"
   domain_base = "${var.app}.${local.network}"
   domain_name = local.is_production ? local.domain_base : local.is_staging ? "staging.${local.domain_base}" : "${terraform.workspace}.${local.domain_base}"
@@ -124,7 +123,7 @@ resource "aws_route53_record" "cert_validation" {
   allow_overwrite = true
   name    = tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_name
   type    = tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_type
-  zone_id = data.terraform_remote_state.shared.outputs.primary_zone.zone_id
+  zone_id = local.dns_zone_id
   records = [tolist(aws_acm_certificate.cert.domain_validation_options)[0].resource_record_value]
   ttl     = 60
 }
@@ -155,7 +154,7 @@ resource "aws_apigatewayv2_api_mapping" "api_mapping" {
 }
 
 resource "aws_route53_record" "api_gateway" {
-  zone_id = data.terraform_remote_state.shared.outputs.primary_zone.zone_id
+  zone_id = local.dns_zone_id
   name    = aws_apigatewayv2_domain_name.custom_domain.domain_name
   type    = "A"
 

@@ -1,5 +1,9 @@
-output "primary_zone" {
-  value = aws_route53_zone.primary
+output "hot_zone" {
+  value = aws_route53_zone.hot
+}
+
+output "warm_zone" {
+  value = aws_route53_zone.warm
 }
 
 output "dev_vpc" {

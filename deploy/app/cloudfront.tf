@@ -78,7 +78,7 @@ resource "aws_route53_record" "cloudfront_cert_validation" {
   allow_overwrite = true
   name    = tolist(aws_acm_certificate.cloudfront_cert[0].domain_validation_options)[0].resource_record_name
   type    = tolist(aws_acm_certificate.cloudfront_cert[0].domain_validation_options)[0].resource_record_type
-  zone_id = data.terraform_remote_state.shared.outputs.primary_zone.zone_id
+  zone_id = local.dns_zone_id
   records = [tolist(aws_acm_certificate.cloudfront_cert[0].domain_validation_options)[0].resource_record_value]
   ttl     = 60
 }
