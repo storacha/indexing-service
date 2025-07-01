@@ -110,7 +110,7 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 	poller.Stop()
 }
 
-func TestCachingQueuePoller_FailedJobsAreNotDeleted(t *testing.T) {
+func TestCachingQueuePoller_FailedJobsAreRetried(t *testing.T) {
 	// Setup test data
 	successfulJob := providercacher.ProviderCachingJob{
 		ID:       "successful-job",
@@ -150,6 +150,57 @@ func TestCachingQueuePoller_FailedJobsAreNotDeleted(t *testing.T) {
 	mockQueue.EXPECT().DeleteJob(mock.Anything, successfulJob.ID).Return(nil).Once()
 	// DeleteJob should NOT be called when processing fails.
 	// Adding no explicit expectation here ensures that the test will fail if DeleteJob is called.
+	// However, the job should be released as it didn't time out.
+	mockQueue.EXPECT().Release(mock.Anything, failedJob.ID).Return(nil).Once()
+
+	poller, err := providercacher.NewCachingQueuePoller(
+		mockQueue,
+		mockCacher,
+	)
+	require.NoError(t, err)
+
+	// Start the poller
+	poller.Start()
+
+	// Wait for the job to be processed
+	time.Sleep(50 * time.Millisecond)
+
+	// Stop the poller
+	poller.Stop()
+}
+
+func TestCachingQueuePoller_JobsTimingOutAreNotRetried(t *testing.T) {
+	// Setup test data
+	bigJob := providercacher.ProviderCachingJob{
+		ID:       "big-job",
+		Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("peer")}},
+		Index:    blobindex.NewShardedDagIndexView(nil, 0),
+	}
+
+	// Setup mocks
+	mockQueue := providercacher.NewMockCachingQueue(t)
+	mockCacher := providercacher.NewMockProviderCacher(t)
+
+	// Expect ReadJobs to be called.
+	// The first call returns our test job, subsequent calls block because there are no more jobs available
+	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return(
+		[]providercacher.ProviderCachingJob{bigJob}, nil,
+	).Once()
+	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).
+		Run(func(ctx context.Context, _ int) {
+			<-ctx.Done()
+		}).
+		Return([]providercacher.ProviderCachingJob{}, nil).
+		Once()
+
+	// Expect CacheProviderForIndexRecords to be called for the job, returns a time out error
+	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, bigJob.Provider, bigJob.Index).
+		Return(context.DeadlineExceeded).Once()
+
+	// Expect DeleteJob to be called because the error is a time out
+	mockQueue.EXPECT().DeleteJob(mock.Anything, bigJob.ID).Return(nil).Once()
+	// Release should NOT be called in case of a timeout to avoid retries.
+	// Adding no explicit expectation here ensures that the test will fail if Release is called.
 
 	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,

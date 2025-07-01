@@ -14,12 +14,16 @@ type (
 	CachingQueueReader interface {
 		ReadJobs(ctx context.Context, maxJobs int) ([]ProviderCachingJob, error)
 	}
+	CachingQueueReleaser interface {
+		Release(ctx context.Context, jobID string) error
+	}
 	CachingQueueDeleter interface {
 		DeleteJob(ctx context.Context, jobID string) error
 	}
 	CachingQueue interface {
 		CachingQueueQueuer
 		CachingQueueReader
+		CachingQueueReleaser
 		CachingQueueDeleter
 	}
 

@@ -127,6 +127,17 @@ func (s *SQSCachingQueue) ReadJobs(ctx context.Context, maxJobs int) ([]provider
 	return jobs, nil
 }
 
+// Release makes a job available for processing again by making it visible in the queue
+func (s *SQSCachingQueue) Release(ctx context.Context, jobID string) error {
+	_, err := s.sqsClient.ChangeMessageVisibility(ctx, &sqs.ChangeMessageVisibilityInput{
+		QueueUrl:          aws.String(s.queueURL),
+		ReceiptHandle:     aws.String(jobID),
+		VisibilityTimeout: 0,
+	})
+
+	return err
+}
+
 // DeleteJob deletes a job message from the SQS queue.
 func (s *SQSCachingQueue) DeleteJob(ctx context.Context, jobID string) error {
 	_, err := s.sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{

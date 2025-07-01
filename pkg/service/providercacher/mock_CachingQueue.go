@@ -174,6 +174,53 @@ func (_c *MockCachingQueue_ReadJobs_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// Release provides a mock function with given fields: ctx, jobID
+func (_m *MockCachingQueue) Release(ctx context.Context, jobID string) error {
+	ret := _m.Called(ctx, jobID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Release")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, jobID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCachingQueue_Release_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Release'
+type MockCachingQueue_Release_Call struct {
+	*mock.Call
+}
+
+// Release is a helper method to define mock.On call
+//   - ctx context.Context
+//   - jobID string
+func (_e *MockCachingQueue_Expecter) Release(ctx interface{}, jobID interface{}) *MockCachingQueue_Release_Call {
+	return &MockCachingQueue_Release_Call{Call: _e.mock.On("Release", ctx, jobID)}
+}
+
+func (_c *MockCachingQueue_Release_Call) Run(run func(ctx context.Context, jobID string)) *MockCachingQueue_Release_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockCachingQueue_Release_Call) Return(_a0 error) *MockCachingQueue_Release_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCachingQueue_Release_Call) RunAndReturn(run func(context.Context, string) error) *MockCachingQueue_Release_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockCachingQueue creates a new instance of MockCachingQueue. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockCachingQueue(t interface {
