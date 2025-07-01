@@ -20,7 +20,7 @@ func TestCachingQueuePoller_StartStop(t *testing.T) {
 	mockQueue := providercacher.NewMockCachingQueue(t)
 	mockCacher := providercacher.NewMockProviderCacher(t)
 
-	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil)
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil)
 
 	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,
@@ -57,17 +57,17 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 	mockQueue := providercacher.NewMockCachingQueue(t)
 	mockCacher := providercacher.NewMockProviderCacher(t)
 
-	// Set up ReadJobs to return batches of the same job
+	// Set up Read to return batches of the same job
 	batch := make([]providercacher.ProviderCachingJob, batchSize)
 	for i := range batchSize {
 		batch[i] = testJob
 	}
 	// Return a number of full batches...
-	mockQueue.EXPECT().ReadJobs(mock.Anything, batchSize).Return(batch, nil).Times(fullBatches)
+	mockQueue.EXPECT().Read(mock.Anything, batchSize).Return(batch, nil).Times(fullBatches)
 	// ...a final partial batch...
-	mockQueue.EXPECT().ReadJobs(mock.Anything, batchSize).Return(batch[:lastBatchSize], nil).Once()
+	mockQueue.EXPECT().Read(mock.Anything, batchSize).Return(batch[:lastBatchSize], nil).Once()
 	// ...and block to simulate long-polling with no more jobs available
-	mockQueue.EXPECT().ReadJobs(mock.Anything, batchSize).Return([]providercacher.ProviderCachingJob{}, nil).
+	mockQueue.EXPECT().Read(mock.Anything, batchSize).Return([]providercacher.ProviderCachingJob{}, nil).
 		Run(func(ctx context.Context, _ int) {
 			<-ctx.Done()
 		}).
@@ -87,9 +87,9 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 		Return(nil).
 		Times(numJobs) // Expect this to be called numJobs times
 
-	// Expect DeleteJob for each job
+	// Expect Delete for each job
 	mockQueue.EXPECT().
-		DeleteJob(mock.Anything, testJob.ID).
+		Delete(mock.Anything, testJob.ID).
 		Return(nil).
 		Times(numJobs) // Expect this to be called numJobs times
 
@@ -128,12 +128,12 @@ func TestCachingQueuePoller_FailedJobsAreRetried(t *testing.T) {
 	mockQueue := providercacher.NewMockCachingQueue(t)
 	mockCacher := providercacher.NewMockProviderCacher(t)
 
-	// Expect ReadJobs to be called.
+	// Expect Read to be called.
 	// The first call returns our test jobs, subsequent calls block because there are no more jobs available
-	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return(
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return(
 		[]providercacher.ProviderCachingJob{successfulJob, failedJob}, nil,
 	).Once()
-	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).
 		Run(func(ctx context.Context, _ int) {
 			<-ctx.Done()
 		}).
@@ -146,10 +146,10 @@ func TestCachingQueuePoller_FailedJobsAreRetried(t *testing.T) {
 	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, failedJob.Provider, failedJob.Index).
 		Return(errors.New("processing error")).Once()
 
-	// Expect DeleteJob to be called only for successfulJob
-	mockQueue.EXPECT().DeleteJob(mock.Anything, successfulJob.ID).Return(nil).Once()
-	// DeleteJob should NOT be called when processing fails.
-	// Adding no explicit expectation here ensures that the test will fail if DeleteJob is called.
+	// Expect Delete to be called only for successfulJob
+	mockQueue.EXPECT().Delete(mock.Anything, successfulJob.ID).Return(nil).Once()
+	// Delete should NOT be called when processing fails.
+	// Adding no explicit expectation here ensures that the test will fail if Delete is called.
 	// However, the job should be released as it didn't time out.
 	mockQueue.EXPECT().Release(mock.Anything, failedJob.ID).Return(nil).Once()
 
@@ -181,12 +181,12 @@ func TestCachingQueuePoller_JobsTimingOutAreNotRetried(t *testing.T) {
 	mockQueue := providercacher.NewMockCachingQueue(t)
 	mockCacher := providercacher.NewMockProviderCacher(t)
 
-	// Expect ReadJobs to be called.
+	// Expect Read to be called.
 	// The first call returns our test job, subsequent calls block because there are no more jobs available
-	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return(
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return(
 		[]providercacher.ProviderCachingJob{bigJob}, nil,
 	).Once()
-	mockQueue.EXPECT().ReadJobs(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).
 		Run(func(ctx context.Context, _ int) {
 			<-ctx.Done()
 		}).
@@ -197,8 +197,8 @@ func TestCachingQueuePoller_JobsTimingOutAreNotRetried(t *testing.T) {
 	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, bigJob.Provider, bigJob.Index).
 		Return(context.DeadlineExceeded).Once()
 
-	// Expect DeleteJob to be called because the error is a time out
-	mockQueue.EXPECT().DeleteJob(mock.Anything, bigJob.ID).Return(nil).Once()
+	// Expect Delete to be called because the error is a time out
+	mockQueue.EXPECT().Delete(mock.Anything, bigJob.ID).Return(nil).Once()
 	// Release should NOT be called in case of a timeout to avoid retries.
 	// Adding no explicit expectation here ensures that the test will fail if Release is called.
 

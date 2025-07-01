@@ -132,7 +132,7 @@ func (p *CachingQueuePoller) Stop() {
 // processJobs reads and processes all available jobs from the queue in batches
 func (p *CachingQueuePoller) processJobs(ctx context.Context) {
 	// Read a batch of jobs and queue them in the job queue
-	jobs, err := p.queue.ReadJobs(ctx, p.jobBatchSize)
+	jobs, err := p.queue.Read(ctx, p.jobBatchSize)
 	if err != nil {
 		log.Errorf("Error reading jobs from queue: %v", err)
 		return
@@ -171,7 +171,7 @@ func cachingJobHandler(queue CachingQueue, cacher ProviderCacher) func(ctx conte
 		}
 
 		// Delete the job too if processing was successful
-		if err := queue.DeleteJob(ctx, job.ID); err != nil {
+		if err := queue.Delete(ctx, job.ID); err != nil {
 			return fmt.Errorf("failed to delete job %s: %w", job.ID, err)
 		}
 

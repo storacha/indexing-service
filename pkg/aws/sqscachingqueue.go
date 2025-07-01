@@ -97,10 +97,10 @@ func (s *SQSCachingQueue) sendMessage(ctx context.Context, msg cachingQueueMessa
 	return nil
 }
 
-// ReadJobs reads a batch of jobs from the SQS queue.
+// Read reads a batch of jobs from the SQS queue.
 // Returns an empty slice if no jobs are available.
 // The caller must process jobs and delete them from the queue when done.
-func (s *SQSCachingQueue) ReadJobs(ctx context.Context, maxJobs int) ([]providercacher.ProviderCachingJob, error) {
+func (s *SQSCachingQueue) Read(ctx context.Context, maxJobs int) ([]providercacher.ProviderCachingJob, error) {
 	receiveOutput, err := s.sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(s.queueURL),
 		MaxNumberOfMessages: int32(maxJobs),
@@ -138,8 +138,8 @@ func (s *SQSCachingQueue) Release(ctx context.Context, jobID string) error {
 	return err
 }
 
-// DeleteJob deletes a job message from the SQS queue.
-func (s *SQSCachingQueue) DeleteJob(ctx context.Context, jobID string) error {
+// Delete deletes a job message from the SQS queue.
+func (s *SQSCachingQueue) Delete(ctx context.Context, jobID string) error {
 	_, err := s.sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      aws.String(s.queueURL),
 		ReceiptHandle: aws.String(jobID),

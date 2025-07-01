@@ -21,12 +21,12 @@ func (_m *MockCachingQueue) EXPECT() *MockCachingQueue_Expecter {
 	return &MockCachingQueue_Expecter{mock: &_m.Mock}
 }
 
-// DeleteJob provides a mock function with given fields: ctx, jobID
-func (_m *MockCachingQueue) DeleteJob(ctx context.Context, jobID string) error {
+// Delete provides a mock function with given fields: ctx, jobID
+func (_m *MockCachingQueue) Delete(ctx context.Context, jobID string) error {
 	ret := _m.Called(ctx, jobID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for DeleteJob")
+		panic("no return value specified for Delete")
 	}
 
 	var r0 error
@@ -39,31 +39,31 @@ func (_m *MockCachingQueue) DeleteJob(ctx context.Context, jobID string) error {
 	return r0
 }
 
-// MockCachingQueue_DeleteJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteJob'
-type MockCachingQueue_DeleteJob_Call struct {
+// MockCachingQueue_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
+type MockCachingQueue_Delete_Call struct {
 	*mock.Call
 }
 
-// DeleteJob is a helper method to define mock.On call
+// Delete is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobID string
-func (_e *MockCachingQueue_Expecter) DeleteJob(ctx interface{}, jobID interface{}) *MockCachingQueue_DeleteJob_Call {
-	return &MockCachingQueue_DeleteJob_Call{Call: _e.mock.On("DeleteJob", ctx, jobID)}
+func (_e *MockCachingQueue_Expecter) Delete(ctx interface{}, jobID interface{}) *MockCachingQueue_Delete_Call {
+	return &MockCachingQueue_Delete_Call{Call: _e.mock.On("Delete", ctx, jobID)}
 }
 
-func (_c *MockCachingQueue_DeleteJob_Call) Run(run func(ctx context.Context, jobID string)) *MockCachingQueue_DeleteJob_Call {
+func (_c *MockCachingQueue_Delete_Call) Run(run func(ctx context.Context, jobID string)) *MockCachingQueue_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockCachingQueue_DeleteJob_Call) Return(_a0 error) *MockCachingQueue_DeleteJob_Call {
+func (_c *MockCachingQueue_Delete_Call) Return(_a0 error) *MockCachingQueue_Delete_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCachingQueue_DeleteJob_Call) RunAndReturn(run func(context.Context, string) error) *MockCachingQueue_DeleteJob_Call {
+func (_c *MockCachingQueue_Delete_Call) RunAndReturn(run func(context.Context, string) error) *MockCachingQueue_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -115,12 +115,12 @@ func (_c *MockCachingQueue_Queue_Call) RunAndReturn(run func(context.Context, Pr
 	return _c
 }
 
-// ReadJobs provides a mock function with given fields: ctx, maxJobs
-func (_m *MockCachingQueue) ReadJobs(ctx context.Context, maxJobs int) ([]ProviderCachingJob, error) {
+// Read provides a mock function with given fields: ctx, maxJobs
+func (_m *MockCachingQueue) Read(ctx context.Context, maxJobs int) ([]ProviderCachingJob, error) {
 	ret := _m.Called(ctx, maxJobs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ReadJobs")
+		panic("no return value specified for Read")
 	}
 
 	var r0 []ProviderCachingJob
@@ -145,31 +145,31 @@ func (_m *MockCachingQueue) ReadJobs(ctx context.Context, maxJobs int) ([]Provid
 	return r0, r1
 }
 
-// MockCachingQueue_ReadJobs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadJobs'
-type MockCachingQueue_ReadJobs_Call struct {
+// MockCachingQueue_Read_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Read'
+type MockCachingQueue_Read_Call struct {
 	*mock.Call
 }
 
-// ReadJobs is a helper method to define mock.On call
+// Read is a helper method to define mock.On call
 //   - ctx context.Context
 //   - maxJobs int
-func (_e *MockCachingQueue_Expecter) ReadJobs(ctx interface{}, maxJobs interface{}) *MockCachingQueue_ReadJobs_Call {
-	return &MockCachingQueue_ReadJobs_Call{Call: _e.mock.On("ReadJobs", ctx, maxJobs)}
+func (_e *MockCachingQueue_Expecter) Read(ctx interface{}, maxJobs interface{}) *MockCachingQueue_Read_Call {
+	return &MockCachingQueue_Read_Call{Call: _e.mock.On("Read", ctx, maxJobs)}
 }
 
-func (_c *MockCachingQueue_ReadJobs_Call) Run(run func(ctx context.Context, maxJobs int)) *MockCachingQueue_ReadJobs_Call {
+func (_c *MockCachingQueue_Read_Call) Run(run func(ctx context.Context, maxJobs int)) *MockCachingQueue_Read_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(int))
 	})
 	return _c
 }
 
-func (_c *MockCachingQueue_ReadJobs_Call) Return(_a0 []ProviderCachingJob, _a1 error) *MockCachingQueue_ReadJobs_Call {
+func (_c *MockCachingQueue_Read_Call) Return(_a0 []ProviderCachingJob, _a1 error) *MockCachingQueue_Read_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCachingQueue_ReadJobs_Call) RunAndReturn(run func(context.Context, int) ([]ProviderCachingJob, error)) *MockCachingQueue_ReadJobs_Call {
+func (_c *MockCachingQueue_Read_Call) RunAndReturn(run func(context.Context, int) ([]ProviderCachingJob, error)) *MockCachingQueue_Read_Call {
 	_c.Call.Return(run)
 	return _c
 }
