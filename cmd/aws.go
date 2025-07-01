@@ -11,7 +11,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/server"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
-	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/remotesyncer"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/ipni-publisher/pkg/notifier"
 	"github.com/storacha/ipni-publisher/pkg/store"
@@ -98,7 +98,7 @@ func setupIPNIPipeline(cfg aws.Config) (*notifier.Notifier, error) {
 	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
-	remoteSyncer := providerindex.NewRemoteSyncer(providerStore, publisherStore)
+	remoteSyncer := remotesyncer.New(providerStore, publisherStore)
 
 	// setup notifier to periodically check IPNI and notify remote syncer if updates are required
 	headStore := aws.NewS3Store(cfg.Config, cfg.NotifierHeadBucket, "")
