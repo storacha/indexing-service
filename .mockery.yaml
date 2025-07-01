@@ -16,6 +16,10 @@ packages:
     interfaces:
       Finder:
       Service:
+  github.com/storacha/indexing-service/pkg/service/providercacher:
+    interfaces:
+      CachingQueue:
+      ProviderCacher:
   github.com/storacha/indexing-service/pkg/service/providerindex:
     interfaces:
       ProviderIndex:

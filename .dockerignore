@@ -1,5 +1,9 @@
 .github
+deploy
+.tfworkspace
+build
 docs
 .goreleaser.yaml
+codecov.yml
 *.md
 LICENSE-*

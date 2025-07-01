@@ -81,7 +81,7 @@ func makeHandler(cfg aws.Config) any {
 }
 
 func handleMessage(ctx context.Context, sqsCachingDecoder *aws.SQSCachingDecoder, providerCacher providercacher.ProviderCacher, msg events.SQSMessage) error {
-	job, err := sqsCachingDecoder.DecodeMessage(ctx, msg.Body)
+	job, err := sqsCachingDecoder.DecodeMessage(ctx, msg.ReceiptHandle, msg.Body)
 	if err != nil {
 		return err
 	}

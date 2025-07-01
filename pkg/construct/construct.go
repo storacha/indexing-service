@@ -74,7 +74,7 @@ type ServiceConfig struct {
 }
 
 type config struct {
-	cachingQueue         blobindexlookup.CachingQueue
+	cachingQueue         providercacher.CachingQueueQueuer
 	opts                 []service.Option
 	ds                   datastore.Batching
 	skipNotification     bool
@@ -122,7 +122,7 @@ func WithServiceOptions(opts ...service.Option) Option {
 }
 
 // WithCachingQueue overrides the default caching queue for provider caching
-func WithCachingQueue(cachingQueue blobindexlookup.CachingQueue) Option {
+func WithCachingQueue(cachingQueue providercacher.CachingQueueQueuer) Option {
 	return func(cfg *config) error {
 		cfg.cachingQueue = cachingQueue
 		return nil
