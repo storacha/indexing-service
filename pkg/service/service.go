@@ -343,8 +343,6 @@ func (is *IndexingService) Cache(ctx context.Context, provider peer.AddrInfo, cl
 // The service should lookup the index cid location claim, and fetch the ShardedDagIndexView, then use the hashes inside
 // to assemble all the multihashes in the index advertisement
 func (is *IndexingService) Publish(ctx context.Context, claim delegation.Delegation) error {
-	ctx, s := telemetry.StartSpan(ctx, "IndexingService.Publish")
-	defer s.End()
 	return Publish(ctx, is.blobIndexLookup, is.claims, is.providerIndex, is.provider, claim)
 }
 
@@ -379,6 +377,9 @@ func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claims 
 }
 
 func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+	ctx, s := telemetry.StartSpan(ctx, "IndexingService.Cache")
+	defer s.End()
+
 	caps := claim.Capabilities()
 	if len(caps) == 0 {
 		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
@@ -386,6 +387,7 @@ func Cache(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claim
 
 	switch caps[0].Can() {
 	case assert.LocationAbility:
+		s.SetAttributes(attribute.KeyValue{Key: "claim", Value: attribute.StringValue("assert/location")})
 		return cacheLocationCommitment(ctx, claims, provIndex, provider, claim)
 	default:
 		return ErrUnrecognizedClaim
@@ -447,14 +449,19 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 }
 
 func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+	ctx, s := telemetry.StartSpan(ctx, "IndexingService.Publish")
+	defer s.End()
+
 	caps := claim.Capabilities()
 	if len(caps) == 0 {
 		return fmt.Errorf("missing capabilities in claim: %s", claim.Link())
 	}
 	switch caps[0].Can() {
 	case assert.EqualsAbility:
+		s.SetAttributes(attribute.KeyValue{Key: "claim", Value: attribute.StringValue("assert/equals")})
 		return publishEqualsClaim(ctx, claims, provIndex, provider, claim)
 	case assert.IndexAbility:
+		s.SetAttributes(attribute.KeyValue{Key: "claim", Value: attribute.StringValue("assert/index")})
 		return publishIndexClaim(ctx, blobIndex, claims, provIndex, provider, claim)
 	default:
 		return ErrUnrecognizedClaim

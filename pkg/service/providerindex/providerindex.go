@@ -21,6 +21,7 @@ import (
 	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/legacy"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 	"go.opentelemetry.io/otel/attribute"
@@ -32,8 +33,6 @@ const (
 	MaxBatchSize = 10_000
 	IPNITimeout  = 1500 * time.Millisecond
 )
-
-var log = logging.Logger("providerindex")
 
 type QueryKey struct {
 	Spaces       []did.DID
@@ -47,26 +46,56 @@ type ProviderIndexService struct {
 	noProviderStore types.NoProviderStore
 	findClient      ipnifind.Finder
 	publisher       publisher.Publisher
-	legacyClaims    LegacyClaimsFinder
+	legacyClaims    legacy.ClaimsFinder
 	mutex           sync.Mutex
 	clock           clock.Clock
+	log             logging.EventLogger
 }
 
 var _ ProviderIndex = (*ProviderIndexService)(nil)
 
-func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder) *ProviderIndexService {
-	return NewWithClock(providerStore, noProviderStore, findClient, publisher, legacyClaims, clock.New())
+type config struct {
+	log   logging.EventLogger
+	clock clock.Clock
 }
 
-func NewWithClock(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims LegacyClaimsFinder, clock clock.Clock) *ProviderIndexService {
+// Option configures an ProviderIndex.
+type Option func(conf *config)
 
+// WithLogger configures the service to use the passed logger instead of the
+// default logger.
+func WithLogger(log logging.EventLogger) Option {
+	return func(conf *config) {
+		conf.log = log
+	}
+}
+
+// WithClock configures the provider index with a mockable clock for testing.
+func WithClock(clock clock.Clock) Option {
+	return func(conf *config) {
+		conf.clock = clock
+	}
+}
+
+func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims legacy.ClaimsFinder, options ...Option) *ProviderIndexService {
+	conf := config{}
+	for _, option := range options {
+		option(&conf)
+	}
+	if conf.clock == nil {
+		conf.clock = clock.New()
+	}
+	if conf.log == nil {
+		conf.log = logging.Logger("providerindex")
+	}
 	return &ProviderIndexService{
 		providerStore:   providerStore,
 		noProviderStore: noProviderStore,
 		findClient:      findClient,
 		publisher:       publisher,
 		legacyClaims:    legacyClaims,
-		clock:           clock,
+		clock:           conf.clock,
+		log:             conf.log,
 	}
 }
 
@@ -160,10 +189,12 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 
 	// Prioritize IPNI results.
 	if ipniRes.err == nil && len(ipniRes.results) > 0 {
-		return pi.cacheResults(ctx, s, mh, ipniRes.results)
+		pi.cacheResults(ctx, s, mh, ipniRes.results)
+		return ipniRes.results, nil
 	}
 	if legacyRes.err == nil && len(legacyRes.results) > 0 {
-		return pi.cacheResults(ctx, s, mh, legacyRes.results)
+		pi.cacheResults(ctx, s, mh, legacyRes.results)
+		return legacyRes.results, nil
 	}
 
 	// Neither query returned data: if error(s) is/are present join them and return as one wrapped error.
@@ -179,38 +210,38 @@ func (pi *ProviderIndexService) getProviderResults(ctx context.Context, mh mh.Mu
 }
 
 // Helper function to cache results.
-func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, mh mh.Multihash, results []model.ProviderResult) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, mh mh.Multihash, results []model.ProviderResult) {
 	s.AddEvent("caching results")
 	n, err := pi.providerStore.Add(ctx, mh, results...)
 	if err != nil {
 		telemetry.Error(s, err, "caching results")
-		return nil, err
+		pi.log.Errorf("adding results to set: %w", err)
+		return
 	}
 	if n > 0 {
 		if err := pi.providerStore.SetExpirable(ctx, mh, true); err != nil {
 			telemetry.Error(s, err, "setting cache entry expiration")
-			return nil, err
+			pi.log.Errorf("setting expirable: %w", err)
 		}
 	}
-	return results, nil
 }
 
 // Helper function to cache empty results.
-func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s trace.Span, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
+func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s trace.Span, mh mh.Multihash, targetClaims []multicodec.Code) {
 	s.AddEvent("caching no results")
 	n, err := pi.noProviderStore.Add(ctx, mh, targetClaims...)
 	if err != nil {
 		telemetry.Error(s, err, "caching no provider results")
-		return nil, err
+		pi.log.Errorf("caching no results: %w", err)
+		return
 	}
 
 	if n > 0 {
 		if err := pi.noProviderStore.SetExpirable(ctx, mh, true); err != nil {
 			telemetry.Error(s, err, "setting no provider results expiration")
-			return nil, err
+			pi.log.Errorf("setting no results expirable: %w", err)
 		}
 	}
-	return nil, nil
 }
 
 func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, s trace.Span, mh mh.Multihash, targetClaims []multicodec.Code) ([]model.ProviderResult, error) {
@@ -306,12 +337,13 @@ func filterBySpace(results []model.ProviderResult, mh mh.Multihash, spaces []did
 func (pi *ProviderIndexService) Cache(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
 	// Cache the entries _with_ expiry - we cannot rely on the IPNI notifier to
 	// tell us when they are published since we are not publishing to IPNI.
-	return Cache(ctx, pi.providerStore, provider, contextID, digests, meta, true)
+	return Cache(ctx, pi.log, pi.providerStore, provider, contextID, digests, meta, true)
 }
 
-func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata, expire bool) error {
-	log := log.With("contextID", []byte(contextID))
-	log.Infof("caching provider results for provider: %s", provider.ID)
+func Cache(ctx context.Context, log logging.EventLogger, providerStore types.ProviderStore, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata, expire bool) error {
+	log.Infof("caching provider results for context: %s, provider: %s", contextID, provider.ID)
+	ctx, s := telemetry.StartSpan(ctx, "ProviderIndexService.Cache")
+	defer s.End()
 
 	mdb, err := meta.MarshalBinary()
 	if err != nil {
@@ -340,9 +372,10 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 
 		size++
 		if size >= MaxBatchSize {
+			s.AddEvent("commit batch")
 			err := batch.Commit(ctx)
 			if err != nil {
-				return fmt.Errorf("batch commiting: %w", err)
+				return fmt.Errorf("comitting batch: %w", err)
 			}
 			batch = providerStore.Batch()
 			size = 0
@@ -350,13 +383,15 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 	}
 
 	if size > 0 {
+		s.AddEvent("commit batch")
 		err = batch.Commit(ctx)
 		if err != nil {
 			return fmt.Errorf("comitting batch: %w", err)
 		}
 	}
 
-	log.Infof("cached %d provider results", total)
+	s.SetAttributes(attribute.KeyValue{Key: "total", Value: attribute.IntValue(total)})
+	log.Infof("cached %d provider results for context: %s", total, contextID)
 	return nil
 }
 
@@ -366,11 +401,10 @@ func Cache(ctx context.Context, providerStore types.ProviderStore, provider peer
 func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrInfo, contextID string, digests iter.Seq[mh.Multihash], meta meta.Metadata) error {
 	ctx, s := telemetry.StartSpan(ctx, "ProviderIndexService.Publish")
 	defer s.End()
-	log := log.With("contextID", []byte(contextID))
 
 	// cache but do not expire (entries will be expired via the notifier)
 	s.AddEvent("start pre-cache")
-	err := Cache(ctx, pi.providerStore, provider, contextID, digests, meta, false)
+	err := Cache(ctx, pi.log, pi.providerStore, provider, contextID, digests, meta, false)
 	if err != nil {
 		return fmt.Errorf("caching provider results: %w", err)
 	}
@@ -383,13 +417,13 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 	if err != nil {
 		if errors.Is(err, publisher.ErrAlreadyAdvertised) {
 			// skipping is ok in this case
-			log.Warnf("Skipping previously published advert")
+			pi.log.Warnf("Skipping previously published advert")
 			return nil
 		}
 
 		return fmt.Errorf("publishing advert: %w", err)
 	}
-	log.Infof("published IPNI advert: %s", id)
+	pi.log.Infof("published IPNI advert: %s", id)
 	return nil
 }
 
@@ -414,7 +448,6 @@ func filterableByContextID(result model.ProviderResult) bool {
 	md := metadata.MetadataContext.New()
 	err := md.UnmarshalBinary(result.Metadata)
 	if err != nil {
-		log.Warnf("decoding metadata: %w", err)
 		return false
 	}
 	// we're only able to filter results with location commitment metadata atm

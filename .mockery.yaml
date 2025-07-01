@@ -16,15 +16,17 @@ packages:
     interfaces:
       Finder:
       Service:
-  github.com/storacha/indexing-service/pkg/service/providerindex:
-    interfaces:
-      ContentToClaimsMapper:
-      LegacyClaimsFinder:
-      ProviderIndex:
   github.com/storacha/indexing-service/pkg/service/providercacher:
     interfaces:
       CachingQueue:
       ProviderCacher:
+  github.com/storacha/indexing-service/pkg/service/providerindex:
+    interfaces:
+      ProviderIndex:
+  github.com/storacha/indexing-service/pkg/service/providerindex/legacy:
+    interfaces:
+      ContentToClaimsMapper:
+      ClaimsFinder:
   github.com/storacha/indexing-service/pkg/types:
     interfaces:
       ContentClaimsCache:
@@ -60,3 +62,11 @@ packages:
           outpkg: "extmocks"
           filename: mock_IpniPublisher.go
           mockname: MockIpniPublisher
+  github.com/ipfs/go-log/v2:
+    interfaces:
+      EventLogger:
+        config:
+          inpackage: False
+          dir: "pkg/internal/testutil/extmocks"
+          outpkg: "extmocks"
+

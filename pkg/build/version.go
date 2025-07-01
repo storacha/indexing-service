@@ -13,7 +13,7 @@ var (
 	// version is the built version.
 	// Set with ldflags in .goreleaser.yaml via -ldflags="-X github.com/storacha/indexing-service/pkg/build.version=v{{.Version}}".
 	version string
-	// Version returns the current version of the Lassie application
+	// Version returns the current version of the Indexing Service application
 	Version string
 	// UserAgent is the user agent used for HTTP requests
 	UserAgent string

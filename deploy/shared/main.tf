@@ -26,6 +26,24 @@ provider "aws" {
   }
 }
 
-resource "aws_route53_zone" "primary" {
-  name = "${var.app}.${local.network}"
+removed {
+  from = aws_route53_zone.primary
+}
+
+import {
+  to = aws_route53_zone.hot
+  id = "Z069841432CRU732HASNL"
+}
+
+resource "aws_route53_zone" "hot" {
+  name = "${var.app}.storacha.network"
+}
+
+import {
+  to = aws_route53_zone.warm
+  id = "Z0845167J9GR7IUCNBTW"
+}
+
+resource "aws_route53_zone" "warm" {
+  name = "${var.app}.warm.storacha.network"
 }

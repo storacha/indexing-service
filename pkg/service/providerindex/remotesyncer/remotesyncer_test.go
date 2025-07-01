@@ -1,4 +1,4 @@
-package providerindex
+package remotesyncer
 
 import (
 	"bytes"
@@ -70,7 +70,7 @@ func TestHandleRemoteSync(t *testing.T) {
 
 	prev := ads[hd.String()].PreviousID
 
-	syncer := NewRemoteSyncer(&providerStore, &ipniStore)
+	syncer := New(&providerStore, &ipniStore)
 	syncer.HandleRemoteSync(context.Background(), prev, nil)
 	requireExpirable(t, &providerStore, &ipniStore, hd, prev, false)
 	requireExpirable(t, &providerStore, &ipniStore, prev, nil, true)

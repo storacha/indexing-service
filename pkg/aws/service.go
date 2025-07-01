@@ -17,6 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/getsentry/sentry-go"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/storacha/go-libstoracha/ipnipublisher/store"
@@ -26,11 +28,12 @@ import (
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
+	"github.com/storacha/indexing-service/pkg/build"
 	"github.com/storacha/indexing-service/pkg/construct"
 	"github.com/storacha/indexing-service/pkg/presets"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
-	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/legacy"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/storacha/indexing-service/pkg/types"
 )
@@ -92,6 +95,8 @@ type Config struct {
 	LegacyAllocationsTableRegion      string
 	LegacyDataBucketURL               string
 	BaseTraceSampleRatio              float64
+	SentryDSN                         string
+	SentryEnvironment                 string
 	HoneycombAPIKey                   string
 	PrincipalMapping                  map[string]string
 	principal.Signer
@@ -240,6 +245,8 @@ func FromEnv(ctx context.Context) Config {
 		LegacyAllocationsTableRegion:      mustGetEnv("LEGACY_ALLOCATIONS_TABLE_REGION"),
 		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
 		BaseTraceSampleRatio:              mustGetFloat("BASE_TRACE_SAMPLE_RATIO"),
+		SentryDSN:                         os.Getenv("SENTRY_DSN"),
+		SentryEnvironment:                 os.Getenv("SENTRY_ENVIRONMENT"),
 		HoneycombAPIKey:                   os.Getenv("HONEYCOMB_API_KEY"),
 		PrincipalMapping:                  principalMapping,
 	}
@@ -306,6 +313,21 @@ func Construct(cfg Config) (types.Service, error) {
 	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(legacyClaimsCfg, cfg.LegacyClaimsBucket, ""))
 	legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
 
+	var provIndexLog logging.EventLogger
+	if cfg.SentryDSN != "" && cfg.SentryEnvironment != "" {
+		err = sentry.Init(sentry.ClientOptions{
+			Dsn:           cfg.SentryDSN,
+			Environment:   cfg.SentryEnvironment,
+			Release:       build.Version,
+			Transport:     sentry.NewHTTPSyncTransport(),
+			EnableTracing: false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("initializing sentry: %w", err)
+		}
+		provIndexLog = telemetry.NewSentryLogger("providerindex")
+	}
+
 	service, err := construct.Construct(
 		cfg.ServiceConfig,
 		construct.SkipNotification(),
@@ -313,7 +335,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithPublisherStore(publisherStore),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims([]providerindex.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL),
+		construct.WithLegacyClaims([]legacy.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
 		construct.WithProvidersClient(redis.NewClusterClientAdapter(providersClient)),
 		construct.WithNoProvidersClient(noProvidersClient),
@@ -323,6 +345,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.WithNoProvidersCacheOptions(redis.ExpirationTime(time.Duration(cfg.NoProvidersCacheExpirationSeconds)*time.Second)),
 		construct.WithClaimsCacheOptions(redis.ExpirationTime(time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second)),
 		construct.WithIndexesCacheOptions(redis.ExpirationTime(time.Duration(cfg.IndexesCacheExpirationSeconds)*time.Second)),
+		construct.WithProviderIndexLogger(provIndexLog),
 	)
 	if err != nil {
 		return nil, err

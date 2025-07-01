@@ -19,7 +19,7 @@ import (
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/principal"
-	"github.com/storacha/indexing-service/pkg/service/providerindex"
+	"github.com/storacha/indexing-service/pkg/service/providerindex/legacy"
 )
 
 type BlockIndexStore interface {
@@ -39,7 +39,7 @@ type blockIndexTableMapper struct {
 	claimExp        time.Duration
 }
 
-var _ providerindex.ContentToClaimsMapper = blockIndexTableMapper{}
+var _ legacy.ContentToClaimsMapper = blockIndexTableMapper{}
 
 // NewBlockIndexTableMapper creates a new ContentToClaimsMapper that synthethizes location claims from data in the
 // blockIndexStore - a giant index of historical data, mapping multihashes to bucket keys/URLs and their byte offsets.
