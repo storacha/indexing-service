@@ -104,7 +104,7 @@ func (s *SQSCachingQueue) ReadJobs(ctx context.Context, maxJobs int) ([]provider
 	receiveOutput, err := s.sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(s.queueURL),
 		MaxNumberOfMessages: int32(maxJobs),
-		WaitTimeSeconds:     0, // don't wait for messages
+		WaitTimeSeconds:     20, // enable long-polling
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to receive messages from SQS: %w", err)

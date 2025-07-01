@@ -4,27 +4,49 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/storacha/go-libstoracha/jobqueue"
 )
 
 const (
-	defaultPollInterval = 5 * time.Second
 	defaultJobBatchSize = 10
+	defaultConcurrency  = 100
 
-	maxJobBatchSize    = 10
-	maxParallelBatches = 100
+	maxJobBatchSize = 10
 )
 
 var log = logging.Logger("service/providercacher")
+
+// config
+type config struct {
+	jobBatchSize int
+	concurrency  int
+}
+
+// Option configures the CachingQueuePoller
+type Option func(*config)
+
+// WithJobBatchSize sets the maximum number of jobs to process in a batch
+func WithJobBatchSize(size int) Option {
+	return func(cfg *config) {
+		cfg.jobBatchSize = size
+	}
+}
+
+// WithConcurrency sets the maximum number of concurrent job processing
+func WithConcurrency(concurrency int) Option {
+	return func(cfg *config) {
+		cfg.concurrency = concurrency
+	}
+}
 
 // CachingQueuePoller polls a queue for provider caching jobs and processes them
 // using the provided ProviderCacher and SQSCachingDecoder.
 type CachingQueuePoller struct {
 	queue        CachingQueue
 	cacher       ProviderCacher
-	interval     time.Duration
+	jq           *jobqueue.JobQueue[ProviderCachingJob]
 	jobBatchSize int
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -33,40 +55,44 @@ type CachingQueuePoller struct {
 	stopOnce     sync.Once
 }
 
-// Option configures the CachingQueuePoller
-type Option func(*CachingQueuePoller)
-
-// WithPollInterval sets the polling interval for the queue
-func WithPollInterval(interval time.Duration) Option {
-	return func(p *CachingQueuePoller) {
-		p.interval = interval
-	}
-}
-
-// WithJobBatchSize sets the maximum number of jobs to process in a batch
-func WithJobBatchSize(size int) Option {
-	return func(p *CachingQueuePoller) {
-		p.jobBatchSize = size
-	}
-}
-
 // NewCachingQueuePoller creates a new CachingQueuePoller instance.
 func NewCachingQueuePoller(queue CachingQueue, cacher ProviderCacher, opts ...Option) (*CachingQueuePoller, error) {
+	cfg := &config{
+		jobBatchSize: defaultJobBatchSize,
+		concurrency:  defaultConcurrency,
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	jobHandler := func(ctx context.Context, job ProviderCachingJob) error {
+		// Process the job
+		if err := cacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index); err != nil {
+			return fmt.Errorf("Failed to cache provider %s: %w", job.Provider, err)
+		}
+
+		// Delete the job if processing was successful
+		if err := queue.DeleteJob(ctx, job.ID); err != nil {
+			return fmt.Errorf("Failed to delete job %s: %w", job.ID, err)
+		}
+
+		return nil
+	}
+
+	jq := jobqueue.NewJobQueue[ProviderCachingJob](
+		jobqueue.JobHandler(jobHandler),
+		jobqueue.WithConcurrency(cfg.concurrency),
+		jobqueue.WithErrorHandler(func(err error) {
+			log.Errorw("caching provider index", "error", err)
+		}))
+
 	poller := &CachingQueuePoller{
 		queue:        queue,
 		cacher:       cacher,
-		interval:     defaultPollInterval,
-		jobBatchSize: defaultJobBatchSize,
+		jq:           jq,
+		jobBatchSize: cfg.jobBatchSize,
 		stopped:      make(chan struct{}),
-	}
-
-	// Apply options
-	for _, opt := range opts {
-		opt(poller)
-	}
-
-	if poller.interval <= 0 {
-		return nil, fmt.Errorf("poll interval %v must be positive", poller.interval)
 	}
 
 	if poller.jobBatchSize > maxJobBatchSize {
@@ -81,21 +107,18 @@ func (p *CachingQueuePoller) Start() {
 	p.startOnce.Do(func() {
 		// Create root context
 		p.ctx, p.cancel = context.WithCancel(context.Background())
+		p.jq.Startup()
 		log.Info("Starting caching queue poller")
 
 		go func() {
-			timer := time.NewTimer(p.interval)
-
 			for {
 				select {
-				case <-timer.C:
-					p.processJobs(p.ctx)
-					timer.Reset(p.interval)
-
 				case <-p.ctx.Done():
 					log.Info("Stopping polling loop")
 					close(p.stopped)
 					return
+				default:
+					p.processJobs(p.ctx)
 				}
 			}
 		}()
@@ -112,80 +135,24 @@ func (p *CachingQueuePoller) Stop() {
 
 		// Wait for the polling loop to finish
 		<-p.stopped
+
+		p.jq.Shutdown(p.ctx)
 	})
 }
 
 // processJobs reads and processes all available jobs from the queue in batches
 func (p *CachingQueuePoller) processJobs(ctx context.Context) {
-	var wg sync.WaitGroup
-	maxGoroutines := make(chan struct{}, maxParallelBatches) // Semaphore to limit concurrent batches
+	// Read a batch of jobs and queue them in the job queue
+	jobs, err := p.queue.ReadJobs(ctx, p.jobBatchSize)
+	if err != nil {
+		log.Errorf("Error reading jobs from queue: %v", err)
+		return
+	}
 
-	// Keep processing batches until the queue is empty
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case maxGoroutines <- struct{}{}: // Acquire semaphore
-		}
-
-		// Read a batch of jobs
-		jobs, err := p.queue.ReadJobs(ctx, p.jobBatchSize)
+	for _, job := range jobs {
+		err := p.jq.Queue(ctx, job)
 		if err != nil {
-			log.Errorf("Error reading jobs from queue: %v", err)
-			break
+			log.Errorf("Error queuing job: %v", err)
 		}
-
-		if len(jobs) == 0 {
-			// No more jobs in the queue
-			break
-		}
-
-		// Process batch in a new goroutine
-		wg.Add(1)
-		go func(batch []ProviderCachingJob) {
-			defer func() {
-				// Release semaphore when done
-				<-maxGoroutines
-				wg.Done()
-			}()
-
-			p.processBatch(ctx, batch)
-		}(jobs)
 	}
-
-	// Wait for all batches to complete
-	wg.Wait()
-}
-
-// processBatch processes a single batch of jobs in parallel
-func (p *CachingQueuePoller) processBatch(ctx context.Context, batch []ProviderCachingJob) {
-	var wg sync.WaitGroup
-
-	// Process each job in the batch in parallel
-	for _, job := range batch {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			// Process the job
-			select {
-			case <-ctx.Done():
-				log.Debug("Context canceled, stopping job processing")
-				return
-			default:
-				if err := p.cacher.CacheProviderForIndexRecords(ctx, job.Provider, job.Index); err != nil {
-					log.Errorf("Failed to cache provider %s: %v", job.Provider, err)
-					return
-				}
-
-				// Delete the job if processing was successful
-				if err := p.queue.DeleteJob(ctx, job.ID); err != nil {
-					log.Errorf("Failed to delete job %s: %v", job.ID, err)
-				}
-			}
-		}()
-	}
-
-	// Wait for all jobs in this batch to complete
-	wg.Wait()
 }
