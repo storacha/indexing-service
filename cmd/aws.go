@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/go-libstoracha/ipnipublisher/notifier"
+	"github.com/storacha/go-libstoracha/ipnipublisher/store"
 	"github.com/storacha/go-libstoracha/metadata"
 	userver "github.com/storacha/go-ucanto/server"
 	"github.com/storacha/indexing-service/pkg/aws"
@@ -13,8 +15,6 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex/remotesyncer"
 	"github.com/storacha/indexing-service/pkg/telemetry"
-	"github.com/storacha/ipni-publisher/pkg/notifier"
-	"github.com/storacha/ipni-publisher/pkg/store"
 	"github.com/urfave/cli/v2"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
