@@ -9,6 +9,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -o indexer ./cmd
 
 FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /indexing-service/indexer /usr/bin/
 
 EXPOSE 8080
