@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/getsentry/sentry-go"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -108,18 +107,8 @@ func FromEnv(ctx context.Context) Config {
 	if err != nil {
 		panic(fmt.Errorf("loading aws default config: %w", err))
 	}
-	ssmClient := ssm.NewFromConfig(awsConfig)
-	response, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(mustGetEnv("PRIVATE_KEY")),
-		WithDecryption: aws.Bool(true),
-	})
-	if err != nil {
-		panic(fmt.Errorf("retrieving private key: %w", err))
-	}
-	if response.Parameter == nil || response.Parameter.Value == nil {
-		panic(ErrNoPrivateKey)
-	}
-	id, err := ed25519.Parse(*response.Parameter.Value)
+
+	id, err := ed25519.Parse(mustGetEnv("PRIVATE_KEY"))
 	if err != nil {
 		panic(fmt.Errorf("parsing private key: %s", err))
 	}
@@ -233,7 +222,6 @@ func FromEnv(ctx context.Context) Config {
 		IPNIStoreBucket:                   mustGetEnv("IPNI_STORE_BUCKET_NAME"),
 		IPNIStorePrefix:                   ipniStoreKeyPrefix,
 		NotifierHeadBucket:                mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
-		NotifierTopicArn:                  mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
 		ClaimStoreBucket:                  mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
 		ClaimStorePrefix:                  os.Getenv("CLAIM_STORE_KEY_PREFIX"),
 		LegacyClaimsTableName:             mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
