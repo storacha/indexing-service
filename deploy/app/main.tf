@@ -40,7 +40,7 @@ provider "aws" {
 
 
 module "app" {
-  source = "github.com/storacha/storoku//app?ref=v0.4.0"
+  source = "github.com/storacha/storoku//app?ref=v0.4.2"
   private_key = var.private_key
   httpport = 8080
   principal_mapping = var.principal_mapping
