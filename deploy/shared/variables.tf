@@ -1,11 +1,19 @@
 variable "app" {
   description = "The name of the application"
   type        = string
-  default = "indexer"
 }
 
-variable "allowed_account_ids" {
-  description = "account ids used for AWS"
-  type = list(string)
-  default = ["505595374361"]
+variable "allowed_account_id" {
+  description = "account id used for AWS"
+  type = string
+}
+
+variable "domain_base" {
+  type = string
+  default = ""
+}
+
+
+variable "cloudflare_zone_id" {
+  type = string
 }
