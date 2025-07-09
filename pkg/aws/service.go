@@ -91,6 +91,10 @@ type Config struct {
 	LegacyClaimsBucket                string
 	LegacyBlockIndexTableName         string
 	LegacyBlockIndexTableRegion       string
+	LegacyStoreTableName              string
+	LegacyStoreTableRegion            string
+	LegacyBlobRegistryTableName       string
+	LegacyBlobRegistryTableRegion     string
 	LegacyAllocationsTableName        string
 	LegacyAllocationsTableRegion      string
 	LegacyDataBucketURL               string
@@ -241,6 +245,10 @@ func FromEnv(ctx context.Context) Config {
 		LegacyClaimsBucket:                mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
 		LegacyBlockIndexTableName:         mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
 		LegacyBlockIndexTableRegion:       mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
+		LegacyStoreTableName:              mustGetEnv("LEGACY_STORE_TABLE_NAME"),
+		LegacyStoreTableRegion:            mustGetEnv("LEGACY_STORE_TABLE_REGION"),
+		LegacyBlobRegistryTableName:       mustGetEnv("LEGACY_BLOB_REGISTRY_TABLE_NAME"),
+		LegacyBlobRegistryTableRegion:     mustGetEnv("LEGACY_BLOB_REGISTRY_TABLE_REGION"),
 		LegacyAllocationsTableName:        mustGetEnv("LEGACY_ALLOCATIONS_TABLE_NAME"),
 		LegacyAllocationsTableRegion:      mustGetEnv("LEGACY_ALLOCATIONS_TABLE_REGION"),
 		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
@@ -302,10 +310,20 @@ func Construct(cfg Config) (types.Service, error) {
 	blockIndexCfg := cfg.Config.Copy()
 	blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
 	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
+	storeTableCfg := cfg.Config.Copy()
+	storeTableCfg.Region = cfg.LegacyStoreTableRegion
+	blobRegistryTableCfg := cfg.Config.Copy()
+	blobRegistryTableCfg.Region = cfg.LegacyBlobRegistryTableRegion
+	legacyMigratedShardChecker := NewDynamoMigratedShardChecker(
+		dynamodb.NewFromConfig(storeTableCfg),
+		dynamodb.NewFromConfig(blobRegistryTableCfg),
+		cfg.LegacyStoreTableName,
+		cfg.LegacyBlobRegistryTableName,
+	)
 	// allow claims synthethized from the block index table to live longer after they are expired in the cache
 	// so that the service doesn't return cached but expired delegations
 	synthetizedClaimExp := time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second + 1*time.Hour
-	blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, cfg.LegacyDataBucketURL, synthetizedClaimExp)
+	blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, legacyMigratedShardChecker, cfg.LegacyDataBucketURL, synthetizedClaimExp)
 	if err != nil {
 		return nil, fmt.Errorf("creating block index table mapper: %w", err)
 	}
