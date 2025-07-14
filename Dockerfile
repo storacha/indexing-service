@@ -6,7 +6,7 @@ COPY go.* .
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=0 go build -o indexer ./cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o indexer ./cmd
 
 FROM scratch
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
