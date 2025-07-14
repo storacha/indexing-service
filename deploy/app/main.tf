@@ -104,20 +104,20 @@ module "app" {
   ]
   buckets = [
     {
-      name = "provider-caching"
+      name = "provider-caching-bucket"
       public = false
       object_expiration_days = 14
     },
     {
-      name = "ipni-store"
+      name = "ipni-store-bucket"
       public = true
     },
     {
-      name = "notifier-head"
+      name = "notifier-head-bucket"
       public = false
     },
     {
-      name = "claim-store"
+      name = "claim-store-bucket"
       public = false
     },
   ]
