@@ -97,6 +97,7 @@ type Config struct {
 	LegacyBlobRegistryTableRegion     string
 	LegacyAllocationsTableName        string
 	LegacyAllocationsTableRegion      string
+	LegacyDotStorageBucketPrefixes    []string // legacy .storage buckets
 	LegacyDataBucketURL               string
 	BaseTraceSampleRatio              float64
 	SentryDSN                         string
@@ -252,6 +253,7 @@ func FromEnv(ctx context.Context) Config {
 		LegacyAllocationsTableName:        mustGetEnv("LEGACY_ALLOCATIONS_TABLE_NAME"),
 		LegacyAllocationsTableRegion:      mustGetEnv("LEGACY_ALLOCATIONS_TABLE_REGION"),
 		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		LegacyDotStorageBucketPrefixes:    strings.Split(mustGetEnv("LEGACY_DOT_STORAGE_BUCKET_PREFIXES"), ","),
 		BaseTraceSampleRatio:              mustGetFloat("BASE_TRACE_SAMPLE_RATIO"),
 		SentryDSN:                         os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:                 os.Getenv("SENTRY_ENVIRONMENT"),
@@ -323,7 +325,7 @@ func Construct(cfg Config) (types.Service, error) {
 	// allow claims synthethized from the block index table to live longer after they are expired in the cache
 	// so that the service doesn't return cached but expired delegations
 	synthetizedClaimExp := time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second + 1*time.Hour
-	blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, legacyMigratedShardChecker, cfg.LegacyDataBucketURL, synthetizedClaimExp)
+	blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, legacyMigratedShardChecker, cfg.LegacyDataBucketURL, synthetizedClaimExp, cfg.LegacyDotStorageBucketPrefixes)
 	if err != nil {
 		return nil, fmt.Errorf("creating block index table mapper: %w", err)
 	}

@@ -29,6 +29,11 @@ variable "legacy_block_index_table_region" {
   default = "us-west-2"
 }
 
+variable "legacy_dotstorage_bucket_prefixes" {
+  description = "list of prefixes for the legacy dotstorage buckets"
+  type = list(string)
+  default = []
+}
 
 variable "legacy_store_table_name" {
   description = "The name of the legacy store DynamoDB table"
@@ -36,11 +41,10 @@ variable "legacy_store_table_name" {
   default = ""
 }
 
-# the store table is always deployed in us-west-2 for both prod and staging
 variable "legacy_store_table_region" {
   description = "The region where the legacy store DynamoDB table is provisioned"
   type = string
-  default = "us-west-2"
+  default = ""
 }
 
 variable "legacy_blob_registry_table_name" {
@@ -49,11 +53,10 @@ variable "legacy_blob_registry_table_name" {
   default = ""
 }
 
-# the blob registry table is always deployed in us-west-2 for both prod and staging
 variable "legacy_blob_registry_table_region" {
   description = "The region where the legacy blob registry table DynamoDB table is provisioned"
   type = string
-  default = "us-west-2"
+  default = ""
 }
 
 variable "legacy_allocations_table_name" {
@@ -74,7 +77,9 @@ locals {
     inferred_legacy_claims_bucket_name = var.legacy_claims_bucket_name != "" ? var.legacy_claims_bucket_name : "${terraform.workspace == "prod" ? "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8" : "staging-content-claims-buc-claimsv1bucketefd46802-1xx2brszve6t3"}"
     inferred_legacy_block_index_table_name = var.legacy_block_index_table_name != "" ? var.legacy_block_index_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
     inferred_legacy_store_table_name = var.legacy_store_table_name != "" ? var.legacy_store_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-store"
+    inferred_legacy_store_table_region = var.legacy_store_table_region != "" ? var.legacy_store_table_region : "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
     inferred_legacy_blob_registry_table_name = var.legacy_blob_registry_table_name != "" ? var.legacy_blob_registry_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-blob-registry"
+    inferred_legacy_blob_registry_table_region = var.legacy_blob_registry_table_region != "" ? var.legacy_blob_registry_table_region : "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
     inferred_legacy_allocations_table_name = var.legacy_allocations_table_name != "" ? var.legacy_allocations_table_name : "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-allocation"
     inferred_legacy_allocations_table_region = var.legacy_allocations_table_region != "" ? var.legacy_allocations_table_region : "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
 }
@@ -106,7 +111,7 @@ data "aws_dynamodb_table" "legacy_block_index_table" {
 
 provider "aws" {
   alias = "store"
-  region = var.legacy_store_table_region
+  region = local.inferred_legacy_store_table_region
 }
 
 data "aws_dynamodb_table" "legacy_store_table" {
@@ -116,7 +121,7 @@ data "aws_dynamodb_table" "legacy_store_table" {
 
 provider "aws" {
   alias = "blob_registry"
-  region = var.legacy_blob_registry_table_region
+  region = local.inferred_legacy_blob_registry_table_region
 }
 
 data "aws_dynamodb_table" "legacy_blob_registry_table" {

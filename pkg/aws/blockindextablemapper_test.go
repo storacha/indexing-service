@@ -24,7 +24,10 @@ import (
 func TestBlockIndexTableMapper(t *testing.T) {
 	id := testutil.Service
 	bucketURL := testutil.Must(url.Parse("https://test.bucket.example.com"))(t)
-
+	dotStorageBuckets := []string{
+		"us-west-2/dotstorage-prod-1",
+		"us-east-2/dotstorage-prod-0",
+	}
 	fixtures := []struct {
 		name                string
 		digest              multihash.Multihash
@@ -37,10 +40,20 @@ func TestBlockIndexTableMapper(t *testing.T) {
 		noClaim bool
 	}{
 		{
-			name:   "b32 multihash key",
+			name:   "b32 multihash key, non-storage bucket",
 			digest: testutil.Must(digestutil.Parse("zQmNUfyG3ynAkCzPFLsijsJwEFpPXqJZF1CJpT9GLYmgBBd"))(t),
 			record: BlockIndexRecord{
 				CarPath: "us-west-2/nftstorage-prod-1/raw/bafyreifvbqc4e5qphijgpj43qxk5ndw2vbfbhkzuuuvpo4cturr2dfk45e/315318734258474846/ciqd7nsjnsrsi6pqulv5j46qel7gw6oeo644o5ef3zopne37xad5oui.car",
+				Offset:  128844,
+				Length:  200,
+			},
+			expectedURL: bucketURL.JoinPath("/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq.car"),
+		},
+		{
+			name:   "b32 multihash key, dot storage bucket, nft prefix",
+			digest: testutil.Must(digestutil.Parse("zQmNUfyG3ynAkCzPFLsijsJwEFpPXqJZF1CJpT9GLYmgBBd"))(t),
+			record: BlockIndexRecord{
+				CarPath: "us-west-2/dotstorage-prod-1/raw/bafyreifvbqc4e5qphijgpj43qxk5ndw2vbfbhkzuuuvpo4cturr2dfk45e/nft-315318734258474846/ciqd7nsjnsrsi6pqulv5j46qel7gw6oeo644o5ef3zopne37xad5oui.car",
 				Offset:  128844,
 				Length:  200,
 			},
@@ -63,6 +76,19 @@ func TestBlockIndexTableMapper(t *testing.T) {
 			digest: testutil.Must(digestutil.Parse("zQmNUfyG3ynAkCzPFLsijsJwEFpPXqJZF1CJpT9GLYmgBBd"))(t),
 			record: BlockIndexRecord{
 				CarPath: "us-west-2/dotstorage-prod-1/raw/bafyreifvbqc4e5qphijgpj43qxk5ndw2vbfbhkzuuuvpo4cturr2dfk45e/315318734258474846/ciqd7nsjnsrsi6pqulv5j46qel7gw6oeo644o5ef3zopne37xad5oui.car",
+				Offset:  128844,
+				Length:  200,
+			},
+			migratedShardCheck:  cidlink.Link{Cid: testutil.Must(cid.Parse("bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq"))(t)},
+			migratedShardResult: result.Ok[bool, error](false),
+			expectedURL:         nil,
+			noClaim:             true,
+		},
+		{
+			name:   "b32 multihash key, dot storage, not migrated",
+			digest: testutil.Must(digestutil.Parse("zQmNUfyG3ynAkCzPFLsijsJwEFpPXqJZF1CJpT9GLYmgBBd"))(t),
+			record: BlockIndexRecord{
+				CarPath: "us-east-2/dotstorage-prod-0/raw/bafyreifvbqc4e5qphijgpj43qxk5ndw2vbfbhkzuuuvpo4cturr2dfk45e/315318734258474846/ciqd7nsjnsrsi6pqulv5j46qel7gw6oeo644o5ef3zopne37xad5oui.car",
 				Offset:  128844,
 				Length:  200,
 			},
@@ -112,7 +138,7 @@ func TestBlockIndexTableMapper(t *testing.T) {
 			if f.migratedShardCheck != nil {
 				mockMigratedShardChecker.data[f.migratedShardCheck] = f.migratedShardResult
 			}
-			bitMapper, err := NewBlockIndexTableMapper(id, mockStore, mockMigratedShardChecker, bucketURL.String(), time.Hour)
+			bitMapper, err := NewBlockIndexTableMapper(id, mockStore, mockMigratedShardChecker, bucketURL.String(), time.Hour, dotStorageBuckets)
 			require.NoError(t, err)
 
 			claimCids, err := bitMapper.GetClaims(context.Background(), f.digest)
@@ -148,7 +174,7 @@ func TestBlockIndexTableMapper(t *testing.T) {
 	t.Run("returns ErrKeyNotFound when block index errors with not found", func(t *testing.T) {
 		mockStore := newMockBlockIndexStore()
 		mockMigratedShardChecker := newMockMigratedShardChecker()
-		bitMapper, err := NewBlockIndexTableMapper(id, mockStore, mockMigratedShardChecker, bucketURL.String(), time.Hour)
+		bitMapper, err := NewBlockIndexTableMapper(id, mockStore, mockMigratedShardChecker, bucketURL.String(), time.Hour, dotStorageBuckets)
 		require.NoError(t, err)
 
 		_, err = bitMapper.GetClaims(context.Background(), testutil.RandomMultihash())

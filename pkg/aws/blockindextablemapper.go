@@ -42,6 +42,7 @@ type blockIndexTableMapper struct {
 	migratedShardChecker MigratedShardChecker
 	bucketURL            url.URL
 	claimExp             time.Duration
+	bucketPrefixes       []string // e.g. "us-west-2/dotstorage-prod-1"
 }
 
 var _ legacy.ContentToClaimsMapper = blockIndexTableMapper{}
@@ -54,7 +55,7 @@ var _ legacy.ContentToClaimsMapper = blockIndexTableMapper{}
 //
 // Using the data in the blockIndexStore, the service will materialize content claims using the id param as the
 // signing key. Claims will be set to expire in the amount of time given by the claimExpiration parameter.
-func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexStore, migratedShardChecker MigratedShardChecker, bucketURL string, claimExpiration time.Duration) (blockIndexTableMapper, error) {
+func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexStore, migratedShardChecker MigratedShardChecker, bucketURL string, claimExpiration time.Duration, bucketPrefixes []string) (blockIndexTableMapper, error) {
 	burl, err := url.Parse(bucketURL)
 	if err != nil {
 		return blockIndexTableMapper{}, fmt.Errorf("parsing bucket URL: %w", err)
@@ -66,6 +67,7 @@ func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexSto
 		migratedShardChecker: migratedShardChecker,
 		bucketURL:            *burl,
 		claimExp:             claimExpiration,
+		bucketPrefixes:       bucketPrefixes,
 	}, nil
 }
 
@@ -94,7 +96,7 @@ func (bit blockIndexTableMapper) GetClaims(ctx context.Context, contentHash mult
 			}
 
 			// check if shard is a web3.storage shard
-			if strings.Join(parts[:2], "/") == "us-west-2/dotstorage-prod-1" {
+			if isLegacyDotStorage(parts, bit.bucketPrefixes) {
 				// check if the shard has been migrated -- if not, skip it
 				migrated, err := bit.migratedShardChecker.ShardMigrated(ctx, shard)
 				if err != nil {
@@ -151,6 +153,21 @@ func (bit blockIndexTableMapper) GetClaims(ctx context.Context, contentHash mult
 	}
 
 	return claimCids, nil
+}
+
+func isLegacyDotStorage(parts []string, bucketPrefixes []string) bool {
+	if len(parts) < 3 {
+		return false
+	}
+	for _, prefix := range bucketPrefixes {
+		fmt.Println(strings.Join(parts, "/"))
+		fmt.Println(prefix)
+		fmt.Println(strings.Join(parts[:2], "/") == prefix && !strings.Contains(parts[4], "nft-"))
+		if strings.Join(parts[:2], "/") == prefix && !strings.Contains(parts[4], "nft-") {
+			return true
+		}
+	}
+	return false
 }
 
 func bucketKeyToShardLink(key string) (ipld.Link, error) {
