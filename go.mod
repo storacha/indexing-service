@@ -30,7 +30,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/extra/redisotel/v9 v9.10.0
 	github.com/redis/go-redis/v9 v9.10.0
-	github.com/storacha/go-libstoracha v0.1.0
+	github.com/storacha/go-libstoracha v0.1.1
 	github.com/storacha/go-ucanto v0.4.1
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
