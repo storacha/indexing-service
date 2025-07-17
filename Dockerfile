@@ -1,14 +1,17 @@
 FROM golang:1.24-bookworm AS build
 
-WORKDIR /go/src/indexing-service
+WORKDIR /indexing-service
 
 COPY go.* .
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=0 go build -o /go/bin/indexing-service ./cmd
+RUN CGO_ENABLED=0 go build -o indexer ./cmd
 
-FROM gcr.io/distroless/static-debian12
-COPY --from=build /go/bin/indexing-service /usr/bin/
+FROM scratch
+COPY --from=build /indexing-service/indexer /usr/bin/
 
-ENTRYPOINT ["/usr/bin/indexing-service"]
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/bin/indexer"]
+CMD ["aws", "--port", "8080"]

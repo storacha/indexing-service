@@ -660,6 +660,8 @@ github.com/storacha/go-libstoracha v0.1.0 h1:MrR2CAy4/GGoMg3n7BUHqlPZY8aloln68zb
 github.com/storacha/go-libstoracha v0.1.0/go.mod h1:sYAYekFrIe/RlYhmamDhmdJyEZk/uHmiUkQ7QksgBLU=
 github.com/storacha/go-ucanto v0.4.1 h1:yas0Ob0l7aV4JDUS5WZiNV73ov6/9qPkuKseTIBCAkY=
 github.com/storacha/go-ucanto v0.4.1/go.mod h1:/I6qtE+oDHc+6lBc/glN+RFx0cbP/mDj4gihD7YezWc=
+github.com/storacha/ipni-publisher v0.0.0-20250211095024-8c9199a49c0d h1:OXQ8MvZuW9bNu1BYrHx1T8zdntAhM4MFCHKaI/nIBFM=
+github.com/storacha/ipni-publisher v0.0.0-20250211095024-8c9199a49c0d/go.mod h1:RSXcupgcsMXuFCrk+fqJHTfJKUNygt7bPFe5yJ+V9tE=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.5.2 h1:xuMeJ0Sdp5ZMRXx/aWO6RZxdr3beISkG5/G/aIRr3pY=
 github.com/stretchr/objx v0.5.2/go.mod h1:FRsXN1f5AsAjCGJKqEizvkpNtU+EGNCLh3NxZ/8L+MA=
