@@ -215,13 +215,13 @@ func (pi *ProviderIndexService) cacheResults(ctx context.Context, s trace.Span, 
 	n, err := pi.providerStore.Add(ctx, mh, results...)
 	if err != nil {
 		telemetry.Error(s, err, "caching results")
-		pi.log.Errorf("adding results to set: %w", err)
+		pi.log.Errorf("adding results to set: %s", err)
 		return
 	}
 	if n > 0 {
 		if err := pi.providerStore.SetExpirable(ctx, mh, true); err != nil {
 			telemetry.Error(s, err, "setting cache entry expiration")
-			pi.log.Errorf("setting expirable: %w", err)
+			pi.log.Errorf("setting expirable: %s", err)
 		}
 	}
 }
@@ -232,14 +232,14 @@ func (pi *ProviderIndexService) cacheNoProviderResults(ctx context.Context, s tr
 	n, err := pi.noProviderStore.Add(ctx, mh, targetClaims...)
 	if err != nil {
 		telemetry.Error(s, err, "caching no provider results")
-		pi.log.Errorf("caching no results: %w", err)
+		pi.log.Errorf("caching no results: %s", err)
 		return
 	}
 
 	if n > 0 {
 		if err := pi.noProviderStore.SetExpirable(ctx, mh, true); err != nil {
 			telemetry.Error(s, err, "setting no provider results expiration")
-			pi.log.Errorf("setting no results expirable: %w", err)
+			pi.log.Errorf("setting no results expirable: %s", err)
 		}
 	}
 }

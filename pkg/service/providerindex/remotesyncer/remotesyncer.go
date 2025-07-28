@@ -57,24 +57,24 @@ func (rs *RemoteSyncer) HandleRemoteSync(ctx context.Context, head, prev ipld.Li
 	for {
 		ad, err := rs.store.Advert(ctx, cur)
 		if err != nil {
-			rs.log.Errorf("getting advert: %s: %w", cur, err)
+			rs.log.Errorf("getting advert: %s: %s", cur, err)
 			return
 		}
 		batch := rs.providerStore.Batch()
 		for d, err := range rs.store.Entries(ctx, ad.Entries) {
 			if err != nil {
-				rs.log.Errorf("iterating advert entries: %s (advert) -> %s (entries): %w", cur, ad.Entries, err)
+				rs.log.Errorf("iterating advert entries: %s (advert) -> %s (entries): %s", cur, ad.Entries, err)
 				return
 			}
 			err := batch.SetExpirable(ctx, d, true)
 			if err != nil {
-				rs.log.Errorf("adding digest to batch: %s: %w", d.B58String(), err)
+				rs.log.Errorf("adding digest to batch: %s: %s", d.B58String(), err)
 				return
 			}
 		}
 		err = batch.Commit(ctx)
 		if err != nil {
-			rs.log.Errorf("comitting batch: %s: %w", cur.String(), err)
+			rs.log.Errorf("comitting batch: %s: %s", cur.String(), err)
 			return
 		}
 		if ad.PreviousID == nil || (prev != nil && ad.PreviousID.String() == prev.String()) {

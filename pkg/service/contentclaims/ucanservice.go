@@ -28,7 +28,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 			func(ctx context.Context, cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
 				err := service.Publish(ctx, inv)
 				if err != nil {
-					log.Errorf("publishing equals claim: %w", err)
+					log.Errorf("publishing equals claim: %s", err)
 				}
 				return ok.Unit{}, nil, err
 			},
@@ -38,7 +38,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 			func(ctx context.Context, cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
 				err := service.Publish(ctx, inv)
 				if err != nil {
-					log.Errorf("publishing index claim: %w", err)
+					log.Errorf("publishing index claim: %s", err)
 				}
 				return ok.Unit{}, nil, err
 			},
@@ -73,7 +73,7 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 
 				err = service.Cache(ctx, provider, claim)
 				if err != nil {
-					log.Errorf("caching claim: %w", err)
+					log.Errorf("caching claim: %s", err)
 				}
 				return ok.Unit{}, nil, err
 			},
