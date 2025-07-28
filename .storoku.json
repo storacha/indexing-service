@@ -1,0 +1,80 @@
+{
+  "app": "indexer",
+  "privateKeyEnvVar": "",
+  "didEnvVar": "",
+  "port": 8080,
+  "js": null,
+  "domainBase": "",
+  "cloudflare": true,
+  "createDB": false,
+  "caches": [
+    "providers",
+    "no-providers",
+    "indexes",
+    "claims"
+  ],
+  "topics": null,
+  "queues": [
+    {
+      "name": "provider-caching",
+      "fifo": false,
+      "messageRetentionSeconds": 86400
+    }
+  ],
+  "buckets": [
+    {
+      "name": "provider-caching-bucket",
+      "public": false,
+      "objectExpirationDays": 14
+    },
+    {
+      "name": "ipni-store-bucket",
+      "public": true
+    },
+    {
+      "name": "notifier-head-bucket",
+      "public": false
+    },
+    {
+      "name": "claim-store-bucket",
+      "public": false
+    }
+  ],
+  "secrets": null,
+  "tables": [
+    {
+      "name": "metadata",
+      "attributes": [
+        {
+          "name": "provider",
+          "type": "S"
+        },
+        {
+          "name": "contextID",
+          "type": "B"
+        }
+      ],
+      "hashKey": "provider",
+      "rangeKey": "contextID"
+    },
+    {
+      "name": "chunk-links",
+      "attributes": [
+        {
+          "name": "provider",
+          "type": "S"
+        },
+        {
+          "name": "contextID",
+          "type": "B"
+        }
+      ],
+      "hashKey": "provider",
+      "rangeKey": "contextID"
+    }
+  ],
+  "networks": [
+    "warm"
+  ],
+  "writeToContainer": false
+}

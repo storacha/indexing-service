@@ -139,14 +139,14 @@ func GetClaimHandler(service types.Getter) http.HandlerFunc {
 				http.Error(w, fmt.Sprintf("not found: %s", c), http.StatusNotFound)
 				return
 			}
-			log.Errorf("getting claim: %w", err)
+			log.Errorf("getting claim: %s", err)
 			http.Error(w, "failed to get claim", http.StatusInternalServerError)
 			return
 		}
 
 		_, err = io.Copy(w, dlg.Archive())
 		if err != nil {
-			log.Warnf("serving claim: %s: %w", c, err)
+			log.Warnf("serving claim: %s: %s", c, err)
 		}
 	}
 }
@@ -174,7 +174,7 @@ func PostClaimsHandler(id principal.Signer, service types.Publisher, options ...
 
 		_, err := io.Copy(w, res.Body())
 		if err != nil {
-			log.Errorf("sending UCAN response: %w", err)
+			log.Errorf("sending UCAN response: %s", err)
 		}
 	}
 }
@@ -245,7 +245,7 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		_, err = io.Copy(w, body)
 		if err != nil {
-			log.Errorf("sending claims response: %w", err)
+			log.Errorf("sending claims response: %s", err)
 		}
 	}
 }

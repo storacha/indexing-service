@@ -1,16 +1,11 @@
+# storoku:ignore
+
 name: Deploy
 
 on:
   push:
     branches:
       - main
-    tags:
-      - "*"
-    paths:
-      - ".github/workflows/deploy.yml"
-      - "cmd/**"
-      - "deploy/**"
-      - "pkg/**"
   pull_request:
     branches: [main]
   workflow_run:
@@ -21,7 +16,7 @@ on:
 
 permissions:
   id-token: write # This is required for requesting the JWT
-  contents: read  # This is required for actions/checkout
+  contents: read # This is required for actions/checkout
 
 jobs:
   # apply staging on pushes to main, plan otherwise
@@ -31,13 +26,16 @@ jobs:
       env: staging
       workspace: staging
       did: did:web:staging.indexer.storacha.network
-      apply: ${{ github.event_name != 'pull_request' }}
       ipni-endpoint: ${{ vars.STAGING_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.STAGING_IPNI_ANNOUNCE_URLS }}
+      apply: ${{ github.event_name != 'pull_request' }}
     secrets:
       aws-account-id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.STAGING_AWS_REGION }}
+      region: ${{ secrets.STAGING_AWS_REGION }}
       private-key: ${{ secrets.STAGING_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.STAGING_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
       honeycomb-api-key: ${{ secrets.STAGING_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.STAGING_SENTRY_DSN }}
 
@@ -47,13 +45,16 @@ jobs:
       env: warm-staging
       workspace: warm-staging
       did: did:web:staging.indexer.warm.storacha.network
-      apply: ${{ github.event_name != 'pull_request' }}
       ipni-endpoint: ${{ vars.WARM_STAGING_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.WARM_STAGING_IPNI_ANNOUNCE_URLS }}
+      apply: ${{ github.event_name != 'pull_request' }}
     secrets:
       aws-account-id: ${{ secrets.WARM_STAGING_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.WARM_STAGING_AWS_REGION }}
+      region: ${{ secrets.WARM_STAGING_AWS_REGION }}
       private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.WARM_STAGING_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
       honeycomb-api-key: ${{ secrets.WARM_STAGING_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.WARM_STAGING_SENTRY_DSN }}
 
@@ -64,12 +65,15 @@ jobs:
       env: production
       workspace: prod
       did: did:web:indexer.storacha.network
-      apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
       ipni-endpoint: ${{ vars.PROD_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.PROD_IPNI_ANNOUNCE_URLS }}
+      apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
     secrets:
       aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
       aws-region: ${{ secrets.PROD_AWS_REGION }}
+      region: ${{ secrets.PROD_AWS_REGION }}
       private-key: ${{ secrets.PROD_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}
       honeycomb-api-key: ${{ secrets.PROD_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.PROD_SENTRY_DSN }}
