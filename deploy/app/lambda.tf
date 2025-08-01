@@ -59,6 +59,14 @@ data "aws_region" "block_index" {
   provider = aws.block_index
 }
 
+data "aws_region" "store" {
+  provider = aws.store
+}
+
+data "aws_region" "blob_registry" {
+  provider = aws.blob_registry
+}
+
 data "aws_region" "allocations" {
   provider = aws.allocations
 }
@@ -122,6 +130,11 @@ resource "aws_lambda_function" "lambda" {
         LEGACY_ALLOCATIONS_TABLE_REGION = data.aws_region.allocations.name
         LEGACY_BLOCK_INDEX_TABLE_NAME = data.aws_dynamodb_table.legacy_block_index_table.id
         LEGACY_BLOCK_INDEX_TABLE_REGION = data.aws_region.block_index.name
+        LEGACY_DOT_STORAGE_BUCKET_PREFIXES = join(",", var.legacy_dotstorage_bucket_prefixes != [] ? var.legacy_dotstorage_bucket_prefixes : terraform.workspace == "prod" ? ["us-west-2/dotstorage-prod-1", "us-east-2/dotstorage-prod-0"] : ["us-east-2/dotstorage-staging-0"])
+        LEGACY_STORE_TABLE_NAME = data.aws_dynamodb_table.legacy_store_table.name
+        LEGACY_STORE_TABLE_REGION = data.aws_region.store.name
+        LEGACY_BLOB_REGISTRY_TABLE_NAME = data.aws_dynamodb_table.legacy_blob_registry_table.name
+        LEGACY_BLOB_REGISTRY_TABLE_REGION = data.aws_region.blob_registry.name
         LEGACY_DATA_BUCKET_URL = var.legacy_data_bucket_url != "" ? var.legacy_data_bucket_url : "https://carpark-${terraform.workspace == "prod" ? "prod" : "staging"}-0.r2.w3s.link"
         GOLOG_LOG_LEVEL = local.is_production ? "error" : "debug"
         OTEL_PROPAGATORS = "tracecontext"
