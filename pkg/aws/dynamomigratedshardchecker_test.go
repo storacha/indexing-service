@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
@@ -26,9 +27,12 @@ func TestDynamoMigratedShardChecker(t *testing.T) {
 
 	storeTable := "store-" + uuid.NewString()
 	blobRegistryTable := "blob-registry-" + uuid.NewString()
+	allocationsTable := "allocations-" + uuid.NewString()
 	createStoreTable(t, dynamoClient, storeTable)
 	createBlobRegistryTable(t, dynamoClient, blobRegistryTable)
-	checker := NewDynamoMigratedShardChecker(dynamoClient, dynamoClient, blobRegistryTable, storeTable)
+	createAllocationsTable(t, dynamoClient, allocationsTable)
+	allocationsStore := NewDynamoAllocationsTable(dynamoClient, allocationsTable)
+	checker := NewDynamoMigratedShardChecker(dynamoClient, dynamoClient, blobRegistryTable, storeTable, allocationsStore)
 
 	t.Run("exists in store table", func(t *testing.T) {
 
@@ -66,11 +70,29 @@ func TestDynamoMigratedShardChecker(t *testing.T) {
 		require.True(t, has, "expected shard to be migrated in store table")
 	})
 
-	t.Run("does not exist in either table", func(t *testing.T) {
+	t.Run("exists in allocations table", func(t *testing.T) {
+
+		cid := testutil.RandomCID()
+		space := testutil.RandomPrincipal().DID()
+		_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+			TableName: aws.String(allocationsTable),
+			Item: map[string]types.AttributeValue{
+				"multihash": &types.AttributeValueMemberS{Value: digestutil.Format(cid.(cidlink.Link).Cid.Hash())},
+				"space":     &types.AttributeValueMemberS{Value: space.DID().String()},
+			},
+		})
+		require.NoError(t, err)
+
+		has, err := checker.ShardMigrated(ctx, cid)
+		require.NoError(t, err)
+		require.True(t, has, "expected shard to be migrated in allocations table")
+	})
+
+	t.Run("does not exist in any table", func(t *testing.T) {
 		cid := testutil.RandomCID()
 		has, err := checker.ShardMigrated(ctx, cid)
 		require.NoError(t, err)
-		require.False(t, has, "expected shard to not be migrated in either table")
+		require.False(t, has, "expected shard to not be migrated in any table")
 	})
 }
 

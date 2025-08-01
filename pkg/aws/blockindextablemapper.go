@@ -160,9 +160,6 @@ func isLegacyDotStorage(parts []string, bucketPrefixes []string) bool {
 		return false
 	}
 	for _, prefix := range bucketPrefixes {
-		fmt.Println(strings.Join(parts, "/"))
-		fmt.Println(prefix)
-		fmt.Println(strings.Join(parts[:2], "/") == prefix && !strings.Contains(parts[4], "nft-"))
 		if strings.Join(parts[:2], "/") == prefix && !strings.Contains(parts[4], "nft-") {
 			return true
 		}

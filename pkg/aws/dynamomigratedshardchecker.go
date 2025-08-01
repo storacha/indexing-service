@@ -18,6 +18,7 @@ type DynamoMigratedShardChecker struct {
 	blobRegistryTableClient dynamodb.QueryAPIClient
 	blobRegistryTableName   string
 	storeTableName          string
+	allocationsStore        AllocationsStore
 }
 
 func (d *DynamoMigratedShardChecker) storeTableShardMigrated(ctx context.Context, shard ipld.Link) (bool, error) {
@@ -76,14 +77,20 @@ func (d *DynamoMigratedShardChecker) ShardMigrated(ctx context.Context, shard ip
 	} else if migrated {
 		return true, nil
 	}
-	return d.blobRegistryTableShardMigrated(ctx, shard)
+	if migrated, err := d.blobRegistryTableShardMigrated(ctx, shard); err != nil {
+		return false, err
+	} else if migrated {
+		return true, nil
+	}
+	return d.allocationsStore.Has(ctx, shard.(cidlink.Link).Cid.Hash())
 }
 
-func NewDynamoMigratedShardChecker(storeTableClient dynamodb.QueryAPIClient, blobRegistryTableClient dynamodb.QueryAPIClient, blobRegistryTableName, storeTableName string) *DynamoMigratedShardChecker {
+func NewDynamoMigratedShardChecker(storeTableClient dynamodb.QueryAPIClient, blobRegistryTableClient dynamodb.QueryAPIClient, blobRegistryTableName, storeTableName string, allocationsStore AllocationsStore) *DynamoMigratedShardChecker {
 	return &DynamoMigratedShardChecker{
 		storeTableClient:        storeTableClient,
 		blobRegistryTableClient: blobRegistryTableClient,
 		blobRegistryTableName:   blobRegistryTableName,
 		storeTableName:          storeTableName,
+		allocationsStore:        allocationsStore,
 	}
 }

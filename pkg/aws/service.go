@@ -321,6 +321,7 @@ func Construct(cfg Config) (types.Service, error) {
 		dynamodb.NewFromConfig(blobRegistryTableCfg),
 		cfg.LegacyStoreTableName,
 		cfg.LegacyBlobRegistryTableName,
+		legacyAllocationsStore,
 	)
 	// allow claims synthethized from the block index table to live longer after they are expired in the cache
 	// so that the service doesn't return cached but expired delegations
