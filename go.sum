@@ -656,10 +656,6 @@ github.com/spf13/cobra v1.2.1/go.mod h1:ExllRjgxM/piMAM+3tAZvg8fsklGAf3tPfi+i8t6
 github.com/spf13/jwalterweatherman v1.1.0/go.mod h1:aNWZUN0dPAAO/Ljvb5BEdw96iTZ0EXowPYD95IqWIGo=
 github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 github.com/spf13/viper v1.8.1/go.mod h1:o0Pch8wJ9BVSWGQMbra6iw0oQ5oktSIBaujf1rJH9Ns=
-github.com/storacha/go-libstoracha v0.1.2-0.20250802004439-dafce7cda1a9 h1:YX1AvF1Bll5gKZCR1accybLzgYkQsI+0Y2m7VQUcjaI=
-github.com/storacha/go-libstoracha v0.1.2-0.20250802004439-dafce7cda1a9/go.mod h1:sYAYekFrIe/RlYhmamDhmdJyEZk/uHmiUkQ7QksgBLU=
-github.com/storacha/go-libstoracha v0.1.2-0.20250802005255-539d6e6f3e81 h1:thCzGWPQ+BCULcyhUWlA0GDzIIlFNzHw7aJVS81qfEU=
-github.com/storacha/go-libstoracha v0.1.2-0.20250802005255-539d6e6f3e81/go.mod h1:sYAYekFrIe/RlYhmamDhmdJyEZk/uHmiUkQ7QksgBLU=
 github.com/storacha/go-libstoracha v0.1.2-0.20250802015302-1a9e026e1250 h1:gB8uVw+dOncbSiaumJoONYPcU9bL9PYazeZjLnV7s5A=
 github.com/storacha/go-libstoracha v0.1.2-0.20250802015302-1a9e026e1250/go.mod h1:sYAYekFrIe/RlYhmamDhmdJyEZk/uHmiUkQ7QksgBLU=
 github.com/storacha/go-ucanto v0.4.1 h1:yas0Ob0l7aV4JDUS5WZiNV73ov6/9qPkuKseTIBCAkY=
