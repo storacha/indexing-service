@@ -18,9 +18,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/bytemap"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -30,11 +33,8 @@ import (
 	"github.com/storacha/go-ucanto/principal"
 	ucanserver "github.com/storacha/go-ucanto/server"
 	"github.com/storacha/go-ucanto/ucan"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -44,7 +44,7 @@ func TestClient(t *testing.T) {
 	indexingID := testutil.Service
 	indexingURL := randomLocalURL(t)
 
-	storageID := testutil.RandomSigner()
+	storageID := testutil.RandomSigner(t)
 	storageProof := delegation.FromDelegation(
 		testutil.Must(
 			delegation.Delegate(
@@ -83,9 +83,9 @@ func TestClient(t *testing.T) {
 			),
 		)(t),
 	)
-	space := testutil.RandomPrincipal()
+	space := testutil.RandomPrincipal(t)
 
-	root, digest, bytes := testutil.RandomCAR(128)
+	root, digest, bytes := testutil.RandomCAR(t, 128)
 	rootDigest := link.ToCID(root).Hash()
 	index, err := blobindex.FromShardArchives(root, [][]byte{bytes})
 	require.NoError(t, err)

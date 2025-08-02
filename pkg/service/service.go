@@ -27,8 +27,8 @@ import (
 	"github.com/storacha/go-ucanto/validator"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/bytemap"
+	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/parallelwalk"

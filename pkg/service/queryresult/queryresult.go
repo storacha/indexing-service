@@ -10,6 +10,8 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-multicodec"
 	multihash "github.com/multiformats/go-multihash/core"
+	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/bytemap"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -17,8 +19,6 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/bytemap"
 	qdm "github.com/storacha/indexing-service/pkg/service/queryresult/datamodel"
 	"github.com/storacha/indexing-service/pkg/types"
 )

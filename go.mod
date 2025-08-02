@@ -31,7 +31,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/extra/redisotel/v9 v9.10.0
 	github.com/redis/go-redis/v9 v9.10.0
-	github.com/storacha/go-libstoracha v0.1.0
+	github.com/storacha/go-libstoracha v0.1.2-0.20250802015302-1a9e026e1250
 	github.com/storacha/go-ucanto v0.4.1
 	github.com/storacha/ipni-publisher v0.0.0-20250211095024-8c9199a49c0d
 	github.com/stretchr/testify v1.10.0
@@ -91,6 +91,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/filecoin-project/go-data-segment v0.0.1 // indirect
 	github.com/filecoin-project/go-fil-commcid v0.2.0 // indirect
+	github.com/filecoin-project/go-fil-commp-hashhash v0.2.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
