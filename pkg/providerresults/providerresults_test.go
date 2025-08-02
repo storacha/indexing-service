@@ -6,35 +6,35 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/providerresults"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProviderResults__Equals(t *testing.T) {
-	testProvider := testutil.RandomProviderResult()
-	testProvider2 := testutil.RandomProviderResult()
+	testProvider := testutil.RandomProviderResult(t)
+	testProvider2 := testutil.RandomProviderResult(t)
 
 	// Create slightly modified versions of the testProvider
 	contextIDChanged := testProvider
-	contextIDChanged.ContextID = testutil.RandomBytes(10)
+	contextIDChanged.ContextID = testutil.RandomBytes(t, 10)
 
 	metadataChanged := testProvider
-	metadataChanged.Metadata = testutil.RandomBytes(10)
+	metadataChanged.Metadata = testutil.RandomBytes(t, 10)
 
 	nullProvider := testProvider
 	nullProvider.Provider = nil
 
 	providerPeerIDChanged := testProvider
 	providerPeerIDChanged.Provider = &peer.AddrInfo{
-		ID:    testutil.RandomPeer(),
+		ID:    testutil.RandomPeer(t),
 		Addrs: testProvider.Provider.Addrs,
 	}
 
 	providerAddrsChanged := testProvider
 	providerAddrsChanged.Provider = &peer.AddrInfo{
 		ID:    testProvider.Provider.ID,
-		Addrs: []multiaddr.Multiaddr{testutil.RandomMultiaddr(), testutil.RandomMultiaddr()},
+		Addrs: []multiaddr.Multiaddr{testutil.RandomMultiaddr(t), testutil.RandomMultiaddr(t)},
 	}
 
 	testCases := []struct {
@@ -58,7 +58,7 @@ func TestProviderResults__Equals(t *testing.T) {
 }
 
 func TestSerialization(t *testing.T) {
-	randomResult := testutil.RandomProviderResult()
+	randomResult := testutil.RandomProviderResult(t)
 
 	testCases := []struct {
 		name       string

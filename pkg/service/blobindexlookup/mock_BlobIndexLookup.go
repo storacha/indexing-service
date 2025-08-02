@@ -5,7 +5,7 @@ package blobindexlookup
 import (
 	context "context"
 
-	blobindex "github.com/storacha/indexing-service/pkg/blobindex"
+	blobindex "github.com/storacha/go-libstoracha/blobindex"
 
 	metadata "github.com/storacha/go-libstoracha/metadata"
 

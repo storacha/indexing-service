@@ -7,7 +7,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/storacha/indexing-service/pkg/internal/testutil/extmocks"
+	"github.com/storacha/indexing-service/pkg/internal/extmocks"
 	"github.com/stretchr/testify/mock"
 )
 

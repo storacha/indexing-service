@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -16,8 +16,8 @@ import (
 
 func TestWithStore__Find(t *testing.T) {
 	// Create a cached claim
-	storedClaim := testutil.RandomLocationDelegation()
-	notStoredClaim := testutil.RandomIndexDelegation()
+	storedClaim := testutil.RandomLocationDelegation(t)
+	notStoredClaim := testutil.RandomIndexDelegation(t)
 
 	// Create a test CID
 	storedCid := storedClaim.Link()

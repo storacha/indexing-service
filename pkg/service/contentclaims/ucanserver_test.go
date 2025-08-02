@@ -14,6 +14,7 @@ import (
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
@@ -25,7 +26,6 @@ import (
 	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/go-ucanto/server"
 	"github.com/storacha/go-ucanto/ucan"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/principalresolver"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -51,7 +51,7 @@ func TestServer(t *testing.T) {
 		testutil.Alice,
 		testutil.Alice.DID().String(),
 		cassert.LocationCaveats{
-			Content:  ctypes.FromHash(testutil.RandomMultihash()),
+			Content:  ctypes.FromHash(testutil.RandomMultihash(t)),
 			Location: []url.URL{*testutil.Must(url.Parse("https://www.yahoo.com"))(t)},
 			Space:    testutil.Bob.DID(),
 		}))(t)
@@ -61,7 +61,7 @@ func TestServer(t *testing.T) {
 		testutil.Service.DID().String(), claim.CacheCaveats{
 			Claim: locationCommitment.Link(),
 			Provider: claim.Provider{
-				Addresses: []multiaddr.Multiaddr{testutil.RandomMultiaddr()},
+				Addresses: []multiaddr.Multiaddr{testutil.RandomMultiaddr(t)},
 			},
 		}))(t)
 	for b, err := range locationCommitment.Blocks() {
@@ -77,8 +77,8 @@ func TestServer(t *testing.T) {
 			testutil.Service,
 			testutil.Service.DID().String(),
 			cassert.EqualsCaveats{
-				Content: ctypes.FromHash(testutil.RandomMultihash()),
-				Equals:  testutil.RandomCID(),
+				Content: ctypes.FromHash(testutil.RandomMultihash(t)),
+				Equals:  testutil.RandomCID(t),
 			},
 		))(t),
 		testutil.Must(cassert.Index.Invoke(
@@ -86,8 +86,8 @@ func TestServer(t *testing.T) {
 			testutil.Service,
 			testutil.Service.DID().String(),
 			cassert.IndexCaveats{
-				Content: testutil.RandomCID(),
-				Index:   testutil.RandomCID(),
+				Content: testutil.RandomCID(t),
+				Index:   testutil.RandomCID(t),
 			},
 		))(t),
 		cacheInvocation,
@@ -150,8 +150,8 @@ func TestPrincipalResolver(t *testing.T) {
 		testutil.Service,
 		testutil.Service.DID().String(),
 		cassert.EqualsCaveats{
-			Content: ctypes.FromHash(testutil.RandomMultihash()),
-			Equals:  testutil.RandomCID(),
+			Content: ctypes.FromHash(testutil.RandomMultihash(t)),
+			Equals:  testutil.RandomCID(t),
 		},
 		delegation.WithProof(proof),
 	))(t)

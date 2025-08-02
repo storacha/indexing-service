@@ -7,7 +7,7 @@ import (
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/stretchr/testify/require"
 )
@@ -15,8 +15,8 @@ import (
 func TestProviderStore(t *testing.T) {
 	mockRedis := NewMockRedis()
 	providerStore := redis.NewProviderStore(mockRedis)
-	mh1, results1 := testutil.Must2(randomProviderResults(4))(t)
-	mh2, results2 := testutil.Must2(randomProviderResults(4))(t)
+	mh1, results1 := randomProviderResults(t, 4)
+	mh2, results2 := randomProviderResults(t, 4)
 
 	ctx := context.Background()
 	_, err := providerStore.Add(ctx, mh1, results1...)
@@ -31,12 +31,12 @@ func TestProviderStore(t *testing.T) {
 	require.ElementsMatch(t, results2, returnedResults2)
 }
 
-func randomProviderResults(num int) (multihash.Multihash, []model.ProviderResult, error) {
-	randomHash := testutil.RandomCID().(cidlink.Link).Cid.Hash()
+func randomProviderResults(t *testing.T, num int) (multihash.Multihash, []model.ProviderResult) {
+	randomHash := testutil.RandomCID(t).(cidlink.Link).Cid.Hash()
 	providerResults := make([]model.ProviderResult, 0, num)
 	for i := 0; i < num; i++ {
-		providerResults = append(providerResults, testutil.RandomProviderResult())
+		providerResults = append(providerResults, testutil.RandomProviderResult(t))
 	}
 
-	return randomHash, providerResults, nil
+	return randomHash, providerResults
 }

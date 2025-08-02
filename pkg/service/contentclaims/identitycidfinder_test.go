@@ -9,17 +9,17 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	multihash "github.com/multiformats/go-multihash/core"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIdentityCidFinder__Find(t *testing.T) {
 	// Create a cached claim
-	identityCidClaim := testutil.RandomLocationDelegation()
-	notIdentityCidClaim := testutil.RandomIndexDelegation()
+	identityCidClaim := testutil.RandomLocationDelegation(t)
+	notIdentityCidClaim := testutil.RandomIndexDelegation(t)
 
 	identityCiddata := testutil.Must(io.ReadAll(identityCidClaim.Archive()))(t)
 

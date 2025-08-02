@@ -11,10 +11,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/did"
-	"github.com/storacha/indexing-service/pkg/blobindex"
 )
 
 // ContextID describes the data used to calculate a context id for IPNI

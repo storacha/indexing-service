@@ -13,14 +13,14 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/bytemap"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal/signer"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -67,7 +67,7 @@ func TestGetRootHandler(t *testing.T) {
 
 func TestGetClaimHandler(t *testing.T) {
 	store := contentclaims.NewStoreFromDatastore(datastore.NewMapDatastore())
-	claim := testutil.RandomIndexDelegation()
+	claim := testutil.RandomIndexDelegation(t)
 	err := store.Put(context.Background(), claim.Link(), claim)
 	require.NoError(t, err)
 
@@ -89,7 +89,7 @@ func TestGetClaimHandler(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		res, err := http.Get(fmt.Sprintf("%s/claim/%s", svr.URL, testutil.RandomCID()))
+		res, err := http.Get(fmt.Sprintf("%s/claim/%s", svr.URL, testutil.RandomCID(t)))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
@@ -105,7 +105,7 @@ func TestGetClaimsHandler(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		mockService := types.NewMockService(t)
 
-		randomHash := testutil.RandomMultihash()
+		randomHash := testutil.RandomMultihash(t)
 		query := types.Query{
 			Type:   types.QueryTypeStandard,
 			Hashes: []multihash.Multihash{randomHash},
@@ -114,16 +114,16 @@ func TestGetClaimsHandler(t *testing.T) {
 			},
 		}
 
-		locationClaim := testutil.RandomLocationDelegation()
-		indexClaim := testutil.RandomIndexDelegation()
-		equalsClaim := testutil.RandomEqualsDelegation()
+		locationClaim := testutil.RandomLocationDelegation(t)
+		indexClaim := testutil.RandomIndexDelegation(t)
+		equalsClaim := testutil.RandomEqualsDelegation(t)
 		claims := map[cid.Cid]delegation.Delegation{
 			link.ToCID(locationClaim.Link()): locationClaim,
 			link.ToCID(indexClaim.Link()):    indexClaim,
 			link.ToCID(equalsClaim.Link()):   equalsClaim,
 		}
 		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](1)
-		indexHash, index := testutil.RandomShardedDagIndexView(32)
+		indexHash, index := testutil.RandomShardedDagIndexView(t, 32)
 		indexContextID := testutil.Must(types.ContextID{
 			Hash: indexHash,
 		}.ToEncoded())(t)
@@ -148,7 +148,7 @@ func TestGetClaimsHandler(t *testing.T) {
 	t.Run("empty results are ok", func(t *testing.T) {
 		mockService := types.NewMockService(t)
 
-		randomHash := testutil.RandomMultihash()
+		randomHash := testutil.RandomMultihash(t)
 		query := types.Query{
 			Type:   types.QueryTypeStandard,
 			Hashes: []multihash.Multihash{randomHash},
@@ -190,8 +190,8 @@ func TestGetClaimsHandler(t *testing.T) {
 	t.Run("honors spaces parameter", func(t *testing.T) {
 		mockService := types.NewMockService(t)
 
-		randomHash := testutil.RandomMultihash()
-		randomSubject := testutil.RandomPrincipal().DID()
+		randomHash := testutil.RandomMultihash(t)
+		randomSubject := testutil.RandomPrincipal(t).DID()
 		query := types.Query{
 			Type:   types.QueryTypeStandard,
 			Hashes: []multihash.Multihash{randomHash},
@@ -219,7 +219,7 @@ func TestGetClaimsHandler(t *testing.T) {
 		svr := httptest.NewServer(GetClaimsHandler(mockService))
 		defer svr.Close()
 
-		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&spaces=invalid", svr.URL, digestutil.Format(testutil.RandomMultihash())))
+		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&spaces=invalid", svr.URL, digestutil.Format(testutil.RandomMultihash(t))))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
@@ -230,7 +230,7 @@ func TestGetClaimsHandler(t *testing.T) {
 		svr := httptest.NewServer(GetClaimsHandler(mockService))
 		defer svr.Close()
 
-		randomHash := testutil.RandomMultihash()
+		randomHash := testutil.RandomMultihash(t)
 
 		claims := map[cid.Cid]delegation.Delegation{}
 		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)

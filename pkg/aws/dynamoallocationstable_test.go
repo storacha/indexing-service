@@ -12,9 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,10 +31,10 @@ func TestDynamoAllocationsTable(t *testing.T) {
 	createAllocationsTable(t, dynamoClient, tableName)
 
 	t.Run("query existing item", func(t *testing.T) {
-		digest := testutil.RandomMultihash()
+		digest := testutil.RandomMultihash(t)
 		insertedAt := time.Now().String()
-		space := testutil.RandomPrincipal().DID().String()
-		invocation := testutil.RandomCID().String()
+		space := testutil.RandomPrincipal(t).DID().String()
+		invocation := testutil.RandomCID(t).String()
 		size := "123"
 		_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
 			TableName: aws.String(tableName),
@@ -56,7 +56,7 @@ func TestDynamoAllocationsTable(t *testing.T) {
 	})
 
 	t.Run("query multiple existing items for same digest", func(t *testing.T) {
-		root := testutil.RandomCID()
+		root := testutil.RandomCID(t)
 		digest := link.ToCID(root).Hash()
 
 		items := []struct {
@@ -66,15 +66,15 @@ func TestDynamoAllocationsTable(t *testing.T) {
 			insertedAt string
 		}{
 			{
-				space:      testutil.RandomPrincipal().DID().String(),
+				space:      testutil.RandomPrincipal(t).DID().String(),
 				size:       fmt.Sprintf("%d", rand.IntN(1024*1024*128)),
-				invocation: testutil.RandomCID().String(),
+				invocation: testutil.RandomCID(t).String(),
 				insertedAt: time.Now().AddDate(-1, 0, 0).String(),
 			},
 			{
-				space:      testutil.RandomPrincipal().DID().String(),
+				space:      testutil.RandomPrincipal(t).DID().String(),
 				size:       fmt.Sprintf("%d", rand.IntN(1024*1024*128)),
-				invocation: testutil.RandomCID().String(),
+				invocation: testutil.RandomCID(t).String(),
 				insertedAt: time.Now().String(),
 			},
 		}
@@ -101,7 +101,7 @@ func TestDynamoAllocationsTable(t *testing.T) {
 	})
 
 	t.Run("query not found", func(t *testing.T) {
-		digest := testutil.RandomMultihash()
+		digest := testutil.RandomMultihash(t)
 		store := NewDynamoAllocationsTable(dynamoClient, tableName)
 		has, err := store.Has(ctx, digest)
 		require.NoError(t, err)

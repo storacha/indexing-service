@@ -12,17 +12,17 @@ import (
 	"time"
 
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/metadata"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBlobIndexLookup__Find(t *testing.T) {
-	cid := testutil.RandomCID().(cidlink.Link).Cid
-	provider := testutil.RandomProviderResult()
-	_, index := testutil.RandomShardedDagIndexView(32)
+	cid := testutil.RandomCID(t).(cidlink.Link).Cid
+	provider := testutil.RandomProviderResult(t)
+	_, index := testutil.RandomShardedDagIndexView(t, 32)
 	indexBytes := testutil.Must(io.ReadAll(testutil.Must(index.Archive())(t)))(t)
 	indexEncodedLength := uint64(len(indexBytes))
 	// sample error
@@ -48,7 +48,7 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 		{
 			name: "partial fetch from offset",
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				randomBytes := testutil.RandomBytes(10)
+				randomBytes := testutil.RandomBytes(t, 10)
 				allBytes := append(randomBytes, indexBytes...)
 				http.ServeContent(w, r, "index", time.Now(), bytes.NewReader(allBytes))
 			},
@@ -59,8 +59,8 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 			name: "partial fetch from offset + length",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 
-				randomStartBytes := testutil.RandomBytes(10)
-				randomEndBytes := testutil.RandomBytes(20)
+				randomStartBytes := testutil.RandomBytes(t, 10)
+				randomEndBytes := testutil.RandomBytes(t, 20)
 
 				allBytes := append(append(randomStartBytes, indexBytes...), randomEndBytes...)
 

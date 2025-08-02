@@ -17,9 +17,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	istypes "github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -39,7 +39,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 	createBlockIndexTable(t, dynamoClient, tableName)
 
 	t.Run("query existing item", func(t *testing.T) {
-		digest := testutil.RandomMultihash()
+		digest := testutil.RandomMultihash(t)
 		path := fmt.Sprintf("http://test.example.com/%s.blob", digestutil.Format(digest))
 		offset := rand.IntN(1024 * 1024 * 128)
 		length := rand.IntN(1024*1024*2) + 1
@@ -66,7 +66,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 	})
 
 	t.Run("query multiple existing items for same digest", func(t *testing.T) {
-		root := testutil.RandomCID()
+		root := testutil.RandomCID(t)
 		digest := link.ToCID(root).Hash()
 
 		items := []struct {
@@ -113,7 +113,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 	})
 
 	t.Run("query not found", func(t *testing.T) {
-		digest := testutil.RandomMultihash()
+		digest := testutil.RandomMultihash(t)
 		store := NewDynamoProviderBlockIndexTable(dynamoClient, tableName)
 		_, err := store.Query(ctx, digest)
 		require.Error(t, err)
@@ -121,7 +121,7 @@ func TestDynamoProviderBlockIndexTable(t *testing.T) {
 	})
 
 	t.Run("limits results", func(t *testing.T) {
-		digest := testutil.RandomMultihash()
+		digest := testutil.RandomMultihash(t)
 		length := 100
 		for i := range blockIndexQueryLimit + 1 {
 			_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{

@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -18,8 +18,8 @@ import (
 
 func TestWithCache__Find(t *testing.T) {
 	// Create a cached claim
-	cachedClaim := testutil.RandomLocationDelegation()
-	notCachedClaim := testutil.RandomIndexDelegation()
+	cachedClaim := testutil.RandomLocationDelegation(t)
+	notCachedClaim := testutil.RandomIndexDelegation(t)
 
 	// Create a test CID
 	cachedCid := cachedClaim.Link()

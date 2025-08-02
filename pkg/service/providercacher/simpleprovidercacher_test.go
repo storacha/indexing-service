@@ -8,9 +8,9 @@ import (
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/link"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -22,15 +22,15 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test providers
-	testProvider := testutil.RandomProviderResult()
-	testProvider2 := testutil.RandomProviderResult()
+	testProvider := testutil.RandomProviderResult(t)
+	testProvider2 := testutil.RandomProviderResult(t)
 
 	// Create a test index with random CIDs
-	testCid1 := testutil.RandomCID()
+	testCid1 := testutil.RandomCID(t)
 	shardIndex := blobindex.NewShardedDagIndexView(testCid1, 2)
 
-	shardMhs := testutil.RandomMultihashes(2)
-	sliceMhs := testutil.RandomMultihashes(6)
+	shardMhs := testutil.RandomMultihashes(t, 2)
+	sliceMhs := testutil.RandomMultihashes(t, 6)
 	for i := range 2 {
 		for j := range 3 {
 			shardIndex.SetSlice(shardMhs[i], sliceMhs[i*3+j], blobindex.Position{})
@@ -39,7 +39,7 @@ func TestSimpleProviderCacher_CacheProviderForIndexRecords(t *testing.T) {
 	// the root block should be in the index also
 	shardIndex.SetSlice(shardMhs[0], link.ToCID(testCid1).Hash(), blobindex.Position{})
 
-	testCid2 := testutil.RandomCID()
+	testCid2 := testutil.RandomCID(t)
 	shardIndex2 := blobindex.NewShardedDagIndexView(testCid2, 2)
 	for j := range 2 {
 		shardIndex2.SetSlice(shardMhs[0], sliceMhs[j], blobindex.Position{})
@@ -147,16 +147,16 @@ func TestSimpleProviderCacher_10kNFT(t *testing.T) {
 	// Create a test context
 	ctx := context.Background()
 
-	prov := testutil.RandomProviderResult()
-	root := testutil.RandomCID()
+	prov := testutil.RandomProviderResult(t)
+	root := testutil.RandomCID(t)
 	idx := blobindex.NewShardedDagIndexView(root, 2)
 
-	shardDigests := testutil.RandomMultihashes(2)
+	shardDigests := testutil.RandomMultihashes(t, 2)
 	// make 10_000 unique hashes
 	sliceDigests := make([]multihash.Multihash, 0, 10_000)
 	for range 10_000 {
 		for {
-			digest := testutil.RandomMultihash()
+			digest := testutil.RandomMultihash(t)
 			if slices.ContainsFunc(sliceDigests, func(s multihash.Multihash) bool { return s.String() == digest.String() }) {
 				continue
 			}

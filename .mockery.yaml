@@ -40,7 +40,7 @@ packages:
       QueryAPIClient:
         config:
           inpackage: False
-          dir: "pkg/internal/testutil/extmocks"
+          dir: "pkg/internal/extmocks"
           outpkg: "extmocks"
           filename: mock_DynamoDBQueryClient.go
           mockname: MockDynamoDBQueryClient
@@ -49,7 +49,7 @@ packages:
       Finder:
         config:
           inpackage: False
-          dir: "pkg/internal/testutil/extmocks"
+          dir: "pkg/internal/extmocks"
           outpkg: "extmocks"
           filename: mock_IpniFinder.go
           mockname: MockIpniFinder
@@ -58,7 +58,7 @@ packages:
       Publisher:
         config:
           inpackage: False
-          dir: "pkg/internal/testutil/extmocks"
+          dir: "pkg/internal/extmocks"
           outpkg: "extmocks"
           filename: mock_IpniPublisher.go
           mockname: MockIpniPublisher
@@ -67,6 +67,6 @@ packages:
       EventLogger:
         config:
           inpackage: False
-          dir: "pkg/internal/testutil/extmocks"
+          dir: "pkg/internal/extmocks"
           outpkg: "extmocks"
 

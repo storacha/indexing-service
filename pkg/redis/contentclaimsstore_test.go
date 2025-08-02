@@ -10,9 +10,9 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/ucan"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/stretchr/testify/require"
 )
@@ -21,13 +21,13 @@ func TestContentClaimsStore(t *testing.T) {
 	mockRedis := NewMockRedis()
 	contentClaimsStore := redis.NewContentClaimsStore(mockRedis)
 	claim1 := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
-		Content:  ctypes.FromHash(testutil.RandomMultihash()),
+		Content:  ctypes.FromHash(testutil.RandomMultihash(t)),
 		Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
 	})
 	delegation1 := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[cassert.LocationCaveats]{claim1}))(t)
 	claim2 := cassert.Index.New(testutil.Service.DID().String(), cassert.IndexCaveats{
-		Content: testutil.RandomCID(),
-		Index:   testutil.RandomCID(),
+		Content: testutil.RandomCID(t),
+		Index:   testutil.RandomCID(t),
 	})
 	delegation1Cid := testutil.Must(cid.Prefix{
 		Version:  1,
