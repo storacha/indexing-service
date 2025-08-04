@@ -37,10 +37,8 @@ provider "aws" {
   alias = "acm"
 }
 
-
-
 module "app" {
-  source = "github.com/storacha/storoku//app?ref=v0.4.2"
+  source = "github.com/storacha/storoku//app?ref=v0.4.4_beta"
   private_key = var.private_key
   httpport = 8080
   principal_mapping = var.principal_mapping
@@ -55,6 +53,7 @@ module "app" {
   # NOTE: do not put sensitive data in env-vars. use secrets
   deployment_env_vars = []
   image_tag = var.image_tag
+  deployment_config = local.deployment_config
   create_db = false
   # enter secret values your app will use here -- these will be available
   # as env vars in the container at runtime
