@@ -26,6 +26,10 @@ type BlockIndexStore interface {
 	Query(ctx context.Context, digest multihash.Multihash) ([]BlockIndexRecord, error)
 }
 
+type MigratedShardChecker interface {
+	ShardMigrated(ctx context.Context, shard ipld.Link) (bool, error)
+}
+
 type BlockIndexRecord struct {
 	CarPath string
 	Offset  uint64
@@ -33,10 +37,12 @@ type BlockIndexRecord struct {
 }
 
 type blockIndexTableMapper struct {
-	id              principal.Signer
-	blockIndexStore BlockIndexStore
-	bucketURL       url.URL
-	claimExp        time.Duration
+	id                   principal.Signer
+	blockIndexStore      BlockIndexStore
+	migratedShardChecker MigratedShardChecker
+	bucketURL            url.URL
+	claimExp             time.Duration
+	bucketPrefixes       []string // e.g. "us-west-2/dotstorage-prod-1"
 }
 
 var _ legacy.ContentToClaimsMapper = blockIndexTableMapper{}
@@ -49,17 +55,19 @@ var _ legacy.ContentToClaimsMapper = blockIndexTableMapper{}
 //
 // Using the data in the blockIndexStore, the service will materialize content claims using the id param as the
 // signing key. Claims will be set to expire in the amount of time given by the claimExpiration parameter.
-func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexStore, bucketURL string, claimExpiration time.Duration) (blockIndexTableMapper, error) {
+func NewBlockIndexTableMapper(id principal.Signer, blockIndexStore BlockIndexStore, migratedShardChecker MigratedShardChecker, bucketURL string, claimExpiration time.Duration, bucketPrefixes []string) (blockIndexTableMapper, error) {
 	burl, err := url.Parse(bucketURL)
 	if err != nil {
 		return blockIndexTableMapper{}, fmt.Errorf("parsing bucket URL: %w", err)
 	}
 
 	return blockIndexTableMapper{
-		id:              id,
-		blockIndexStore: blockIndexStore,
-		bucketURL:       *burl,
-		claimExp:        claimExpiration,
+		id:                   id,
+		blockIndexStore:      blockIndexStore,
+		migratedShardChecker: migratedShardChecker,
+		bucketURL:            *burl,
+		claimExp:             claimExpiration,
+		bucketPrefixes:       bucketPrefixes,
 	}, nil
 }
 
@@ -87,6 +95,17 @@ func (bit blockIndexTableMapper) GetClaims(ctx context.Context, contentHash mult
 				continue
 			}
 
+			// check if shard is a web3.storage shard
+			if isLegacyDotStorage(parts, bit.bucketPrefixes) {
+				// check if the shard has been migrated -- if not, skip it
+				migrated, err := bit.migratedShardChecker.ShardMigrated(ctx, shard)
+				if err != nil {
+					return nil, fmt.Errorf("checking if shard %s is migrated: %w", shard.String(), err)
+				}
+				if !migrated {
+					continue
+				}
+			}
 			u = bit.bucketURL.JoinPath(fmt.Sprintf("/%s/%s.car", shard.String(), shard.String()))
 			locs = append(locs, cassert.LocationCaveats{
 				Content:  content,
@@ -134,6 +153,18 @@ func (bit blockIndexTableMapper) GetClaims(ctx context.Context, contentHash mult
 	}
 
 	return claimCids, nil
+}
+
+func isLegacyDotStorage(parts []string, bucketPrefixes []string) bool {
+	if len(parts) < 3 {
+		return false
+	}
+	for _, prefix := range bucketPrefixes {
+		if strings.Join(parts[:2], "/") == prefix && !strings.Contains(parts[4], "nft-") {
+			return true
+		}
+	}
+	return false
 }
 
 func bucketKeyToShardLink(key string) (ipld.Link, error) {

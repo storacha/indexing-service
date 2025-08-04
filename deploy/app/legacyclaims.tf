@@ -5,6 +5,10 @@ locals {
     legacy_block_index_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
     legacy_allocations_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-allocation"
     legacy_allocations_table_region = "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
+    legacy_store_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-store"
+    legacy_store_table_region = "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
+    legacy_blob_registry_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-blob-registry"
+    legacy_blob_registry_table_region = "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
 }
 
 provider "aws" {
@@ -44,7 +48,27 @@ data "aws_dynamodb_table" "legacy_allocations_table" {
   name = local.legacy_allocations_table_name
 }
 
-data "aws_iam_policy_document" "lambda_legacy_dynamodb_query_document" {
+provider "aws" {
+  alias = "store"
+  region = local.legacy_store_table_region
+}
+
+data "aws_dynamodb_table" "legacy_store_table" {
+  provider = aws.store
+  name = local.legacy_store_table_name
+}
+
+provider "aws" {
+  alias = "blob_registry"
+  region = local.legacy_blob_registry_table_region
+}
+
+data "aws_dynamodb_table" "legacy_blob_registry_table" {
+  provider = aws.blob_registry
+  name = local.legacy_blob_registry_table_name
+}
+
+data "aws_iam_policy_document" "task_legacy_dynamodb_query_document" {
   statement {
     actions = [
       "dynamodb:Query",
@@ -54,6 +78,8 @@ data "aws_iam_policy_document" "lambda_legacy_dynamodb_query_document" {
       data.aws_dynamodb_table.legacy_block_index_table.arn,
       data.aws_dynamodb_table.legacy_allocations_table.arn,
       "${data.aws_dynamodb_table.legacy_allocations_table.arn}/index/*",
+      data.aws_dynamodb_table.legacy_store_table.arn,
+      data.aws_dynamodb_table.legacy_blob_registry_table.arn,
     ]
   }
 }
@@ -61,7 +87,7 @@ data "aws_iam_policy_document" "lambda_legacy_dynamodb_query_document" {
 resource "aws_iam_policy" "task_legacy_dynamodb_query" {
   name        = "${terraform.workspace}-${var.app}-task-legacy-dynamodb-query"
   description = "This policy will be used by the ECS task to query data from legacy DynamoDB tables"
-  policy      = data.aws_iam_policy_document.lambda_legacy_dynamodb_query_document.json
+  policy      = data.aws_iam_policy_document.task_legacy_dynamodb_query_document.json
 }
 
 resource "aws_iam_role_policy_attachment" "task_legacy_dynamodb_query" {
