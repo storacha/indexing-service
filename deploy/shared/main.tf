@@ -4,20 +4,26 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.86.0"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5"
+    }
   }
   backend "s3" {
     bucket = "storacha-terraform-state"
-    key    = "storacha/indexing-service/shared.tfstate"
+    key = "storacha/${var.app}/shared.tfstate"
     region = "us-west-2"
+    encrypt = true
   }
 }
 
 provider "aws" {
-  allowed_account_ids = var.allowed_account_ids
+  allowed_account_ids = [var.allowed_account_id]
+  region = "us-west-2"
   default_tags {
     tags = {
-      "Environment" = terraform.workspace
-      "ManagedBy"   = "OpenTofu"
+      Environment   = "shared"
+      ManagedBy     = "OpenTofu"
       Owner         = "storacha"
       Team          = "Storacha Engineering"
       Organization  = "Storacha"
@@ -26,24 +32,33 @@ provider "aws" {
   }
 }
 
-removed {
-  from = aws_route53_zone.primary
+provider "aws" {
+  alias = "dev"
+  allowed_account_ids = [var.allowed_account_id]
+  region = "us-east-2"
+  default_tags {
+    tags = {
+      Environment   = "dev"
+      ManagedBy     = "OpenTofu"
+      Owner         = "storacha"
+      Team          = "Storacha Engineering"
+      Organization  = "Storacha"
+      Project       = "${var.app}"
+    }
+  }
 }
 
-import {
-  to = aws_route53_zone.hot
-  id = "Z069841432CRU732HASNL"
-}
-
-resource "aws_route53_zone" "hot" {
-  name = "${var.app}.storacha.network"
-}
-
-import {
-  to = aws_route53_zone.warm
-  id = "Z0845167J9GR7IUCNBTW"
-}
-
-resource "aws_route53_zone" "warm" {
-  name = "${var.app}.warm.storacha.network"
+module "shared" {
+  source = "github.com/storacha/storoku//shared?ref=v0.4.4"
+  providers = {
+    aws = aws
+    aws.dev = aws.dev
+  }
+  create_db = false
+  caches = ["providers","no-providers","indexes","claims",]
+  networks = ["warm",]
+  app = var.app
+  zone_id = var.cloudflare_zone_id
+  domain_base = var.domain_base
+  setup_cloudflare = true
 }

@@ -9,13 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
-	lambdadetector "go.opentelemetry.io/contrib/detectors/aws/lambda"
+	ecsdetector "go.opentelemetry.io/contrib/detectors/aws/ecs"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-sdk-go-v2/otelaws"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -47,15 +47,15 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config, opts ...TelemetryOptio
 		}
 	}
 
-	// WithInsecure is ok here because we are exporting traces to the AWS OpenTelemetry collector which is running
-	// in a layer within the lambda's execution environment
-	exp, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
+	// The default HTTP exporter will fetch the endpoint from the OTEL_EXPORTER_OTLP_ENDPOINT environment variable
+	// and will use the headers from the OTEL_EXPORTER_OTLP_HEADERS environment variable
+	exp, err := otlptracehttp.New(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// the resource detector populates some span attributes with information about the environment
-	detector := lambdadetector.NewResourceDetector()
+	detector := ecsdetector.NewResourceDetector()
 	resource, err := detector.Detect(ctx)
 	if err != nil {
 		return nil, err

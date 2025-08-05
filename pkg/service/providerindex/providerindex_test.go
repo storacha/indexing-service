@@ -379,7 +379,7 @@ func TestGetProviderResults(t *testing.T) {
 		mockIpniFinder.EXPECT().Find(extmocks.AnyContext, someHash).Return(ipniFinderResponse, nil)
 		mockLegacyClaims.EXPECT().Find(extmocks.AnyContext, someHash, targetClaim).Return(nil, nil)
 		mockStore.EXPECT().Add(extmocks.AnyContext, someHash, expectedResult).Return(0, errors.New("some error"))
-		mockLog.EXPECT().Errorf("adding results to set: %w", errors.New("some error"))
+		mockLog.EXPECT().Errorf("adding results to set: %s", errors.New("some error"))
 
 		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
 		require.NoError(t, err)

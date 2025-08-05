@@ -50,7 +50,9 @@ func (s *S3Store) Put(ctx context.Context, key string, len uint64, data io.Reade
 
 func NewS3Store(cfg aws.Config, bucket string, keyPrefix string) *S3Store {
 	return &S3Store{
-		s3Client:  s3.NewFromConfig(cfg),
+		s3Client: s3.NewFromConfig(cfg, func(options *s3.Options) {
+			options.DisableLogOutputChecksumValidationSkipped = true
+		}),
 		bucket:    bucket,
 		keyPrefix: keyPrefix,
 	}

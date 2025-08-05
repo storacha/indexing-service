@@ -74,18 +74,6 @@ This is the DID for this deployment (did:web:... for example). e.g.
 TF_VAR_did='did:web:yourname.indexer.storacha.network'
 ```
 
-#### `TF_VAR_public_url`
-
-This is the public URL of the peer for this deployment. e.g.
-
-```sh
-TF_VAR_public_url='https://yourname.indexer.storacha.network'
-```
-
-#### `TF_VAR_honeycomb_api_key`
-
-Setting this variable enables tracing for lambdas based on HTTP handlers. Currently, only Honeycomb is supported as the tracing backend. You can create a Honeycomb account and get an API key from the [Honeycomb website](https://www.honeycomb.io/).
-
 #### `TF_VAR_principal_mapping`
 
 Optional. JSON encoded mapping of did:web to did:key. e.g.
@@ -94,21 +82,25 @@ Optional. JSON encoded mapping of did:web to did:key. e.g.
 TF_VAR_principal_mapping={"did:web:example.com":"did:key:z6MktkCXwNmpqejQxYd7JHPcw7d4Srjct7sX74VLfKqsPyAw"}
 ```
 
-#### `TF_VAR_ipni_endpoint`
+#### `IPNI_ENDPOINT`
 
 Optional. HTTP endpoint of the IPNI instance used to discover providers.
 
 ```sh
-TF_VAR_ipni_endpoint="https://cid.contact"
+IPNI_ENDPOINT="https://cid.contact"
 ```
 
-#### `TF_VAR_ipni_announce_urls`
+#### `IPNI_ANNOUNCE_URLS`
 
 Optional. JSON array of IPNI node URLs to announce chain updates to.
 
 ```sh
-TF_VAR_ipni_announce_urls=["https://cid.contact/announce"]
+IPNI_ANNOUNCE_URLS=["https://cid.contact/announce"]
 ```
+
+#### `HONEYCOMB_API_KEY`
+
+Setting this variable enables tracing for lambdas based on HTTP handlers. Currently, only Honeycomb is supported as the tracing backend. You can create a Honeycomb account and get an API key from the [Honeycomb website](https://www.honeycomb.io/).
 
 ### Deployment commands
 

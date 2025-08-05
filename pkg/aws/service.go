@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/getsentry/sentry-go"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -75,7 +74,7 @@ type Config struct {
 	NoProvidersCacheExpirationSeconds int64
 	ClaimsCacheExpirationSeconds      int64
 	IndexesCacheExpirationSeconds     int64
-	SQSCachingQueueURL                string
+	SQSCachingQueueID                 string
 	CachingBucket                     string
 	ChunkLinksTableName               string
 	MetadataTableName                 string
@@ -113,18 +112,8 @@ func FromEnv(ctx context.Context) Config {
 	if err != nil {
 		panic(fmt.Errorf("loading aws default config: %w", err))
 	}
-	ssmClient := ssm.NewFromConfig(awsConfig)
-	response, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(mustGetEnv("PRIVATE_KEY")),
-		WithDecryption: aws.Bool(true),
-	})
-	if err != nil {
-		panic(fmt.Errorf("retrieving private key: %w", err))
-	}
-	if response.Parameter == nil || response.Parameter.Value == nil {
-		panic(ErrNoPrivateKey)
-	}
-	id, err := ed25519.Parse(*response.Parameter.Value)
+
+	id, err := ed25519.Parse(mustGetEnv("PRIVATE_KEY"))
 	if err != nil {
 		panic(fmt.Errorf("parsing private key: %s", err))
 	}
@@ -181,6 +170,12 @@ func FromEnv(ctx context.Context) Config {
 		ipniPublisherDirectAnnounceURLs = presets.IPNIAnnounceURLs
 	}
 
+	var legacyDotStorageBucketPrefixes []string
+	err = json.Unmarshal([]byte(mustGetEnv("LEGACY_DOT_STORAGE_BUCKET_PREFIXES")), &legacyDotStorageBucketPrefixes)
+	if err != nil {
+		panic(fmt.Errorf("parsing legacy dot storage bucket prefixes JSON: %w", err))
+	}
+
 	return Config{
 		Config: awsConfig,
 		Signer: id,
@@ -188,37 +183,37 @@ func FromEnv(ctx context.Context) Config {
 			PrivateKey: cryptoPrivKey,
 			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
 			ProvidersRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("PROVIDERS_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("PROVIDERS_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("PROVIDERS_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("PROVIDERS_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
 			NoProviderRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("NO_PROVIDERS_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("NO_PROVIDERS_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("NO_PROVIDERS_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("NO_PROVIDERS_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
 			ClaimsRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("CLAIMS_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("CLAIMS_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("CLAIMS_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("CLAIMS_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
 			},
 			IndexesRedis: goredis.ClusterOptions{
-				Addrs:                      []string{mustGetEnv("INDEXES_REDIS_URL")},
+				Addrs:                      []string{mustGetEnv("INDEXES_CACHE_URL")},
 				ReadOnly:                   true,
 				RouteRandomly:              true,
-				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("REDIS_USER_ID"), mustGetEnv("INDEXES_REDIS_CACHE")),
+				CredentialsProviderContext: redisCredentialVerifier(awsConfig, mustGetEnv("CACHE_USER_ID"), mustGetEnv("INDEXES_CACHE_ID")),
 				TLSConfig: &tls.Config{
 					MinVersion: tls.VersionTLS12,
 				},
@@ -231,16 +226,15 @@ func FromEnv(ctx context.Context) Config {
 		NoProvidersCacheExpirationSeconds: mustGetInt("NO_PROVIDERS_CACHE_EXPIRATION_SECONDS"),
 		ClaimsCacheExpirationSeconds:      mustGetInt("CLAIMS_CACHE_EXPIRATION_SECONDS"),
 		IndexesCacheExpirationSeconds:     mustGetInt("INDEXES_CACHE_EXPIRATION_SECONDS"),
-		SQSCachingQueueURL:                mustGetEnv("PROVIDER_CACHING_QUEUE_URL"),
+		SQSCachingQueueID:                 mustGetEnv("PROVIDER_CACHING_QUEUE_ID"),
 		CachingBucket:                     mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
-		ChunkLinksTableName:               mustGetEnv("CHUNK_LINKS_TABLE_NAME"),
-		MetadataTableName:                 mustGetEnv("METADATA_TABLE_NAME"),
+		ChunkLinksTableName:               mustGetEnv("CHUNK_LINKS_TABLE_ID"),
+		MetadataTableName:                 mustGetEnv("METADATA_TABLE_ID"),
 		IPNIStoreBucket:                   mustGetEnv("IPNI_STORE_BUCKET_NAME"),
 		IPNIStorePrefix:                   ipniStoreKeyPrefix,
 		NotifierHeadBucket:                mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
-		NotifierTopicArn:                  mustGetEnv("NOTIFIER_SNS_TOPIC_ARN"),
 		ClaimStoreBucket:                  mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
-		ClaimStorePrefix:                  os.Getenv("CLAIM_STORE_KEY_REFIX"),
+		ClaimStorePrefix:                  os.Getenv("CLAIM_STORE_KEY_PREFIX"),
 		LegacyClaimsTableName:             mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
 		LegacyClaimsTableRegion:           mustGetEnv("LEGACY_CLAIMS_TABLE_REGION"),
 		LegacyClaimsBucket:                mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
@@ -253,7 +247,7 @@ func FromEnv(ctx context.Context) Config {
 		LegacyAllocationsTableName:        mustGetEnv("LEGACY_ALLOCATIONS_TABLE_NAME"),
 		LegacyAllocationsTableRegion:      mustGetEnv("LEGACY_ALLOCATIONS_TABLE_REGION"),
 		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
-		LegacyDotStorageBucketPrefixes:    strings.Split(mustGetEnv("LEGACY_DOT_STORAGE_BUCKET_PREFIXES"), ","),
+		LegacyDotStorageBucketPrefixes:    legacyDotStorageBucketPrefixes,
 		BaseTraceSampleRatio:              mustGetFloat("BASE_TRACE_SAMPLE_RATIO"),
 		SentryDSN:                         os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:                 os.Getenv("SENTRY_ENVIRONMENT"),
@@ -279,7 +273,7 @@ func Construct(cfg Config) (types.Service, error) {
 		indexesClient = telemetry.InstrumentRedisClient(indexesClient)
 	}
 
-	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueURL, cfg.CachingBucket)
+	cachingQueue := NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueID, cfg.CachingBucket)
 	ipniStore := NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
 	claimBucketStore := contentclaims.NewStoreFromBucket(NewS3Store(cfg.Config, cfg.ClaimStoreBucket, cfg.ClaimStorePrefix))
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
