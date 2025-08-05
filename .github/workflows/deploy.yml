@@ -44,6 +44,7 @@ jobs:
     with:
       env: warm-staging
       workspace: warm-staging
+      network: warm
       did: did:web:staging.indexer.warm.storacha.network
       ipni-endpoint: ${{ vars.WARM_STAGING_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.WARM_STAGING_IPNI_ANNOUNCE_URLS }}
