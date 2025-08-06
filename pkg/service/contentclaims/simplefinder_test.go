@@ -11,15 +11,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSimpleFinder__Find(t *testing.T) {
-	claim := testutil.RandomIndexDelegation()
-	otherClaim := testutil.RandomIndexDelegation()
+	claim := testutil.RandomIndexDelegation(t)
+	otherClaim := testutil.RandomIndexDelegation(t)
 
 	// sample error
 	testCases := []struct {

@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/uuid"
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 )
 

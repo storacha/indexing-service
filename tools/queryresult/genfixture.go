@@ -22,6 +22,8 @@ import (
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/bytemap"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
 	"github.com/storacha/go-ucanto/core/car"
@@ -29,8 +31,6 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/ucan"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
 )

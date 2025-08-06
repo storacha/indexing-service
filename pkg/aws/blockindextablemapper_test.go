@@ -11,12 +11,12 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/bytemap"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/result"
-	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -177,7 +177,7 @@ func TestBlockIndexTableMapper(t *testing.T) {
 		bitMapper, err := NewBlockIndexTableMapper(id, mockStore, mockMigratedShardChecker, bucketURL.String(), time.Hour, dotStorageBuckets)
 		require.NoError(t, err)
 
-		_, err = bitMapper.GetClaims(context.Background(), testutil.RandomMultihash())
+		_, err = bitMapper.GetClaims(context.Background(), testutil.RandomMultihash(t))
 		require.ErrorIs(t, err, types.ErrKeyNotFound)
 	})
 }

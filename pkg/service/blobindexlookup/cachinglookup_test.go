@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/metadata"
-	"github.com/storacha/indexing-service/pkg/blobindex"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -20,14 +20,14 @@ import (
 func TestWithCache__Find(t *testing.T) {
 
 	// Create a test CID
-	cachedContextID := testutil.RandomBytes(16)
-	notCachedContextID := testutil.RandomBytes(16)
+	cachedContextID := testutil.RandomBytes(t, 16)
+	notCachedContextID := testutil.RandomBytes(t, 16)
 	// Create a cached index
-	_, cachedIndex := testutil.RandomShardedDagIndexView(32)
-	_, notCachedIndex := testutil.RandomShardedDagIndexView(32)
+	_, cachedIndex := testutil.RandomShardedDagIndexView(t, 32)
+	_, notCachedIndex := testutil.RandomShardedDagIndexView(t, 32)
 
 	// Create provider
-	provider := testutil.RandomProviderResult()
+	provider := testutil.RandomProviderResult(t)
 
 	// sample error
 	anError := errors.New("something went wrong")

@@ -8,9 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ipfs/go-cid"
+	"github.com/storacha/go-libstoracha/testutil"
+	"github.com/storacha/indexing-service/pkg/internal/extmocks"
 	"github.com/storacha/indexing-service/pkg/internal/link"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil/extmocks"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -23,9 +23,9 @@ func TestGetClaims(t *testing.T) {
 		mockDynamoDBClient := extmocks.NewMockDynamoDBQueryClient(t)
 		dynamoDBMapper := NewDynamoContentToClaimsMapper(mockDynamoDBClient, testTable)
 
-		contentHash := testutil.RandomMultihash()
-		locationClaimCID := link.ToCID(testutil.RandomCID())
-		indexClaimCID := link.ToCID(testutil.RandomCID())
+		contentHash := testutil.RandomMultihash(t)
+		locationClaimCID := link.ToCID(testutil.RandomCID(t))
+		indexClaimCID := link.ToCID(testutil.RandomCID(t))
 
 		locationClaim, err := attributevalue.MarshalMap(contentClaimItem{
 			Content: contentHash.String(),
@@ -64,7 +64,7 @@ func TestGetClaims(t *testing.T) {
 			Count: 0,
 		}, nil)
 
-		_, err := dynamoDBMapper.GetClaims(ctx, testutil.RandomMultihash())
+		_, err := dynamoDBMapper.GetClaims(ctx, testutil.RandomMultihash(t))
 
 		require.Equal(t, types.ErrKeyNotFound, err)
 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 

@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,8 +36,8 @@ func TestDynamoMigratedShardChecker(t *testing.T) {
 
 	t.Run("exists in store table", func(t *testing.T) {
 
-		cid := testutil.RandomCID()
-		space := testutil.RandomPrincipal().DID()
+		cid := testutil.RandomCID(t)
+		space := testutil.RandomPrincipal(t).DID()
 		_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
 			TableName: aws.String(storeTable),
 			Item: map[string]types.AttributeValue{
@@ -54,8 +54,8 @@ func TestDynamoMigratedShardChecker(t *testing.T) {
 
 	t.Run("exists in blob registry table", func(t *testing.T) {
 
-		cid := testutil.RandomCID()
-		space := testutil.RandomPrincipal().DID()
+		cid := testutil.RandomCID(t)
+		space := testutil.RandomPrincipal(t).DID()
 		_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
 			TableName: aws.String(blobRegistryTable),
 			Item: map[string]types.AttributeValue{
@@ -72,8 +72,8 @@ func TestDynamoMigratedShardChecker(t *testing.T) {
 
 	t.Run("exists in allocations table", func(t *testing.T) {
 
-		cid := testutil.RandomCID()
-		space := testutil.RandomPrincipal().DID()
+		cid := testutil.RandomCID(t)
+		space := testutil.RandomPrincipal(t).DID()
 		_, err := dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
 			TableName: aws.String(allocationsTable),
 			Item: map[string]types.AttributeValue{
@@ -89,7 +89,7 @@ func TestDynamoMigratedShardChecker(t *testing.T) {
 	})
 
 	t.Run("does not exist in any table", func(t *testing.T) {
-		cid := testutil.RandomCID()
+		cid := testutil.RandomCID(t)
 		has, err := checker.ShardMigrated(ctx, cid)
 		require.NoError(t, err)
 		require.False(t, has, "expected shard to not be migrated in any table")

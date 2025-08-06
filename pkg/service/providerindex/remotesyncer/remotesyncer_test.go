@@ -19,8 +19,8 @@ import (
 	"github.com/ipni/go-libipni/ingest/schema"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"github.com/storacha/indexing-service/pkg/bytemap"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
+	"github.com/storacha/go-libstoracha/bytemap"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func TestHandleRemoteSync(t *testing.T) {
 
 		var ec schema.EntryChunk
 		for range rand.IntN(100) {
-			digest := testutil.RandomMultihash()
+			digest := testutil.RandomMultihash(t)
 			ec.Entries = append(ec.Entries, digest)
 			_, err := providerStore.Add(context.Background(), digest, model.ProviderResult{})
 			require.NoError(t, err)

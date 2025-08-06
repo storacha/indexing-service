@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/storacha/indexing-service/pkg/blobindex"
+	"github.com/storacha/go-libstoracha/blobindex"
 )
 
 type (

@@ -5,7 +5,7 @@ package providercacher
 import (
 	context "context"
 
-	blobindex "github.com/storacha/indexing-service/pkg/blobindex"
+	blobindex "github.com/storacha/go-libstoracha/blobindex"
 
 	mock "github.com/stretchr/testify/mock"
 

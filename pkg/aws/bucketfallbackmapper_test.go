@@ -15,13 +15,13 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/bytemap"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/aws"
-	"github.com/storacha/indexing-service/pkg/bytemap"
 	"github.com/storacha/indexing-service/pkg/internal/digestutil"
-	"github.com/storacha/indexing-service/pkg/internal/testutil"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +30,7 @@ func TestBucketFallbackMapper(t *testing.T) {
 	ctx := context.Background()
 	responses := bytemap.NewByteMap[multihash.Multihash, resp](-1)
 	hasResponses := bytemap.NewByteMap[multihash.Multihash, hasResp](-1)
-	signer := testutil.RandomSigner()
+	signer := testutil.RandomSigner(t)
 
 	// set up test server
 	mux := http.NewServeMux()
@@ -40,17 +40,17 @@ func TestBucketFallbackMapper(t *testing.T) {
 	defer server.Close()
 	serverURL := testutil.Must(url.Parse(server.URL))(t)
 
-	errorOnReadAllocationsHash := testutil.RandomMultihash()
+	errorOnReadAllocationsHash := testutil.RandomMultihash(t)
 	hasResponses.Set(errorOnReadAllocationsHash, hasResp{false, errors.New("something went wrong")})
 
-	nonHasHash := testutil.RandomMultihash()
+	nonHasHash := testutil.RandomMultihash(t)
 	hasResponses.Set(nonHasHash, hasResp{false, nil})
 
-	hasNonSuccessHash := testutil.RandomMultihash()
+	hasNonSuccessHash := testutil.RandomMultihash(t)
 	responses.Set(hasNonSuccessHash, resp{0, http.StatusInternalServerError})
 	hasResponses.Set(hasNonSuccessHash, hasResp{true, nil})
 
-	hasSuccessHash := testutil.RandomMultihash()
+	hasSuccessHash := testutil.RandomMultihash(t)
 	hasSuccessContentLength := uint64(500)
 	responses.Set(hasSuccessHash, resp{int64(hasSuccessContentLength), http.StatusOK})
 	hasResponses.Set(hasSuccessHash, hasResp{true, nil})
