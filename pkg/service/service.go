@@ -86,8 +86,9 @@ var targetClaims = map[types.QueryType][]multicodec.Code{
 }
 
 type queryResult struct {
-	Claims  map[cid.Cid]delegation.Delegation
-	Indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]
+	Claims   map[cid.Cid]delegation.Delegation
+	Indexes  bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]
+	Messages []string
 }
 
 type queryState struct {
@@ -148,13 +149,25 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			claimCid := hasClaimCid.GetClaim()
 			url, err := fetchClaimURL(*result.Provider, claimCid)
 			if err != nil {
-				telemetry.Error(s, err, "building claim URL")
-				return err
+				state.Modify(func(qs queryState) queryState {
+					err = fmt.Errorf("building claim URL for %s: %w", result.Provider.ID.String(), err)
+					qs.qr.Messages = append(qs.qr.Messages, err.Error())
+					return qs
+				})
+				continue
 			}
 
 			s.AddEvent("fetching claims")
 			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, url)
 			if err != nil {
+				if errors.As(err, &contentclaims.ClaimFetchError{}) {
+					state.Modify(func(qs queryState) queryState {
+						err = fmt.Errorf("fetching claim %s from %s: %w", claimCid.String(), url.String(), err)
+						qs.qr.Messages = append(qs.qr.Messages, err.Error())
+						return qs
+					})
+					continue
+				}
 				telemetry.Error(s, err, "fetching claims")
 				return err
 			}
@@ -211,8 +224,12 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					}
 					url, err := fetchRetrievalURL(*result.Provider, *shard)
 					if err != nil {
-						telemetry.Error(s, err, "fetching index retrieval URL")
-						return err
+						state.Modify(func(qs queryState) queryState {
+							err = fmt.Errorf("building index retrieval URL for %s: %w", result.Provider.ID.String(), err)
+							qs.qr.Messages = append(qs.qr.Messages, err.Error())
+							return qs
+						})
+						continue
 					}
 
 					s.AddEvent("fetching index")
@@ -276,7 +293,7 @@ func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.Quer
 	if err != nil {
 		return nil, err
 	}
-	return queryresult.Build(qs.qr.Claims, qs.qr.Indexes)
+	return queryresult.Build(qs.qr.Claims, qs.qr.Indexes, queryresult.WithMessage(qs.qr.Messages...))
 }
 
 type replacement struct {

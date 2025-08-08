@@ -31,12 +31,20 @@ func QueryResultType() schema.Type {
 // QueryResultModel is the golang structure for encoding query results
 type QueryResultModel struct {
 	Result0_1 *QueryResultModel0_1
+	Result0_2 *QueryResultModel0_2
 }
 
 // QueryResultModel0_1 describes the found claims and indexes for a given query
 type QueryResultModel0_1 struct {
 	Claims  []ipld.Link
 	Indexes *IndexesModel
+}
+
+// QueryResultModel0_2 describes the found claims and indexes for a given query
+type QueryResultModel0_2 struct {
+	Claims   []ipld.Link
+	Indexes  *IndexesModel
+	Messages []string
 }
 
 // IndexesModel maps encoded context IDs to index links
