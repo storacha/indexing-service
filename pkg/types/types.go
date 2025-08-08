@@ -153,6 +153,8 @@ type QueryResult interface {
 	// Indexes is a list of links to the CID hash of archived sharded dag indexes that can be found in this
 	// message
 	Indexes() []ipld.Link
+	// Messages may contain non-fatal issues that occurred during query execution.
+	Messages() []string
 }
 
 type Getter interface {
