@@ -96,6 +96,8 @@ func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 	mux := http.NewServeMux()
 	maybeInstrumentAndAdd(mux, "GET /", GetRootHandler(c.id), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "GET /claim/{claim}", GetClaimHandler(indexer), c.enableTelemetry)
+	// temporary fix: post claims handler accessible at POST / too
+	maybeInstrumentAndAdd(mux, "POST /", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "POST /claims", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "GET /claims", GetClaimsHandler(indexer), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "GET /.well-known/did.json", GetDIDDocument(c.id), c.enableTelemetry)
