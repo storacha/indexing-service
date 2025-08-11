@@ -12,6 +12,8 @@ import (
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/core/result/ok"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
 	"github.com/storacha/go-ucanto/server"
@@ -21,61 +23,64 @@ import (
 
 var log = logging.Logger("contentclaims")
 
-func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMethod[ok.Unit] {
-	return map[ucan.Ability]server.ServiceMethod[ok.Unit]{
+func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMethod[ok.Unit, failure.IPLDBuilderFailure] {
+	return map[ucan.Ability]server.ServiceMethod[ok.Unit, failure.IPLDBuilderFailure]{
 		assert.EqualsAbility: server.Provide(
 			assert.Equals,
-			func(ctx context.Context, cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
+			func(ctx context.Context, cap ucan.Capability[assert.EqualsCaveats], inv invocation.Invocation, ictx server.InvocationContext) (result.Result[ok.Unit, failure.IPLDBuilderFailure], fx.Effects, error) {
 				err := service.Publish(ctx, inv)
 				if err != nil {
 					log.Errorf("publishing equals claim: %s", err)
+					return nil, nil, err
 				}
-				return ok.Unit{}, nil, err
+				return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 			},
 		),
 		assert.IndexAbility: server.Provide(
 			assert.Index,
-			func(ctx context.Context, cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
+			func(ctx context.Context, cap ucan.Capability[assert.IndexCaveats], inv invocation.Invocation, ictx server.InvocationContext) (result.Result[ok.Unit, failure.IPLDBuilderFailure], fx.Effects, error) {
 				err := service.Publish(ctx, inv)
 				if err != nil {
 					log.Errorf("publishing index claim: %s", err)
+					return nil, nil, err
 				}
-				return ok.Unit{}, nil, err
+				return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 			},
 		),
 		claim.CacheAbility: server.Provide(
 			claim.Cache,
-			func(ctx context.Context, cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ictx server.InvocationContext) (ok.Unit, fx.Effects, error) {
+			func(ctx context.Context, cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ictx server.InvocationContext) (result.Result[ok.Unit, failure.IPLDBuilderFailure], fx.Effects, error) {
 				peerid, err := toPeerID(inv.Issuer())
 				if err != nil {
-					return ok.Unit{}, nil, err
+					return nil, nil, err
 				}
 
 				provider := peer.AddrInfo{ID: peerid, Addrs: cap.Nb().Provider.Addresses}
 
 				bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(inv.Blocks()))
 				if err != nil {
-					return ok.Unit{}, nil, err
+					return nil, nil, err
 				}
 
 				rootbl, present, err := bs.Get(cap.Nb().Claim)
 				if err != nil {
-					return ok.Unit{}, nil, err
+					return nil, nil, err
 				}
 				if !present {
-					return ok.Unit{}, nil, NewMissingClaimError()
+					return result.Error[ok.Unit, failure.IPLDBuilderFailure](NewMissingClaimError()), nil, nil
 				}
 
 				claim, err := delegation.NewDelegation(rootbl, bs)
 				if err != nil {
-					return ok.Unit{}, nil, err
+					return nil, nil, err
 				}
 
 				err = service.Cache(ctx, provider, claim)
 				if err != nil {
 					log.Errorf("caching claim: %s", err)
+					return nil, nil, err
 				}
-				return ok.Unit{}, nil, err
+				return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 			},
 		),
 	}

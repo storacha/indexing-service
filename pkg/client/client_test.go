@@ -29,6 +29,8 @@ import (
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt/fx"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/core/result/ok"
 	"github.com/storacha/go-ucanto/principal"
 	ucanserver "github.com/storacha/go-ucanto/server"
@@ -258,9 +260,9 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 			cassert.EqualsAbility,
 			ucanserver.Provide(
 				cassert.Equals,
-				func(ctx context.Context, cap ucan.Capability[cassert.EqualsCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[cassert.EqualsCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (result.Result[ok.Unit, failure.IPLDBuilderFailure], fx.Effects, error) {
 					notifyInvocation(inv)
-					return ok.Unit{}, nil, nil
+					return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 				},
 			),
 		),
@@ -268,9 +270,9 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 			cassert.IndexAbility,
 			ucanserver.Provide(
 				cassert.Index,
-				func(ctx context.Context, cap ucan.Capability[cassert.IndexCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[cassert.IndexCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (result.Result[ok.Unit, failure.IPLDBuilderFailure], fx.Effects, error) {
 					notifyInvocation(inv)
-					return ok.Unit{}, nil, nil
+					return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 				},
 			),
 		),
@@ -278,9 +280,9 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 			claim.CacheAbility,
 			ucanserver.Provide(
 				claim.Cache,
-				func(ctx context.Context, cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (ok.Unit, fx.Effects, error) {
+				func(ctx context.Context, cap ucan.Capability[claim.CacheCaveats], inv invocation.Invocation, ictx ucanserver.InvocationContext) (result.Result[ok.Unit, failure.IPLDBuilderFailure], fx.Effects, error) {
 					notifyInvocation(inv)
-					return ok.Unit{}, nil, nil
+					return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 				},
 			),
 		),

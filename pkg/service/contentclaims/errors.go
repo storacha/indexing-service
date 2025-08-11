@@ -6,12 +6,16 @@ import (
 )
 
 type Failure struct {
-	Name    string
-	Message string
+	name    string
+	message string
 }
 
 func (f Failure) Error() string {
-	return f.Message
+	return f.message
+}
+
+func (f Failure) Name() string {
+	return f.name
 }
 
 func (f Failure) ToIPLD() (datamodel.Node, error) {
@@ -22,16 +26,16 @@ func (f Failure) ToIPLD() (datamodel.Node, error) {
 		return nil, err
 	}
 	ma.AssembleKey().AssignString("name")
-	ma.AssembleValue().AssignString(f.Name)
+	ma.AssembleValue().AssignString(f.name)
 	ma.AssembleKey().AssignString("message")
-	ma.AssembleValue().AssignString(f.Message)
+	ma.AssembleValue().AssignString(f.message)
 	ma.Finish()
 	return nb.Build(), nil
 }
 
 func NewMissingClaimError() Failure {
 	return Failure{
-		Name:    "MissingClaim",
-		Message: "Claim data was not found in the invocation payload.",
+		name:    "MissingClaim",
+		message: "Claim data was not found in the invocation payload.",
 	}
 }
