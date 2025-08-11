@@ -42,8 +42,9 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 				err := service.Publish(ctx, inv)
 				if err != nil {
 					log.Errorf("publishing index claim: %s", err)
+					return nil, nil, err
 				}
-				return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, err
+				return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 			},
 		),
 		claim.CacheAbility: server.Provide(
@@ -77,8 +78,9 @@ func NewUCANService(service types.Publisher) map[ucan.Ability]server.ServiceMeth
 				err = service.Cache(ctx, provider, claim)
 				if err != nil {
 					log.Errorf("caching claim: %s", err)
+					return nil, nil, err
 				}
-				return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, err
+				return result.Ok[ok.Unit, failure.IPLDBuilderFailure](ok.Unit{}), nil, nil
 			},
 		),
 	}
