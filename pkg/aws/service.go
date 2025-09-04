@@ -311,10 +311,10 @@ func Construct(cfg Config) (types.Service, error) {
 	blobRegistryTableCfg := cfg.Config.Copy()
 	blobRegistryTableCfg.Region = cfg.LegacyBlobRegistryTableRegion
 	legacyMigratedShardChecker := NewDynamoMigratedShardChecker(
-		dynamodb.NewFromConfig(storeTableCfg),
-		dynamodb.NewFromConfig(blobRegistryTableCfg),
 		cfg.LegacyStoreTableName,
+		dynamodb.NewFromConfig(storeTableCfg),
 		cfg.LegacyBlobRegistryTableName,
+		dynamodb.NewFromConfig(blobRegistryTableCfg),
 		legacyAllocationsStore,
 	)
 	// allow claims synthethized from the block index table to live longer after they are expired in the cache
