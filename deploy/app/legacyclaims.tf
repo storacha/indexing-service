@@ -78,8 +78,8 @@ data "aws_iam_policy_document" "task_legacy_dynamodb_query_document" {
       data.aws_dynamodb_table.legacy_block_index_table.arn,
       data.aws_dynamodb_table.legacy_allocations_table.arn,
       "${data.aws_dynamodb_table.legacy_allocations_table.arn}/index/*",
-      data.aws_dynamodb_table.legacy_store_table.arn,
-      data.aws_dynamodb_table.legacy_blob_registry_table.arn,
+      "${data.aws_dynamodb_table.legacy_store_table.arn}/index/cid",
+      "${data.aws_dynamodb_table.legacy_blob_registry_table.arn}/index/digest",
     ]
   }
 }
