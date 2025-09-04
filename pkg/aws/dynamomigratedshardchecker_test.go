@@ -32,7 +32,7 @@ func TestDynamoMigratedShardChecker(t *testing.T) {
 	createBlobRegistryTable(t, dynamoClient, blobRegistryTable)
 	createAllocationsTable(t, dynamoClient, allocationsTable)
 	allocationsStore := NewDynamoAllocationsTable(dynamoClient, allocationsTable)
-	checker := NewDynamoMigratedShardChecker(dynamoClient, dynamoClient, blobRegistryTable, storeTable, allocationsStore)
+	checker := NewDynamoMigratedShardChecker(storeTable, dynamoClient, blobRegistryTable, dynamoClient, allocationsStore)
 
 	t.Run("exists in store table", func(t *testing.T) {
 

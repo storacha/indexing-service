@@ -66,7 +66,7 @@ func (d *DynamoMigratedShardChecker) blobRegistryTableShardMigrated(ctx context.
 		Select:                    dynamotypes.SelectCount,
 	})
 	if err != nil {
-		return false, fmt.Errorf("querying store table: %w", err)
+		return false, fmt.Errorf("querying blob registry table: %w", err)
 	}
 	return o.Count > 0, nil
 }
@@ -85,12 +85,12 @@ func (d *DynamoMigratedShardChecker) ShardMigrated(ctx context.Context, shard ip
 	return d.allocationsStore.Has(ctx, shard.(cidlink.Link).Cid.Hash())
 }
 
-func NewDynamoMigratedShardChecker(storeTableClient dynamodb.QueryAPIClient, blobRegistryTableClient dynamodb.QueryAPIClient, blobRegistryTableName, storeTableName string, allocationsStore AllocationsStore) *DynamoMigratedShardChecker {
+func NewDynamoMigratedShardChecker(storeTableName string, storeTableClient dynamodb.QueryAPIClient, blobRegistryTableName string, blobRegistryTableClient dynamodb.QueryAPIClient, allocationsStore AllocationsStore) *DynamoMigratedShardChecker {
 	return &DynamoMigratedShardChecker{
-		storeTableClient:        storeTableClient,
-		blobRegistryTableClient: blobRegistryTableClient,
-		blobRegistryTableName:   blobRegistryTableName,
 		storeTableName:          storeTableName,
+		storeTableClient:        storeTableClient,
+		blobRegistryTableName:   blobRegistryTableName,
+		blobRegistryTableClient: blobRegistryTableClient,
 		allocationsStore:        allocationsStore,
 	}
 }
