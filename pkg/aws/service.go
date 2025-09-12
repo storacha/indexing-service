@@ -103,6 +103,8 @@ type Config struct {
 	SentryEnvironment                 string
 	HoneycombAPIKey                   string
 	PrincipalMapping                  map[string]string
+	IPNIFormatPeerID                  string
+	IPNIFormatEndpoint                string
 	principal.Signer
 }
 
@@ -252,6 +254,8 @@ func FromEnv(ctx context.Context) Config {
 		SentryDSN:                         os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:                 os.Getenv("SENTRY_ENVIRONMENT"),
 		HoneycombAPIKey:                   os.Getenv("HONEYCOMB_API_KEY"),
+		IPNIFormatPeerID:                  os.Getenv("IPNI_FORMAT_PEER_ID"),
+		IPNIFormatEndpoint:                os.Getenv("IPNI_FORMAT_ENDPOINT"),
 		PrincipalMapping:                  principalMapping,
 	}
 }

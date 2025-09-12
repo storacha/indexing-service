@@ -12,9 +12,15 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipni/go-libipni/find/model"
+	"github.com/ipni/go-libipni/metadata"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-ucanto/core/car"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
@@ -30,41 +36,68 @@ import (
 
 var log = logging.Logger("server")
 
+type ipniConfig struct {
+	provider peer.AddrInfo
+	metadata []byte
+}
+
 type config struct {
 	id                   principal.Signer
 	contentClaimsOptions []server.Option
 	enableTelemetry      bool
+	ipniConfig           *ipniConfig
 }
 
-type Option func(*config)
+type Option func(*config) error
 
 // WithIdentity specifies the server DID.
 func WithIdentity(s principal.Signer) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.id = s
+		return nil
 	}
 }
 
 func WithContentClaimsOptions(options ...server.Option) Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.contentClaimsOptions = options
+		return nil
 	}
 }
 
 func WithTelemetry() Option {
-	return func(c *config) {
+	return func(c *config) error {
 		c.enableTelemetry = true
+		return nil
+	}
+}
+
+func WithIPNI(provider peer.AddrInfo, metadata metadata.Metadata) Option {
+	return func(c *config) error {
+		mb, err := metadata.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		c.ipniConfig = &ipniConfig{
+			provider: provider,
+			metadata: mb,
+		}
+		return nil
 	}
 }
 
 // ListenAndServe creates a new indexing service HTTP server, and starts it up.
 func ListenAndServe(addr string, indexer types.Service, opts ...Option) error {
+	mux, err := NewServer(indexer, opts...)
+	if err != nil {
+		return err
+	}
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: NewServer(indexer, opts...),
+		Handler: mux,
 	}
 	log.Infof("Listening on %s", addr)
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -72,17 +105,19 @@ func ListenAndServe(addr string, indexer types.Service, opts ...Option) error {
 }
 
 // NewServer creates a new indexing service HTTP server.
-func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
+func NewServer(indexer types.Service, opts ...Option) (*http.ServeMux, error) {
 	c := &config{}
 	for _, opt := range opts {
-		opt(c)
+		if err := opt(c); err != nil {
+			return nil, err
+		}
 	}
 
 	if c.id == nil {
 		log.Warn("Generating a server identity as one has not been set!")
 		id, err := ed25519.Generate()
 		if err != nil {
-			panic(err)
+			return nil, fmt.Errorf("generating identity: %w", err)
 		}
 		c.id = id
 	}
@@ -101,8 +136,10 @@ func NewServer(indexer types.Service, opts ...Option) *http.ServeMux {
 	maybeInstrumentAndAdd(mux, "POST /claims", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "GET /claims", GetClaimsHandler(indexer), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "GET /.well-known/did.json", GetDIDDocument(c.id), c.enableTelemetry)
-
-	return mux
+	if c.ipniConfig != nil {
+		maybeInstrumentAndAdd(mux, "GET /cid/{cid}", GetIPNICIDHandler(indexer, c.ipniConfig), c.enableTelemetry)
+	}
+	return mux, nil
 }
 
 func maybeInstrumentAndAdd(mux *http.ServeMux, route string, handler http.HandlerFunc, enableTelemetry bool) {
@@ -249,6 +286,80 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 		if err != nil {
 			log.Errorf("sending claims response: %s", err)
 		}
+	}
+}
+
+func GetIPNICIDHandler(service types.Querier, config *ipniConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, s := telemetry.StartSpan(r.Context(), "GetClaimsHandler")
+		defer s.End()
+		if config == nil {
+			http.Error(w, "IPNI config not available", http.StatusInternalServerError)
+			return
+		}
+		parts := strings.Split(r.URL.Path, "/")
+		c, err := cid.Parse(parts[len(parts)-1])
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid CID: %s", err), http.StatusBadRequest)
+			return
+		}
+		mh := c.Hash()
+		qr, err := service.Query(ctx, types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{mh},
+			Match: types.Match{
+				Subject: []did.DID{},
+			},
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("processing query: %s", err.Error()), http.StatusInternalServerError)
+			return
+		}
+		if len(qr.Claims()) == 0 {
+			http.Error(w, fmt.Sprintf("no claims found for CID: %s", c), http.StatusNotFound)
+			return
+		}
+		blocks, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(qr.Blocks()))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("reading blocks from query result: %s", err), http.StatusInternalServerError)
+			return
+		}
+
+		// iterate over all claims to see if there are location claims, return preset peer if found
+		for _, root := range qr.Claims() {
+			claim, err := delegation.NewDelegationView(root, blocks)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("decoding delegation: %s", err), http.StatusInternalServerError)
+				return
+			}
+
+			switch claim.Capabilities()[0].Can() {
+			case assert.LocationAbility:
+				data, err := model.MarshalFindResponse(&model.FindResponse{
+					MultihashResults: []model.MultihashResult{{
+						Multihash: mh,
+						ProviderResults: []model.ProviderResult{{
+							ContextID: mh,
+							Metadata:  config.metadata,
+							Provider:  &config.provider,
+						}},
+					}},
+				})
+
+				if err != nil {
+					http.Error(w, fmt.Sprintf("marshalling find response: %s", err), http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, err = w.Write(data)
+				if err != nil {
+					log.Errorf("sending find response: %s", err)
+				}
+			}
+		}
+
 	}
 }
 
