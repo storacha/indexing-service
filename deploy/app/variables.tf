@@ -50,3 +50,9 @@ variable "network" {
   type        = string
   default     = "hot"
 }
+
+variable "use_prod_vars" {
+  description = "set to true to use production legacy storage tables and buckets in non-prod environments (e.g. for staging)"
+  type        = bool
+  default     = false
+}

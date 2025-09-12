@@ -49,6 +49,11 @@ var awsCmd = &cli.Command{
 			),
 		)
 
+		ipniSrvOpts, err := ipniOpts(cfg.IPNIFormatPeerID, cfg.IPNIFormatEndpoint)
+		if err != nil {
+			return fmt.Errorf("setting up IPNI options: %w", err)
+		}
+		srvOpts = append(srvOpts, ipniSrvOpts...)
 		// an empty API key disables instrumentation
 		if cfg.HoneycombAPIKey != "" {
 			var telemetryOpts []telemetry.TelemetryOption

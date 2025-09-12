@@ -7,11 +7,17 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipni/go-libipni/find/model"
+	"github.com/ipni/go-libipni/maurl"
+	"github.com/ipni/go-libipni/metadata"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/bytemap"
@@ -289,6 +295,101 @@ func TestGetClaimsHandler(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, http.StatusBadRequest, res.StatusCode)
 		})
+	})
+}
+
+func TestGetIPNICIDHandler(t *testing.T) {
+	ma := testutil.Must(maurl.FromURL(testutil.Must(url.Parse("https://indexer.storacha.network"))(t)))(t)
+	// Create IPNI config
+	providerID, err := peer.Decode("12D3KooWQYzpBQCkNTQhacLJL9uEMEWWFYGrLCcB8mKT87tgKKQA")
+	require.NoError(t, err)
+	provider := peer.AddrInfo{ID: providerID, Addrs: []multiaddr.Multiaddr{ma}}
+	md := metadata.Default.New(metadata.IpfsGatewayHttp{})
+	config := &ipniConfig{
+		provider: provider,
+		metadata: testutil.Must(md.MarshalBinary())(t),
+	}
+	t.Run("happy path", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash(t)
+		testCID := cid.NewCidV1(cid.Raw, randomHash)
+		query := types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{randomHash},
+			Match: types.Match{
+				Subject: []did.DID{},
+			},
+		}
+
+		locationClaim := testutil.RandomLocationDelegation(t)
+		claims := map[cid.Cid]delegation.Delegation{
+			link.ToCID(locationClaim.Link()): locationClaim,
+		}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](1)
+		indexHash, index := testutil.RandomShardedDagIndexView(t, 32)
+		indexContextID := testutil.Must(types.ContextID{
+			Hash: indexHash,
+		}.ToEncoded())(t)
+		indexes.Set(indexContextID, index)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+		svr := httptest.NewServer(GetIPNICIDHandler(mockService, config))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/cid/%s", svr.URL, testCID))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Equal(t, "application/json", res.Header.Get("Content-Type"))
+
+		bytes, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		findResp, err := model.UnmarshalFindResponse(bytes)
+		require.NoError(t, err)
+
+		require.Len(t, findResp.MultihashResults, 1)
+		require.Equal(t, randomHash, findResp.MultihashResults[0].Multihash)
+		require.Len(t, findResp.MultihashResults[0].ProviderResults, 1)
+		require.Equal(t, provider.ID, findResp.MultihashResults[0].ProviderResults[0].Provider.ID)
+	})
+
+	t.Run("empty results are ok", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash(t)
+		testCID := cid.NewCidV1(cid.Raw, randomHash)
+		query := types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{randomHash},
+			Match: types.Match{
+				Subject: []did.DID{},
+			},
+		}
+
+		claims := map[cid.Cid]delegation.Delegation{}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+		svr := httptest.NewServer(GetIPNICIDHandler(mockService, config))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/cid/%s", svr.URL, testCID))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+
+	t.Run("invalid hash", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		svr := httptest.NewServer(GetIPNICIDHandler(mockService, config))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/cid/invalid", svr.URL))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 }
 

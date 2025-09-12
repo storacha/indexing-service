@@ -3,8 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 
+	"github.com/ipni/go-libipni/maurl"
+	"github.com/ipni/go-libipni/metadata"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/redis/go-redis/v9"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
@@ -65,6 +70,14 @@ var serverCmd = &cli.Command{
 					Value: `["https://cid.contact/announce"]`,
 					Usage: "JSON array of IPNI node URLs to announce chain updates to.",
 				},
+				&cli.StringFlag{
+					Name:  "ipni-format-peer-id",
+					Usage: "Peer ID of the IPNI node to use for format announcements (enables endpoint mimicking IPNI).",
+				},
+				&cli.StringFlag{
+					Name:  "ipni-format-endpoint",
+					Usage: "HTTP endpoint of the IPNI node to use for format announcements (enables endpoint mimicking IPNI).",
+				},
 			},
 			Action: func(cCtx *cli.Context) error {
 				addr := fmt.Sprintf(":%d", cCtx.Int("port"))
@@ -108,6 +121,11 @@ var serverCmd = &cli.Command{
 					),
 				)
 
+				ipniSrvOpts, err := ipniOpts(cCtx.String("ipni-format-peer-id"), cCtx.String("ipni-format-endpoint"))
+				if err != nil {
+					return fmt.Errorf("setting up IPNI options: %w", err)
+				}
+				opts = append(opts, ipniSrvOpts...)
 				var sc construct.ServiceConfig
 				sc.ProvidersRedis = redis.ClusterOptions{
 					Addrs:    []string{cCtx.String("redis-url")},
@@ -155,4 +173,25 @@ var serverCmd = &cli.Command{
 			},
 		},
 	},
+}
+
+func ipniOpts(ipniFormatPeerID string, ipniFormatEndpoint string) ([]server.Option, error) {
+	if ipniFormatEndpoint == "" || ipniFormatPeerID == "" {
+		return nil, nil
+	}
+	peerID, err := peer.Decode(ipniFormatPeerID)
+	if err != nil {
+		return nil, fmt.Errorf("decoding IPNI format peer ID: %w", err)
+	}
+	url, err := url.Parse(ipniFormatEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("parsing IPNI format endpoint URL: %w", err)
+	}
+	ma, err := maurl.FromURL(url)
+	if err != nil {
+		return nil, fmt.Errorf("converting IPNI format endpoint URL to multiaddr: %w", err)
+	}
+	return []server.Option{
+		server.WithIPNI(peer.AddrInfo{ID: peerID, Addrs: []multiaddr.Multiaddr{ma}}, metadata.Default.New(metadata.IpfsGatewayHttp{})),
+	}, nil
 }

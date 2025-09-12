@@ -1,14 +1,14 @@
 locals {
-    legacy_claims_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-content-claims-claims-v1"
-    legacy_claims_table_region = "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
-    legacy_claims_bucket_name = "${terraform.workspace == "prod" ? "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8" : "staging-content-claims-buc-claimsv1bucketefd46802-1xx2brszve6t3"}"
-    legacy_block_index_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-ep-v1-blocks-cars-position"
-    legacy_allocations_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-allocation"
-    legacy_allocations_table_region = "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
-    legacy_store_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-store"
-    legacy_store_table_region = "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
-    legacy_blob_registry_table_name = "${terraform.workspace == "prod" ? "prod" : "staging"}-w3infra-blob-registry"
-    legacy_blob_registry_table_region = "${terraform.workspace == "prod" ? "us-west-2" : "us-east-2"}"
+    legacy_claims_table_name = "${terraform.workspace == "prod" || var.use_prod_vars ? "prod" : "staging"}-content-claims-claims-v1"
+    legacy_claims_table_region = "${terraform.workspace == "prod"|| var.use_prod_vars ? "us-west-2" : "us-east-2"}"
+    legacy_claims_bucket_name = "${terraform.workspace == "prod" || var.use_prod_vars ? "prod-content-claims-bucket-claimsv1bucketefd46802-1mqz6d8o7xw8" : "staging-content-claims-buc-claimsv1bucketefd46802-1xx2brszve6t3"}"
+    legacy_block_index_table_name = "${terraform.workspace == "prod" || var.use_prod_vars ? "prod" : "staging"}-ep-v1-blocks-cars-position"
+    legacy_allocations_table_name = "${terraform.workspace == "prod" || var.use_prod_vars ? "prod" : "staging"}-w3infra-allocation"
+    legacy_allocations_table_region = "${terraform.workspace == "prod" || var.use_prod_vars ? "us-west-2" : "us-east-2"}"
+    legacy_store_table_name = "${terraform.workspace == "prod" || var.use_prod_vars ? "prod" : "staging"}-w3infra-store"
+    legacy_store_table_region = "${terraform.workspace == "prod" || var.use_prod_vars ? "us-west-2" : "us-east-2"}"
+    legacy_blob_registry_table_name = "${terraform.workspace == "prod" || var.use_prod_vars ? "prod" : "staging"}-w3infra-blob-registry"
+    legacy_blob_registry_table_region = "${terraform.workspace == "prod" || var.use_prod_vars ? "us-west-2" : "us-east-2"}"
 }
 
 provider "aws" {

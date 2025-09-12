@@ -28,6 +28,8 @@ jobs:
       did: did:web:staging.indexer.storacha.network
       ipni-endpoint: ${{ vars.STAGING_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.STAGING_IPNI_ANNOUNCE_URLS }}
+      ipni-format-peer-id: ${{ vars.STAGING_IPNI_FORMAT_PEER_ID }}
+      ipni-format-endpoint: ${{ vars.STAGING_IPNI_FORMAT_ENDPOINT }}
       apply: ${{ github.event_name != 'pull_request' }}
     secrets:
       aws-account-id: ${{ secrets.STAGING_AWS_ACCOUNT_ID }}
@@ -48,6 +50,8 @@ jobs:
       did: did:web:staging.indexer.warm.storacha.network
       ipni-endpoint: ${{ vars.WARM_STAGING_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.WARM_STAGING_IPNI_ANNOUNCE_URLS }}
+      ipni-format-peer-id: ${{ vars.WARM_STAGING_IPNI_FORMAT_PEER_ID }}
+      ipni-format-endpoint: ${{ vars.WARM_STAGING_IPNI_FORMAT_ENDPOINT }}
       apply: ${{ github.event_name != 'pull_request' }}
     secrets:
       aws-account-id: ${{ secrets.WARM_STAGING_AWS_ACCOUNT_ID }}
@@ -68,6 +72,8 @@ jobs:
       did: did:web:indexer.storacha.network
       ipni-endpoint: ${{ vars.PROD_IPNI_ENDPOINT }}
       ipni-announce-urls: ${{ vars.PROD_IPNI_ANNOUNCE_URLS }}
+      ipni-format-peer-id: ${{ vars.PROD_IPNI_FORMAT_PEER_ID }}
+      ipni-format-endpoint: ${{ vars.PROD_IPNI_FORMAT_ENDPOINT }}
       apply: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
     secrets:
       aws-account-id: ${{ secrets.PROD_AWS_ACCOUNT_ID }}
