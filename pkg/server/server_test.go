@@ -355,7 +355,7 @@ func TestGetIPNICIDHandler(t *testing.T) {
 		require.Equal(t, provider.ID, findResp.MultihashResults[0].ProviderResults[0].Provider.ID)
 	})
 
-	t.Run("empty results are ok", func(t *testing.T) {
+	t.Run("empty results are 404", func(t *testing.T) {
 		mockService := types.NewMockService(t)
 
 		randomHash := testutil.RandomMultihash(t)
@@ -370,6 +370,39 @@ func TestGetIPNICIDHandler(t *testing.T) {
 
 		claims := map[cid.Cid]delegation.Delegation{}
 		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
+
+		svr := httptest.NewServer(GetIPNICIDHandler(mockService, config))
+		defer svr.Close()
+
+		res, err := http.Get(fmt.Sprintf("%s/cid/%s", svr.URL, testCID))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+	t.Run("no location claims are 404", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash(t)
+		testCID := cid.NewCidV1(cid.Raw, randomHash)
+		query := types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{randomHash},
+			Match: types.Match{
+				Subject: []did.DID{},
+			},
+		}
+
+		equalsClaim := testutil.RandomEqualsDelegation(t)
+		claims := map[cid.Cid]delegation.Delegation{
+			link.ToCID(equalsClaim.Link()): equalsClaim,
+		}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](1)
+		indexHash, index := testutil.RandomShardedDagIndexView(t, 32)
+		indexContextID := testutil.Must(types.ContextID{
+			Hash: indexHash,
+		}.ToEncoded())(t)
+		indexes.Set(indexContextID, index)
 		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
 		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil)
 

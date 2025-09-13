@@ -357,9 +357,10 @@ func GetIPNICIDHandler(service types.Querier, config *ipniConfig) http.HandlerFu
 				if err != nil {
 					log.Errorf("sending find response: %s", err)
 				}
+				return
 			}
 		}
-
+		http.Error(w, fmt.Sprintf("no claims found for CID: %s", c), http.StatusNotFound)
 	}
 }
 
