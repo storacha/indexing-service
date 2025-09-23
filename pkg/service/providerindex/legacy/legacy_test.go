@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/multiformats/go-multicodec"
+	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-libstoracha/testutil"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/extmocks"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"

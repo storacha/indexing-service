@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	multihash "github.com/multiformats/go-multihash"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
+	"github.com/storacha/go-libstoracha/digestutil"
 )
 
 type DynamoAllocationsTable struct {

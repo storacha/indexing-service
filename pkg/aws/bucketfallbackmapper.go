@@ -12,9 +12,9 @@ import (
 	multihash "github.com/multiformats/go-multihash"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/principal"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
