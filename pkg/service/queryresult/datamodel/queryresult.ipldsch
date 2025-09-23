@@ -1,8 +1,15 @@
 type QueryResult union {
   | QueryResult0_1 "index/query/result@0.1"
+  | QueryResult0_2 "index/query/result@0.2"
 } representation keyed
 
 type QueryResult0_1 struct {
   claims optional [Link]
   indexes optional {String:Link}
+}
+
+type QueryResult0_2 struct {
+  claims optional [Link]
+  indexes optional {String:Link}
+  messages optional [String]
 }
