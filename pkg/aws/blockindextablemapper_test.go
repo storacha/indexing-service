@@ -13,10 +13,10 @@ import (
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/bytemap"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
+	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/result"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )

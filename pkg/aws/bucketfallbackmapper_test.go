@@ -18,10 +18,10 @@ import (
 	"github.com/storacha/go-libstoracha/bytemap"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
+	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/indexing-service/pkg/aws"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )

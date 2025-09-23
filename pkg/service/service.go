@@ -29,7 +29,7 @@ import (
 
 	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/bytemap"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
+	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/parallelwalk"
 	"github.com/storacha/indexing-service/pkg/internal/jobwalker/singlewalk"

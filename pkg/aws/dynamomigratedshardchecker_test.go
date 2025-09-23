@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/testutil"
-	"github.com/storacha/indexing-service/pkg/internal/digestutil"
 	"github.com/stretchr/testify/require"
 )
 
