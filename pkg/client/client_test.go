@@ -253,7 +253,7 @@ func TestClient(t *testing.T) {
 	})
 }
 
-func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(inv invocation.Invocation)) ucanserver.ServerView {
+func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(inv invocation.Invocation)) ucanserver.ServerView[ucanserver.Service] {
 	s, err := ucanserver.NewServer(
 		id,
 		ucanserver.WithServiceMethod(

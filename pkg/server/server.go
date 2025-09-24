@@ -199,7 +199,7 @@ func PostClaimsHandler(id principal.Signer, service types.Publisher, options ...
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		res, _ := server.Request(r.Context(), ucanhttp.NewHTTPRequest(r.Body, r.Header))
+		res, _ := server.Request(r.Context(), ucanhttp.NewRequest(r.Body, r.Header))
 
 		for key, vals := range res.Headers() {
 			for _, v := range vals {

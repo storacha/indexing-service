@@ -141,7 +141,7 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 }
 
 func New(servicePrincipal ucan.Principal, serviceURL url.URL) (*Client, error) {
-	channel := http.NewHTTPChannel(serviceURL.JoinPath(claimsPath))
+	channel := http.NewChannel(serviceURL.JoinPath(claimsPath))
 	conn, err := client.NewConnection(servicePrincipal, channel)
 	if err != nil {
 		return nil, fmt.Errorf("creating connection: %w", err)
