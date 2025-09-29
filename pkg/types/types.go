@@ -143,6 +143,13 @@ type Query struct {
 	Type   QueryType
 	Hashes []mh.Multihash
 	Match  Match
+	// Delegations allowing the indexer to retrieve bytes from the network. These
+	// are typically `space/content/retrieve` delegations for each subject (space)
+	// in the [Match] paremeter.
+	//
+	// Delegations are sent in the `X-Agent-Message` HTTP header and MUST NOT
+	// exceed 4kb in size.
+	Delegations []delegation.Delegation
 }
 
 // QueryResult is an encodable result of a query
