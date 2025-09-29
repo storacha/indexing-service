@@ -25,7 +25,7 @@ import (
 
 type queryResult struct {
 	root ipld.Block
-	data *qdm.QueryResultModel0_1
+	data *qdm.QueryResultModel0_2
 	blks blockstore.BlockReader
 }
 
@@ -52,8 +52,16 @@ func (q *queryResult) Indexes() []datamodel.Link {
 	return indexes
 }
 
+func (q *queryResult) Messages() []string {
+	return q.data.Messages
+}
+
 func (q *queryResult) Root() block.Block {
 	return q.root
+}
+
+func Archive(qr types.QueryResult) io.Reader {
+	return car.Encode([]datamodel.Link{qr.Root().Link()}, qr.Blocks())
 }
 
 func Extract(r io.Reader) (types.QueryResult, error) {
@@ -83,11 +91,36 @@ func Extract(r io.Reader) (types.QueryResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decoding query result: %w", err)
 	}
-	return &queryResult{root, queryResultModel.Result0_1, blks}, nil
+	if queryResultModel.Result0_1 != nil {
+		result := qdm.QueryResultModel0_2{
+			Claims:  queryResultModel.Result0_1.Claims,
+			Indexes: queryResultModel.Result0_1.Indexes,
+		}
+		return &queryResult{root, &result, blks}, nil
+	}
+	return &queryResult{root, queryResultModel.Result0_2, blks}, nil
+}
+
+type buildConfig struct {
+	messages []string
+}
+
+type BuildOption func(cfg *buildConfig)
+
+// WithMessage adds a message to the query result.
+func WithMessage(message ...string) BuildOption {
+	return func(cfg *buildConfig) {
+		cfg.messages = append(cfg.messages, message...)
+	}
 }
 
 // Build generates a new encodable QueryResult
-func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]) (types.QueryResult, error) {
+func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView], options ...BuildOption) (types.QueryResult, error) {
+	var cfg buildConfig
+	for _, o := range options {
+		o(&cfg)
+	}
+
 	bs, err := blockstore.NewBlockStore()
 	if err != nil {
 		return nil, err
@@ -139,9 +172,10 @@ func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[typ
 	}
 
 	queryResultModel := qdm.QueryResultModel{
-		Result0_1: &qdm.QueryResultModel0_1{
-			Claims:  cls,
-			Indexes: indexesModel,
+		Result0_2: &qdm.QueryResultModel0_2{
+			Claims:   cls,
+			Indexes:  indexesModel,
+			Messages: cfg.messages,
 		},
 	}
 
@@ -160,5 +194,5 @@ func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[typ
 		return nil, err
 	}
 
-	return &queryResult{root: rt, data: queryResultModel.Result0_1, blks: bs}, nil
+	return &queryResult{root: rt, data: queryResultModel.Result0_2, blks: bs}, nil
 }
