@@ -14,6 +14,7 @@ import (
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
@@ -21,6 +22,7 @@ import (
 	unit "github.com/storacha/go-ucanto/core/result/ok"
 	udm "github.com/storacha/go-ucanto/core/result/ok/datamodel"
 	"github.com/storacha/go-ucanto/principal"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	"github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
@@ -56,6 +58,7 @@ type Client struct {
 	servicePrincipal ucan.Principal
 	serviceURL       url.URL
 	connection       client.Connection
+	httpClient       *gohttp.Client
 }
 
 func (c *Client) execute(ctx context.Context, inv invocation.Invocation) error {
@@ -130,7 +133,27 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		q.Add("spaces", space.String())
 	}
 	url.RawQuery = q.Encode()
-	res, err := gohttp.DefaultClient.Get(url.String())
+	req, err := gohttp.NewRequestWithContext(ctx, gohttp.MethodGet, url.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	// If there are query delegations, then add them to an X-Agent-Message header.
+	if len(query.Delegations) > 0 {
+		invs := make([]invocation.Invocation, 0, len(query.Delegations))
+		for _, d := range query.Delegations {
+			invs = append(invs, d)
+		}
+		msg, err := message.Build(invs, nil)
+		if err != nil {
+			return nil, fmt.Errorf("building agent message: %w", err)
+		}
+		headerValue, err := hcmsg.EncodeHeader(msg)
+		if err != nil {
+			return nil, fmt.Errorf("encoding %s header: %w", hcmsg.HeaderName, err)
+		}
+		req.Header.Set(hcmsg.HeaderName, headerValue)
+	}
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("sending query to server: %w", err)
 	}
@@ -140,11 +163,30 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	return queryresult.Extract(res.Body)
 }
 
-func New(servicePrincipal ucan.Principal, serviceURL url.URL) (*Client, error) {
-	channel := http.NewChannel(serviceURL.JoinPath(claimsPath))
+type Option func(*Client)
+
+// WithHTTPClient configures the HTTP client to use for making query requests
+// and invocations.
+func WithHTTPClient(httpClient *gohttp.Client) Option {
+	return func(c *Client) {
+		c.httpClient = httpClient
+	}
+}
+
+func New(servicePrincipal ucan.Principal, serviceURL url.URL, options ...Option) (*Client, error) {
+	c := Client{
+		servicePrincipal: servicePrincipal,
+		serviceURL:       serviceURL,
+		httpClient:       gohttp.DefaultClient,
+	}
+	for _, opt := range options {
+		opt(&c)
+	}
+	channel := http.NewChannel(serviceURL.JoinPath(claimsPath), http.WithClient(c.httpClient))
 	conn, err := client.NewConnection(servicePrincipal, channel)
 	if err != nil {
 		return nil, fmt.Errorf("creating connection: %w", err)
 	}
-	return &Client{servicePrincipal, serviceURL, conn}, nil
+	c.connection = conn
+	return &c, nil
 }
