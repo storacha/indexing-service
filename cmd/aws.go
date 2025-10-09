@@ -88,6 +88,8 @@ var awsCmd = &cli.Command{
 		cacher.Start()
 		defer cacher.Stop()
 
+		// TODO: add the IPNI publisher store config HERE!
+
 		return server.ListenAndServe(addr, indexer, srvOpts...)
 	},
 }
