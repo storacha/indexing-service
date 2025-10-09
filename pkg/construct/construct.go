@@ -25,6 +25,7 @@ import (
 	"github.com/storacha/go-libstoracha/ipnipublisher/store"
 	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/go-libstoracha/metadata"
+	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
@@ -498,10 +499,19 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		publicAddrInfo.Addrs = append(publicAddrInfo.Addrs, addr)
 	}
 
+	skBytes, err := sc.PrivateKey.Raw()
+	if err != nil {
+		return nil, err
+	}
+	serviceID, err := ed25519.FromRaw(skBytes)
+	if err != nil {
+		return nil, err
+	}
+
 	// with concurrency will still get overridden if a different walker setting is used
 	serviceOpts := append([]service.Option{service.WithConcurrency(15)}, cfg.opts...)
 
-	s.IndexingService = service.NewIndexingService(blobIndexLookup, claims, publicAddrInfo, providerIndex, serviceOpts...)
+	s.IndexingService = service.NewIndexingService(serviceID, blobIndexLookup, claims, publicAddrInfo, providerIndex, serviceOpts...)
 
 	return s, nil
 }

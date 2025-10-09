@@ -16,6 +16,7 @@ import (
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
+	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,7 +78,8 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 			defer func() { testServer.Close() }()
 			// Create BlobIndexLookup instance
 			cl := blobindexlookup.NewBlobIndexLookup(testServer.Client())
-			index, err := cl.Find(context.Background(), cid.Bytes(), provider, testutil.Must(url.Parse(testServer.URL))(t), tc.rngHeader)
+			spec := types.NewRetrievalRequest(testutil.Must(url.Parse(testServer.URL))(t), tc.rngHeader, nil)
+			index, err := cl.Find(context.Background(), cid.Bytes(), provider, spec)
 			if tc.expectedErr != nil {
 				require.ErrorContains(t, err, tc.expectedErr.Error())
 			} else {

@@ -20,10 +20,13 @@ import (
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/advertisement"
 	"github.com/storacha/go-libstoracha/capabilities/assert"
+	"github.com/storacha/go-libstoracha/capabilities/space/content"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/iterable"
+	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
+	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/validator"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -52,6 +55,7 @@ var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
 
 // IndexingService implements read/write logic for indexing data with IPNI, content claims, sharded dag indexes, and a cache layer
 type IndexingService struct {
+	id              ucan.Signer
 	blobIndexLookup blobindexlookup.BlobIndexLookup
 	claims          contentclaims.Service
 	providerIndex   providerindex.ProviderIndex
@@ -216,7 +220,39 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					}
 
 					s.AddEvent("fetching index")
-					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
+					var auth *types.RetrievalAuth
+					match, err := assert.Location.Match(validator.NewSource(claim.Capabilities()[0], claim))
+					if err != nil {
+						return fmt.Errorf("failed to match claim to location commitment: %w", err)
+					}
+					lcCaveats := match.Value().Nb()
+					space := lcCaveats.Space
+					dlgs := state.Access().q.Delegations
+					// Authorized retrieval requires a space in the location claim, a
+					// delegation for the retrieval, and an absolute byte range to extract.
+					if space != did.Undef && len(dlgs) > 0 && lcCaveats.Range != nil && lcCaveats.Range.Length != nil {
+						var proofs []delegation.Proof
+						for _, d := range dlgs {
+							for _, c := range d.Capabilities() {
+								if c.Can() == content.Retrieve.Can() && c.With() == space.String() {
+									proofs = append(proofs, delegation.FromDelegation(d))
+								}
+							}
+						}
+						if len(proofs) > 0 {
+							cap := content.Retrieve.New(space.String(), content.RetrieveCaveats{
+								Blob: content.BlobDigest{Digest: lcCaveats.Content.Hash()},
+								Range: content.Range{
+									Start: lcCaveats.Range.Offset,
+									End:   lcCaveats.Range.Offset + *lcCaveats.Range.Length,
+								},
+							})
+							a := types.NewRetrievalAuth(is.id, claim.Issuer(), cap, proofs)
+							auth = &a
+						}
+					}
+					req := types.NewRetrievalRequest(url, typedProtocol.Range, auth)
+					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, req)
 					if err != nil {
 						telemetry.Error(s, err, "fetching index blob")
 						return err
@@ -357,13 +393,14 @@ func WithConcurrency(concurrency int) Option {
 }
 
 // NewIndexingService returns a new indexing service
-func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claims contentclaims.Service, publicAddrInfo peer.AddrInfo, providerIndex providerindex.ProviderIndex, options ...Option) *IndexingService {
+func NewIndexingService(id ucan.Signer, blobIndexLookup blobindexlookup.BlobIndexLookup, claims contentclaims.Service, publicAddrInfo peer.AddrInfo, providerIndex providerindex.ProviderIndex, options ...Option) *IndexingService {
 	provider := peer.AddrInfo{ID: publicAddrInfo.ID}
 	for _, addr := range publicAddrInfo.Addrs {
 		claimSuffix, _ := multiaddr.NewMultiaddr("/http-path/" + url.PathEscape("claim/"+ClaimUrlPlaceholder))
 		provider.Addrs = append(provider.Addrs, multiaddr.Join(addr, claimSuffix))
 	}
 	is := &IndexingService{
+		id:              id,
 		blobIndexLookup: blobIndexLookup,
 		claims:          claims,
 		provider:        provider,
