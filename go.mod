@@ -13,6 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.80.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.34.7
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.38.8
+	github.com/aws/smithy-go v1.22.4
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
 	github.com/benbjohnson/clock v1.3.5
 	github.com/getsentry/sentry-go v0.33.0
@@ -30,11 +31,12 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/extra/redisotel/v9 v9.10.0
 	github.com/redis/go-redis/v9 v9.10.0
-	github.com/storacha/go-libstoracha v0.2.8
-	github.com/storacha/go-ucanto v0.6.2
+	github.com/storacha/go-libstoracha v0.3.0
+	github.com/storacha/go-ucanto v0.6.5
 	github.com/stretchr/testify v1.10.0
-	github.com/testcontainers/testcontainers-go v0.37.0
+	github.com/testcontainers/testcontainers-go v0.39.0
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/minio v0.39.0
 	github.com/testcontainers/testcontainers-go/modules/valkey v0.37.0
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/whyrusleeping/cbor-gen v0.3.1
@@ -50,7 +52,7 @@ require (
 )
 
 require (
-	dario.cat/mergo v1.0.1 // indirect
+	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/alexbrainman/goissue34681 v0.0.0-20191006012335-3fc7a47baff5 // indirect
@@ -69,10 +71,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.30.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.34.0 // indirect
-	github.com/aws/smithy-go v1.22.4 // indirect
 	github.com/brunoscheufler/aws-ecs-metadata-go v0.0.0-20221221133751-67e37ae746cd // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/containerd/errdefs v1.0.0 // indirect
+	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
@@ -81,10 +84,10 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v28.0.1+incompatible // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
+	github.com/docker/docker v28.3.3+incompatible // indirect
+	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/ebitengine/purego v0.8.2 // indirect
+	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/filecoin-project/go-data-segment v0.0.1 // indirect
 	github.com/filecoin-project/go-fil-commcid v0.2.0 // indirect
@@ -125,9 +128,10 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
+	github.com/moby/go-archive v0.1.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
-	github.com/moby/sys/sequential v0.5.0 // indirect
-	github.com/moby/sys/user v0.1.0 // indirect
+	github.com/moby/sys/sequential v0.6.0 // indirect
+	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
@@ -146,7 +150,7 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/redis/go-redis/extra/rediscmd/v9 v9.10.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/shirou/gopsutil/v4 v4.25.1 // indirect
+	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
@@ -164,7 +168,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250519155744-55703ea1f237 // indirect
