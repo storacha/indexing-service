@@ -88,7 +88,7 @@ var awsCmd = &cli.Command{
 		cacher.Start()
 		defer cacher.Stop()
 
-		// TODO: add the IPNI publisher store config HERE!
+		srvOpts = append(srvOpts, server.WithIPNIPublisherStore(setupIPNIPublisherStore(cfg)))
 
 		return server.ListenAndServe(addr, indexer, srvOpts...)
 	},
@@ -129,4 +129,11 @@ func setupProviderCacher(cfg aws.Config) (*providercacher.CachingQueuePoller, er
 	providerCacher := providercacher.NewSimpleProviderCacher(providerStore)
 
 	return providercacher.NewCachingQueuePoller(cachingQueue, providerCacher)
+}
+
+func setupIPNIPublisherStore(cfg aws.Config) *store.AdStore {
+	ipniStore := aws.NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
+	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
+	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
+	return store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
 }
