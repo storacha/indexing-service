@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
+	"github.com/cenkalti/backoff/v5"
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/ipld/go-ipld-prime"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	"github.com/ipni/go-libipni/find/model"
 	meta "github.com/ipni/go-libipni/metadata"
@@ -30,8 +32,9 @@ import (
 
 const (
 	// MaxBatchSize is the maximum number of items that'll be added to a batch.
-	MaxBatchSize = 10_000
-	IPNITimeout  = 1500 * time.Millisecond
+	MaxBatchSize       = 10_000
+	IPNITimeout        = 1500 * time.Millisecond
+	maxPublishAttempts = 5
 )
 
 type QueryKey struct {
@@ -413,7 +416,13 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 	defer pi.mutex.Unlock()
 
 	s.AddEvent("start publish")
-	id, err := pi.publisher.Publish(ctx, provider, contextID, digests, meta)
+	id, err := backoff.Retry(ctx, func() (ipld.Link, error) {
+		l, err := pi.publisher.Publish(ctx, provider, contextID, digests, meta)
+		if err != nil && errors.Is(err, publisher.ErrAlreadyAdvertised) {
+			return nil, backoff.Permanent(err)
+		}
+		return l, err
+	}, backoff.WithMaxTries(maxPublishAttempts))
 	if err != nil {
 		if errors.Is(err, publisher.ErrAlreadyAdvertised) {
 			// skipping is ok in this case
