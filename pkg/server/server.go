@@ -53,7 +53,6 @@ type config struct {
 	contentClaimsOptions []server.Option
 	enableTelemetry      bool
 	ipniConfig           *ipniConfig
-	publisherStore       store.PublisherStore
 }
 
 type Option func(*config) error
@@ -90,13 +89,6 @@ func WithIPNI(provider peer.AddrInfo, metadata metadata.Metadata) Option {
 			provider: provider,
 			metadata: mb,
 		}
-		return nil
-	}
-}
-
-func WithIPNIPublisherStore(store store.PublisherStore) Option {
-	return func(c *config) error {
-		c.publisherStore = store
 		return nil
 	}
 }
@@ -153,14 +145,6 @@ func NewServer(indexer types.Service, opts ...Option) (*http.ServeMux, error) {
 	maybeInstrumentAndAdd(mux, "GET /.well-known/did.json", GetDIDDocument(c.id), c.enableTelemetry)
 	if c.ipniConfig != nil {
 		maybeInstrumentAndAdd(mux, "GET /cid/{cid}", GetIPNICIDHandler(indexer, c.ipniConfig), c.enableTelemetry)
-	}
-	// Temporary endpoint to publish an orphan advert to the indexer's IPNI chain
-	if c.publisherStore != nil {
-		sk, err := crypto.UnmarshalEd25519PrivateKey(c.id.Raw())
-		if err != nil {
-			return nil, err
-		}
-		mux.HandleFunc("POST /ad", PostAdHandler(sk, c.publisherStore))
 	}
 	return mux, nil
 }
