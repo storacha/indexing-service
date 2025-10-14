@@ -1,8 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,19 +10,14 @@ import (
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-ipld-prime"
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
-	"github.com/ipni/go-libipni/dagsync/ipnisync/head"
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/ipni/go-libipni/ingest/schema"
 	"github.com/ipni/go-libipni/metadata"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/capabilities/assert"
-	"github.com/storacha/go-libstoracha/ipnipublisher/store"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -420,95 +413,4 @@ func GetDIDDocument(id principal.Signer) http.HandlerFunc {
 		}
 		w.Write(bytes)
 	}
-}
-
-func PostAdHandler(sk crypto.PrivKey, store store.PublisherStore) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad, err := decodeAdvert(r.Body)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("decoding advert: %s", err.Error()), http.StatusBadRequest)
-			return
-		}
-
-		if err := validateAdvertSig(sk, ad); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		adlink, err := publishAdvert(r.Context(), sk, store, ad)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("publishing advert: %s", err.Error()), http.StatusInternalServerError)
-			return
-		}
-
-		out, err := json.Marshal(adlink)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("marshaling JSON: %s", err.Error()), http.StatusInternalServerError)
-			return
-		}
-		w.Write(out)
-	})
-}
-
-// ensures the advert came from this node originally
-func validateAdvertSig(sk crypto.PrivKey, ad schema.Advertisement) error {
-	sigBytes := ad.Signature
-	err := ad.Sign(sk)
-	if err != nil {
-		return fmt.Errorf("signing advert: %w", err)
-	}
-	if !bytes.Equal(sigBytes, ad.Signature) {
-		return errors.New("advert was not created by this node")
-	}
-	return nil
-}
-
-// assumed in DAG-JSON encoding
-func decodeAdvert(r io.Reader) (schema.Advertisement, error) {
-	advBytes, err := io.ReadAll(r)
-	if err != nil {
-		return schema.Advertisement{}, err
-	}
-
-	adLink, err := cid.V1Builder{
-		Codec:  cid.DagJSON,
-		MhType: multihash.SHA2_256,
-	}.Sum(advBytes)
-	if err != nil {
-		return schema.Advertisement{}, err
-	}
-
-	return schema.BytesToAdvertisement(adLink, advBytes)
-}
-
-func publishAdvert(ctx context.Context, sk crypto.PrivKey, store store.PublisherStore, ad schema.Advertisement) (ipld.Link, error) {
-	prevHead, err := store.Head(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	ad.PreviousID = prevHead.Head
-
-	if err = ad.Sign(sk); err != nil {
-		return nil, fmt.Errorf("signing advert: %w", err)
-	}
-
-	if err := ad.Validate(); err != nil {
-		return nil, fmt.Errorf("validating advert: %w", err)
-	}
-
-	link, err := store.PutAdvert(ctx, ad)
-	if err != nil {
-		return nil, fmt.Errorf("putting advert: %w", err)
-	}
-
-	head, err := head.NewSignedHead(link.(cidlink.Link).Cid, "/indexer/ingest/mainnet", sk)
-	if err != nil {
-		return nil, fmt.Errorf("signing head: %w", err)
-	}
-	if _, err := store.ReplaceHead(ctx, prevHead, head); err != nil {
-		return nil, fmt.Errorf("replacing head: %w", err)
-	}
-
-	return link, nil
 }
