@@ -1,3 +1,4 @@
+# storoku:ignore
 # copy to .env.terraform and set missing vars
 TF_WORKSPACE= # your name here
 TF_VAR_network= # optional, if the deployments targets a network different from the default specify it here

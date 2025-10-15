@@ -5,31 +5,12 @@ import (
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/indexing-service/pkg/internal/queuepoller"
 )
 
 type (
-	CachingQueueQueuer interface {
-		Queue(ctx context.Context, job ProviderCachingJob) error
-	}
-
-	CachingQueueReader interface {
-		Read(ctx context.Context, maxJobs int) ([]ProviderCachingJob, error)
-	}
-
-	CachingQueueReleaser interface {
-		Release(ctx context.Context, jobID string) error
-	}
-
-	CachingQueueDeleter interface {
-		Delete(ctx context.Context, jobID string) error
-	}
-
-	CachingQueue interface {
-		CachingQueueQueuer
-		CachingQueueReader
-		CachingQueueReleaser
-		CachingQueueDeleter
-	}
+	CachingQueueQueuer = queuepoller.QueueQueuer[ProviderCachingJob]
+	CachingQueue       = queuepoller.Queue[ProviderCachingJob]
 
 	ProviderCachingJob struct {
 		ID       string

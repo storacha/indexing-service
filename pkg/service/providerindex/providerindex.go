@@ -11,9 +11,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/cenkalti/backoff/v5"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-ipld-prime"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	"github.com/ipni/go-libipni/find/model"
 	meta "github.com/ipni/go-libipni/metadata"
@@ -32,9 +30,8 @@ import (
 
 const (
 	// MaxBatchSize is the maximum number of items that'll be added to a batch.
-	MaxBatchSize       = 10_000
-	IPNITimeout        = 1500 * time.Millisecond
-	maxPublishAttempts = 5
+	MaxBatchSize = 10_000
+	IPNITimeout  = 1500 * time.Millisecond
 )
 
 type QueryKey struct {
@@ -48,7 +45,7 @@ type ProviderIndexService struct {
 	providerStore   types.ProviderStore
 	noProviderStore types.NoProviderStore
 	findClient      ipnifind.Finder
-	publisher       publisher.Publisher
+	asyncPublisher  publisher.AsyncPublisher
 	legacyClaims    legacy.ClaimsFinder
 	mutex           sync.Mutex
 	clock           clock.Clock
@@ -80,7 +77,7 @@ func WithClock(clock clock.Clock) Option {
 	}
 }
 
-func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, publisher publisher.Publisher, legacyClaims legacy.ClaimsFinder, options ...Option) *ProviderIndexService {
+func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStore, findClient ipnifind.Finder, asyncPublisher publisher.AsyncPublisher, legacyClaims legacy.ClaimsFinder, options ...Option) *ProviderIndexService {
 	conf := config{}
 	for _, option := range options {
 		option(&conf)
@@ -95,7 +92,7 @@ func New(providerStore types.ProviderStore, noProviderStore types.NoProviderStor
 		providerStore:   providerStore,
 		noProviderStore: noProviderStore,
 		findClient:      findClient,
-		publisher:       publisher,
+		asyncPublisher:  asyncPublisher,
 		legacyClaims:    legacyClaims,
 		clock:           conf.clock,
 		log:             conf.log,
@@ -416,13 +413,7 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 	defer pi.mutex.Unlock()
 
 	s.AddEvent("start publish")
-	id, err := backoff.Retry(ctx, func() (ipld.Link, error) {
-		l, err := pi.publisher.Publish(ctx, provider, contextID, digests, meta)
-		if err != nil && errors.Is(err, publisher.ErrAlreadyAdvertised) {
-			return nil, backoff.Permanent(err)
-		}
-		return l, err
-	}, backoff.WithMaxTries(maxPublishAttempts))
+	err = pi.asyncPublisher.Publish(ctx, provider, contextID, digests, meta)
 	if err != nil {
 		if errors.Is(err, publisher.ErrAlreadyAdvertised) {
 			// skipping is ok in this case
@@ -432,7 +423,6 @@ func (pi *ProviderIndexService) Publish(ctx context.Context, provider peer.AddrI
 
 		return fmt.Errorf("publishing advert: %w", err)
 	}
-	pi.log.Infof("published IPNI advert: %s", id)
 	return nil
 }
 

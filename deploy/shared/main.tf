@@ -49,7 +49,7 @@ provider "aws" {
 }
 
 module "shared" {
-  source = "github.com/storacha/storoku//shared?ref=v0.4.4"
+  source = "github.com/storacha/storoku//shared?ref=v0.4.6"
   providers = {
     aws = aws
     aws.dev = aws.dev
@@ -58,6 +58,7 @@ module "shared" {
   caches = ["providers","no-providers","indexes","claims",]
   networks = ["warm",]
   app = var.app
+  create_shared_dev_resources = var.create_shared_dev_resources
   zone_id = var.cloudflare_zone_id
   domain_base = var.domain_base
   setup_cloudflare = true

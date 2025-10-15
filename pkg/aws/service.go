@@ -20,6 +20,8 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	goredis "github.com/redis/go-redis/v9"
+	publisherqueue "github.com/storacha/go-libstoracha/ipnipublisher/queue"
+	awspublisherqueue "github.com/storacha/go-libstoracha/ipnipublisher/queue/aws"
 	"github.com/storacha/go-libstoracha/ipnipublisher/store"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -76,6 +78,8 @@ type Config struct {
 	IndexesCacheExpirationSeconds     int64
 	SQSCachingQueueID                 string
 	CachingBucket                     string
+	SQSPublishingQueueID              string
+	PublishingBucket                  string
 	ChunkLinksTableName               string
 	MetadataTableName                 string
 	IPNIStoreBucket                   string
@@ -230,6 +234,8 @@ func FromEnv(ctx context.Context) Config {
 		IndexesCacheExpirationSeconds:     mustGetInt("INDEXES_CACHE_EXPIRATION_SECONDS"),
 		SQSCachingQueueID:                 mustGetEnv("PROVIDER_CACHING_QUEUE_ID"),
 		CachingBucket:                     mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
+		SQSPublishingQueueID:              mustGetEnv("IPNI_PUBLISHING_QUEUE_ID"),
+		PublishingBucket:                  mustGetEnv("IPNI_PUBLISHING_BUCKET_NAME"),
 		ChunkLinksTableName:               mustGetEnv("CHUNK_LINKS_TABLE_ID"),
 		MetadataTableName:                 mustGetEnv("METADATA_TABLE_ID"),
 		IPNIStoreBucket:                   mustGetEnv("IPNI_STORE_BUCKET_NAME"),
@@ -283,6 +289,10 @@ func Construct(cfg Config) (types.Service, error) {
 	chunkLinksTable := NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
+
+	publishingQueue := awspublisherqueue.NewSQSPublishingQueue(cfg.Config, cfg.SQSPublishingQueueID, cfg.PublishingBucket)
+	queuePublisher := publisherqueue.NewQueuePublisher(publishingQueue)
+
 	legacyDataBucketURL, err := url.Parse(cfg.LegacyDataBucketURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing carpark url: %s", err)
@@ -352,6 +362,7 @@ func Construct(cfg Config) (types.Service, error) {
 		construct.SkipNotification(),
 		construct.WithCachingQueue(cachingQueue),
 		construct.WithPublisherStore(publisherStore),
+		construct.WithAsyncPublisher(queuePublisher),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
 		construct.WithLegacyClaims([]legacy.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL),

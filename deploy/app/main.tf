@@ -37,8 +37,10 @@ provider "aws" {
   alias = "acm"
 }
 
+
+
 module "app" {
-  source = "github.com/storacha/storoku//app?ref=v0.4.4"
+  source = "github.com/storacha/storoku//app?ref=v0.4.6"
   private_key = var.private_key
   httpport = 8080
   principal_mapping = var.principal_mapping
@@ -53,7 +55,6 @@ module "app" {
   # NOTE: do not put sensitive data in env-vars. use secrets
   deployment_env_vars = []
   image_tag = var.image_tag
-  deployment_config = local.deployment_config
   create_db = false
   # enter secret values your app will use here -- these will be available
   # as env vars in the container at runtime
@@ -64,6 +65,14 @@ module "app" {
     {
       name = "provider-caching"
       fifo = false
+      high_throughput = false
+      message_retention_seconds = 86400
+    },
+  
+    {
+      name = "ipni-publisher"
+      fifo = true
+      high_throughput = true
       message_retention_seconds = 86400
     },
   ]
@@ -118,6 +127,11 @@ module "app" {
     {
       name = "claim-store-bucket"
       public = false
+    },
+    {
+      name = "ipni-publisher-bucket"
+      public = false
+      object_expiration_days = 14
     },
   ]
   providers = {
