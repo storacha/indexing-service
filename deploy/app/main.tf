@@ -9,16 +9,16 @@ terraform {
     }
   }
   backend "s3" {
-    bucket = "storacha-terraform-state"
-    key = "storacha/${var.app}/terraform.tfstate"
-    region = "us-west-2"
+    bucket  = "storacha-terraform-state"
+    key     = "storacha/${var.app}/terraform.tfstate"
+    region  = "us-west-2"
     encrypt = true
   }
 }
 
 provider "aws" {
   allowed_account_ids = [var.allowed_account_id]
-  region = var.region
+  region              = var.region
   default_tags {
     tags = {
       "Environment" = terraform.workspace
@@ -34,49 +34,50 @@ provider "aws" {
 # CloudFront is a global service. Certs must be created in us-east-1, where the core ACM infra lives
 provider "aws" {
   region = "us-east-1"
-  alias = "acm"
+  alias  = "acm"
 }
 
 
 
 module "app" {
-  source = "github.com/storacha/storoku//app?ref=v0.4.6"
-  private_key = var.private_key
-  httpport = 8080
-  principal_mapping = var.principal_mapping
-  did = var.did
-  app = var.app
-  appState = var.app
+  source             = "github.com/storacha/storoku//app?ref=v0.4.6"
+  private_key        = var.private_key
+  httpport           = 8080
+  principal_mapping  = var.principal_mapping
+  did                = var.did
+  app                = var.app
+  appState           = var.app
+  deployment_config  = local.deployment_config
   write_to_container = false
-  environment = terraform.workspace
-  network = var.network
+  environment        = terraform.workspace
+  network            = var.network
   # if there are any env vars you want available only to your container
   # in the vpc as opposed to set in the dockerfile, enter them here
   # NOTE: do not put sensitive data in env-vars. use secrets
   deployment_env_vars = []
-  image_tag = var.image_tag
-  create_db = false
+  image_tag           = var.image_tag
+  create_db           = false
   # enter secret values your app will use here -- these will be available
   # as env vars in the container at runtime
-  secrets = { 
+  secrets = {
   }
   # enter any sqs queues you want to create here
   queues = [
     {
-      name = "provider-caching"
-      fifo = false
-      high_throughput = false
+      name                      = "provider-caching"
+      fifo                      = false
+      high_throughput           = false
       message_retention_seconds = 86400
     },
-  
+
     {
-      name = "ipni-publisher"
-      fifo = true
-      high_throughput = true
+      name                      = "ipni-publisher"
+      fifo                      = true
+      high_throughput           = true
       message_retention_seconds = 86400
     },
   ]
-  caches = ["providers","no-providers","indexes","claims",]
+  caches = ["providers", "no-providers", "indexes", "claims", ]
   topics = []
   tables = [
     {
@@ -91,8 +92,8 @@ module "app" {
           type = "B"
         },
       ]
-      hash_key = "provider"
-      range_key ="contextID"
+      hash_key  = "provider"
+      range_key = "contextID"
     },
     {
       name = "chunk-links"
@@ -106,38 +107,38 @@ module "app" {
           type = "B"
         },
       ]
-      hash_key = "provider"
-      range_key ="contextID"
+      hash_key  = "provider"
+      range_key = "contextID"
     },
   ]
   buckets = [
     {
-      name = "provider-caching-bucket"
-      public = false
+      name                   = "provider-caching-bucket"
+      public                 = false
       object_expiration_days = 14
     },
     {
-      name = "ipni-store-bucket"
+      name   = "ipni-store-bucket"
       public = true
     },
     {
-      name = "notifier-head-bucket"
+      name   = "notifier-head-bucket"
       public = false
     },
     {
-      name = "claim-store-bucket"
+      name   = "claim-store-bucket"
       public = false
     },
     {
-      name = "ipni-publisher-bucket"
-      public = false
+      name                   = "ipni-publisher-bucket"
+      public                 = false
       object_expiration_days = 14
     },
   ]
   providers = {
-    aws = aws
+    aws     = aws
     aws.acm = aws.acm
   }
-  env_files = var.env_files
+  env_files   = var.env_files
   domain_base = var.domain_base
 }

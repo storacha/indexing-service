@@ -198,8 +198,7 @@ func jobHandler[Job any](queue Queue[Job], handler JobHandler[Job], identifier J
 			return fmt.Errorf("failed to perform job %s: %w", identifier.ID(job), err)
 		}
 
-		// Do not hold up the queue by re-attempting a cache job that times out. It is
-		// probably a big DAG and retrying is unlikely to subsequently succeed.
+		// Do not hold up the queue by re-attempting a job that times out.
 		// Log the error and proceed with deletion.
 		if errors.Is(err, context.DeadlineExceeded) {
 			log.Warnf("Not retrying provider job for %s: %s", identifier.ID(job), err)
