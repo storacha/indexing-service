@@ -5,6 +5,8 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/storacha/go-libstoracha/ipnipublisher/notifier"
+	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
+	awspublisherqueue "github.com/storacha/go-libstoracha/ipnipublisher/queue/aws"
 	"github.com/storacha/go-libstoracha/ipnipublisher/store"
 	"github.com/storacha/go-libstoracha/metadata"
 	userver "github.com/storacha/go-ucanto/server"
@@ -14,6 +16,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/server"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/service/providerindex/remotesyncer"
+	"github.com/storacha/indexing-service/pkg/service/publishingqueue"
 	"github.com/storacha/indexing-service/pkg/telemetry"
 	"github.com/urfave/cli/v2"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -88,6 +91,13 @@ var awsCmd = &cli.Command{
 		cacher.Start()
 		defer cacher.Stop()
 
+		publisher, err := setupIPNIPublisher(cfg)
+		if err != nil {
+			return err
+		}
+		publisher.Start()
+		defer publisher.Stop()
+
 		srvOpts = append(srvOpts, server.WithIPNIPublisherStore(setupIPNIPublisherStore(cfg)))
 
 		return server.ListenAndServe(addr, indexer, srvOpts...)
@@ -101,10 +111,7 @@ func setupIPNIPipeline(cfg aws.Config) (*notifier.Notifier, error) {
 		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
 	}
 	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
-	ipniStore := aws.NewS3Store(cfg.Config, cfg.IPNIStoreBucket, cfg.IPNIStorePrefix)
-	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
-	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
-	publisherStore := store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
+	publisherStore := setupIPNIPublisherStore(cfg)
 	remoteSyncer := remotesyncer.New(providerStore, publisherStore)
 
 	// setup notifier to periodically check IPNI and notify remote syncer if updates are required
@@ -136,4 +143,18 @@ func setupIPNIPublisherStore(cfg aws.Config) *store.AdStore {
 	chunkLinksTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.ChunkLinksTableName)
 	metadataTable := aws.NewDynamoProviderContextTable(cfg.Config, cfg.MetadataTableName)
 	return store.NewPublisherStore(ipniStore, chunkLinksTable, metadataTable, store.WithMetadataContext(metadata.MetadataContext))
+}
+
+func setupIPNIPublisher(cfg aws.Config) (*publishingqueue.PublishingQueuePoller, error) {
+	publisherQueue := awspublisherqueue.NewSQSPublishingQueue(cfg.Config, cfg.SQSPublishingQueueID, cfg.PublishingBucket)
+	publisher, err := publisher.New(
+		cfg.ServiceConfig.PrivateKey,
+		setupIPNIPublisherStore(cfg),
+		publisher.WithDirectAnnounce(cfg.ServiceConfig.IPNIDirectAnnounceURLs...),
+		publisher.WithAnnounceAddrs(cfg.ServiceConfig.IPNIAnnounceAddrs...),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating IPNI publisher: %w", err)
+	}
+	return publishingqueue.NewPublishingQueuePoller(publisherQueue, publisher)
 }

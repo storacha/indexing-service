@@ -80,6 +80,7 @@ type config struct {
 	skipNotification     bool
 	startIPNIServer      bool
 	publisherStore       store.PublisherStore
+	asyncPublisher       publisher.AsyncPublisher
 	claimsStore          types.ContentClaimsStore
 	providersClient      redis.PipelineClient
 	noProvidersClient    redis.Client
@@ -142,6 +143,14 @@ func SkipNotification() Option {
 func WithStartIPNIServer(startIPNIServer bool) Option {
 	return func(cfg *config) error {
 		cfg.startIPNIServer = startIPNIServer
+		return nil
+	}
+}
+
+// WithAsyncPublisher overrides the default IPNI publisher
+func WithAsyncPublisher(asyncPublisher publisher.AsyncPublisher) Option {
+	return func(cfg *config) error {
+		cfg.asyncPublisher = asyncPublisher
 		return nil
 	}
 }
@@ -401,19 +410,24 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		notifier.Notify(remotesyncer.New(providersCache, publisherStore).HandleRemoteSync)
 	}
 
-	directAnnounceURLs := sc.IPNIDirectAnnounceURLs
-	if len(directAnnounceURLs) == 0 {
-		directAnnounceURLs = append(directAnnounceURLs, sc.IPNIFindURL)
-	}
+	asyncPublisher := cfg.asyncPublisher
+	if asyncPublisher == nil {
 
-	publisher, err := publisher.New(
-		sc.PrivateKey,
-		publisherStore,
-		publisher.WithDirectAnnounce(directAnnounceURLs...),
-		publisher.WithAnnounceAddrs(sc.IPNIAnnounceAddrs...),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating IPNI publisher: %w", err)
+		directAnnounceURLs := sc.IPNIDirectAnnounceURLs
+		if len(directAnnounceURLs) == 0 {
+			directAnnounceURLs = append(directAnnounceURLs, sc.IPNIFindURL)
+		}
+
+		ipniPublisher, err := publisher.New(
+			sc.PrivateKey,
+			publisherStore,
+			publisher.WithDirectAnnounce(directAnnounceURLs...),
+			publisher.WithAnnounceAddrs(sc.IPNIAnnounceAddrs...),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating IPNI publisher: %w", err)
+		}
+		asyncPublisher = publisher.AsyncFrom(ipniPublisher)
 	}
 
 	if cfg.startIPNIServer {
@@ -445,7 +459,7 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		legacyClaims = legacy.NewNoResultsClaimsFinder()
 	}
 
-	providerIndex := providerindex.New(providersCache, noProvidersCache, findClient, publisher, legacyClaims, providerindex.WithLogger(cfg.provIndexLog))
+	providerIndex := providerindex.New(providersCache, noProvidersCache, findClient, asyncPublisher, legacyClaims, providerindex.WithLogger(cfg.provIndexLog))
 
 	claimsStore := cfg.claimsStore
 	if claimsStore == nil {

@@ -18,6 +18,13 @@
     {
       "name": "provider-caching",
       "fifo": false,
+      "highThroughput": false,
+      "messageRetentionSeconds": 86400
+    },
+    {
+      "name": "ipni-publisher",
+      "fifo": true,
+      "highThroughput": true,
       "messageRetentionSeconds": 86400
     }
   ],
@@ -38,6 +45,11 @@
     {
       "name": "claim-store-bucket",
       "public": false
+    },
+    {
+      "name": "ipni-publisher-bucket",
+      "public": false,
+      "objectExpirationDays": 14
     }
   ],
   "secrets": null,
