@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	gohttp "net/http"
+	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
@@ -23,7 +24,7 @@ import (
 	udm "github.com/storacha/go-ucanto/core/result/ok/datamodel"
 	"github.com/storacha/go-ucanto/principal"
 	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
-	"github.com/storacha/go-ucanto/transport/http"
+	ucan_http "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -38,7 +39,7 @@ type ErrFailedResponse struct {
 	Body       string
 }
 
-func errFromResponse(res *gohttp.Response) ErrFailedResponse {
+func errFromResponse(res *http.Response) ErrFailedResponse {
 	err := ErrFailedResponse{StatusCode: res.StatusCode}
 
 	message, merr := io.ReadAll(res.Body)
@@ -51,14 +52,14 @@ func errFromResponse(res *gohttp.Response) ErrFailedResponse {
 }
 
 func (e ErrFailedResponse) Error() string {
-	return fmt.Sprintf("http request failed, status: %d %s, message: %s", e.StatusCode, gohttp.StatusText(e.StatusCode), e.Body)
+	return fmt.Sprintf("http request failed, status: %d %s, message: %s", e.StatusCode, http.StatusText(e.StatusCode), e.Body)
 }
 
 type Client struct {
 	servicePrincipal ucan.Principal
 	serviceURL       url.URL
 	connection       client.Connection
-	httpClient       *gohttp.Client
+	httpClient       *http.Client
 }
 
 func (c *Client) execute(ctx context.Context, inv invocation.Invocation) error {
@@ -133,7 +134,7 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		q.Add("spaces", space.String())
 	}
 	url.RawQuery = q.Encode()
-	req, err := gohttp.NewRequestWithContext(ctx, gohttp.MethodGet, url.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -167,7 +168,7 @@ type Option func(*Client)
 
 // WithHTTPClient configures the HTTP client to use for making query requests
 // and invocations.
-func WithHTTPClient(httpClient *gohttp.Client) Option {
+func WithHTTPClient(httpClient *http.Client) Option {
 	return func(c *Client) {
 		c.httpClient = httpClient
 	}
@@ -177,12 +178,12 @@ func New(servicePrincipal ucan.Principal, serviceURL url.URL, options ...Option)
 	c := Client{
 		servicePrincipal: servicePrincipal,
 		serviceURL:       serviceURL,
-		httpClient:       gohttp.DefaultClient,
+		httpClient:       &http.Client{Timeout: 30 * time.Second},
 	}
 	for _, opt := range options {
 		opt(&c)
 	}
-	channel := http.NewChannel(serviceURL.JoinPath(claimsPath), http.WithClient(c.httpClient))
+	channel := ucan_http.NewChannel(serviceURL.JoinPath(claimsPath), ucan_http.WithClient(c.httpClient))
 	conn, err := client.NewConnection(servicePrincipal, channel)
 	if err != nil {
 		return nil, fmt.Errorf("creating connection: %w", err)
