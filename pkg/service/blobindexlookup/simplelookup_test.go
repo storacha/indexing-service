@@ -78,8 +78,8 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 			defer func() { testServer.Close() }()
 			// Create BlobIndexLookup instance
 			cl := blobindexlookup.NewBlobIndexLookup(testServer.Client())
-			spec := types.NewRetrievalRequest(testutil.Must(url.Parse(testServer.URL))(t), tc.rngHeader, nil)
-			index, err := cl.Find(context.Background(), cid.Bytes(), provider, spec)
+			req := types.NewRetrievalRequest(testutil.Must(url.Parse(testServer.URL))(t), tc.rngHeader, nil)
+			index, err := cl.Find(context.Background(), cid.Bytes(), provider, req)
 			if tc.expectedErr != nil {
 				require.ErrorContains(t, err, tc.expectedErr.Error())
 			} else {
