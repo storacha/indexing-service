@@ -12,6 +12,7 @@ import (
 	"github.com/storacha/go-libstoracha/blobindex"
 	rclient "github.com/storacha/go-ucanto/client/retrieval"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
@@ -30,11 +31,11 @@ func NewBlobIndexLookup(httpClient *http.Client) BlobIndexLookup {
 }
 
 // Find fetches the blob index from the given fetchURL
-func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, result model.ProviderResult, spec types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
+func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, result model.ProviderResult, request types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
 	// If retrieval authroization details were provided, make a UCAN authorized
 	// retrieval request.
-	if spec.Auth != nil {
-		body, err := doAuthorizedRetrieval(ctx, spec, s.httpClient)
+	if request.Auth != nil {
+		body, err := doAuthorizedRetrieval(ctx, s.httpClient, request)
 		if err != nil {
 			return nil, fmt.Errorf("executing authorized retrieval: %w", err)
 		}
@@ -43,43 +44,43 @@ func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, resul
 	}
 
 	// attempt to fetch the index from provided url
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, spec.URL.String(), nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, request.URL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("constructing request: %w", err)
 	}
-	rng := spec.Range
+	rng := request.Range
 	if rng != nil {
 		rangeHeader := fmt.Sprintf("bytes=%d-", rng.Offset)
 		if rng.Length != nil {
 			rangeHeader += strconv.FormatUint(rng.Offset+*rng.Length-1, 10)
 		}
-		req.Header.Set("Range", rangeHeader)
+		httpReq.Header.Set("Range", rangeHeader)
 	}
-	resp, err := s.httpClient.Do(req)
+	resp, err := s.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch index: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), spec.URL.String())
+		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), request.URL.String())
 	}
 	defer resp.Body.Close()
 	return blobindex.Extract(resp.Body)
 }
 
-func doAuthorizedRetrieval(ctx context.Context, spec types.RetrievalRequest, httpClient *http.Client) (io.ReadCloser, error) {
+func doAuthorizedRetrieval(ctx context.Context, httpClient *http.Client, request types.RetrievalRequest) (io.ReadCloser, error) {
 	headers := http.Header{}
-	if spec.Range != nil {
-		if spec.Range.Length != nil {
-			headers.Set("Range", fmt.Sprintf("bytes=%d-%d", spec.Range.Offset, spec.Range.Offset+*spec.Range.Length-1))
+	if request.Range != nil {
+		if request.Range.Length != nil {
+			headers.Set("Range", fmt.Sprintf("bytes=%d-%d", request.Range.Offset, request.Range.Offset+*request.Range.Length-1))
 		} else {
-			headers.Set("Range", fmt.Sprintf("bytes=%d-", spec.Range.Offset))
+			headers.Set("Range", fmt.Sprintf("bytes=%d-", request.Range.Offset))
 		}
 	}
 
 	conn, err := rclient.NewConnection(
-		spec.Auth.Audience,
-		spec.URL,
+		request.Auth.Audience,
+		request.URL,
 		rclient.WithClient(httpClient),
 		rclient.WithHeaders(headers),
 	)
@@ -87,8 +88,8 @@ func doAuthorizedRetrieval(ctx context.Context, spec types.RetrievalRequest, htt
 		return nil, err
 	}
 
-	iss, aud, cap := spec.Auth.Issuer, spec.Auth.Audience, spec.Auth.Capability
-	inv, err := invocation.Invoke(iss, aud, cap)
+	iss, aud, cap := request.Auth.Issuer, request.Auth.Audience, request.Auth.Capability
+	inv, err := invocation.Invoke(iss, aud, cap, delegation.WithProof(request.Auth.Proofs...))
 	if err != nil {
 		return nil, err
 	}

@@ -180,7 +180,7 @@ type mockBlobIndexLookup struct {
 	err   error
 }
 
-func (m *mockBlobIndexLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, spec types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
+func (m *mockBlobIndexLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, req types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
 	return m.index, m.err
 }
 

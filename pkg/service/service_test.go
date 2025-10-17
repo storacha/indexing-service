@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -86,7 +85,7 @@ func TestQuery(t *testing.T) {
 
 		// and finally call the blob index lookup service to fetch the actual index
 		indexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexCid.Hash()))))(t)
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, indexBlobUrl, (*metadata.Range)(nil)).Return(index, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, types.RetrievalRequest{URL: indexBlobUrl}).Return(index, nil)
 
 		// similarly, the equals claim should make the service ask for the location claim of the equivalent content
 		equalsLocationDelegationCid, equalsLocationDelegation, equalsLocationProviderResult := buildTestLocationClaim(t, equivalentCid, providerAddr)
@@ -102,7 +101,7 @@ func TestQuery(t *testing.T) {
 
 		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		result, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		result, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
 
 		require.NoError(t, err)
 
@@ -143,7 +142,7 @@ func TestQuery(t *testing.T) {
 
 			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
 
-			_, err := service.Query(context.Background(), query)
+			_, err := service.Query(t.Context(), query)
 			require.NoError(t, err)
 		})
 
@@ -160,7 +159,7 @@ func TestQuery(t *testing.T) {
 
 			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
 
-			_, err := service.Query(context.Background(), query)
+			_, err := service.Query(t.Context(), query)
 			require.NoError(t, err)
 		})
 
@@ -177,7 +176,7 @@ func TestQuery(t *testing.T) {
 
 			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
 
-			_, err := service.Query(context.Background(), query)
+			_, err := service.Query(t.Context(), query)
 			require.NoError(t, err)
 		})
 	})
@@ -198,7 +197,7 @@ func TestQuery(t *testing.T) {
 
 		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		_, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		_, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
 
 		require.Error(t, err)
 	})
@@ -232,7 +231,7 @@ func TestQuery(t *testing.T) {
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, locationDelegationCid, locationClaimUrl).Return(nil, errors.New("content claims service error"))
 		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		_, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		_, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
 
 		require.Error(t, err)
 	})
@@ -283,11 +282,11 @@ func TestQuery(t *testing.T) {
 
 		// and finally call the blob index lookup service to fetch the actual index, which will fail
 		indexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexCid.Hash()))))(t)
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, indexBlobUrl, (*metadata.Range)(nil)).Return(nil, errors.New("blob index lookup error"))
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, types.RetrievalRequest{URL: indexBlobUrl}).Return(nil, errors.New("blob index lookup error"))
 
 		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		_, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		_, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
 
 		require.Error(t, err)
 	})
@@ -393,7 +392,7 @@ func TestPublishIndexClaim(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		err = Publish(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
+		err = Publish(t.Context(), testutil.Service, nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
 	})
 
@@ -429,7 +428,7 @@ func TestPublishIndexClaim(t *testing.T) {
 
 		// expect the blob index lookup service to be called once to fetch the shard index
 		mockBlobIndexLookup.EXPECT().Find(
-			extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything,
 		).Return(shardIndex, nil)
 
 		// expect the index claim to be published
@@ -441,7 +440,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.NoError(t, err)
 	})
 
@@ -465,7 +464,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to publish the claim
-		err = Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
+		err = Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
 
 		// Expect an error indicating missing capabilities
 		require.Error(t, err)
@@ -489,7 +488,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to publish the claim
-		err = Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyIndexClaim)
+		err = Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyIndexClaim)
 
 		// Expect an error indicating a problem with reading the index claim caveats
 		require.Error(t, err)
@@ -515,7 +514,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockClaimsService.EXPECT().Publish(extmocks.AnyContext, indexDelegation).Return(fmt.Errorf("failed to cache claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with caching the claim
 		require.Error(t, err)
@@ -547,7 +546,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{}, nil) // no location commitments found
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating no location commitments found
 		require.Error(t, err)
@@ -579,7 +578,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{}, fmt.Errorf("failed to find location commitments"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with finding location commitments
 		require.Error(t, err)
@@ -611,7 +610,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{{}}, nil)
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with fetching the blob index
 		require.Error(t, err)
@@ -643,7 +642,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{indexResult}, nil) // this is the wrong claim type
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with the metadata type
 		require.Error(t, err)
@@ -677,7 +676,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with building the retrieval URL
 		require.Error(t, err)
@@ -711,10 +710,10 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fetching blob index: verifying claim: building claim URL: no {claim} endpoint found")
 	})
@@ -746,13 +745,13 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 		// Simulate a failure from claims.Find
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("failed to find claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fetching blob index: verifying claim: failed to find claim")
 	})
@@ -784,7 +783,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
 
 		// Simulate a failure from claims.Find
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything).Return(locationDelegation, nil)
@@ -793,7 +792,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "publishing index claim: failed to publish claim")
 	})
@@ -825,7 +824,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
 
 		// Simulate a failure from claims.Find
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything).Return(locationDelegation, nil)
@@ -834,7 +833,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "publishing index claim: failed to publish claim")
 	})
@@ -864,7 +863,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		// Simulate a successful result from provIndex.Publish
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
 		require.NoError(t, err)
 	})
 
@@ -885,7 +884,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to publish the claim
-		err = Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyEqualsClaim)
+		err = Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyEqualsClaim)
 
 		// Expect an error indicating a problem with reading the claim caveats
 		require.Error(t, err)
@@ -911,7 +910,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		// Simulate a failure from claims.Publish
 		mockClaimsService.EXPECT().Publish(extmocks.AnyContext, equalsDelegation).Return(fmt.Errorf("failed to publish claim"))
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "caching equals claim with claim service: failed to publish claim")
 	})
@@ -938,7 +937,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		// Simulate a failure from provIndex.Publish
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "publishing equals claim: failed to publish claim")
 	})
@@ -956,7 +955,7 @@ func TestCacheClaim(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		err = Cache(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
+		err = Cache(t.Context(), nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
 	})
 
@@ -979,7 +978,7 @@ func TestCacheClaim(t *testing.T) {
 		anyMetadata := mock.AnythingOfType("metadata.Metadata")
 		mockProviderIndex.EXPECT().Cache(extmocks.AnyContext, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(nil)
 
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
 
@@ -1001,7 +1000,7 @@ func TestCacheClaim(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
+		err = Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), fmt.Sprintf("missing capabilities in claim: %s", claim.Link()))
 	})
@@ -1022,7 +1021,7 @@ func TestCacheClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to cache the claim, which will fail
-		err = Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyLocationClaim)
+		err = Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyLocationClaim)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "reading index claim data")
 	})
@@ -1056,7 +1055,7 @@ func TestCacheClaim(t *testing.T) {
 		mockClaimsService.EXPECT().Cache(extmocks.AnyContext, locationDelegation).Return(nil)
 
 		// Cache the claim with expiration
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
 
@@ -1090,7 +1089,7 @@ func TestCacheClaim(t *testing.T) {
 		mockClaimsService.EXPECT().Cache(extmocks.AnyContext, locationDelegation).Return(nil)
 
 		// Cache the claim with expiration
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
 
@@ -1120,7 +1119,7 @@ func TestCacheClaim(t *testing.T) {
 		)
 
 		// Attempt to cache the claim
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "something went wrong while caching claim in claims.Cache")
 	})
@@ -1155,7 +1154,7 @@ func TestCacheClaim(t *testing.T) {
 		)
 
 		// Attempt to cache the claim
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "something went wrong while caching claim in providerIndex.Cache")
 	})
