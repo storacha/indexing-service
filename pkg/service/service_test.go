@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
@@ -402,7 +403,10 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
@@ -689,7 +693,10 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				// Only the blob URL is provided, it is missing the claim URL which is used to build the claim URL
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
@@ -724,7 +731,10 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
@@ -762,7 +772,10 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
@@ -803,7 +816,10 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
