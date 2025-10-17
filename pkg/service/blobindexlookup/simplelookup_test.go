@@ -112,6 +112,7 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 				_, err = io.Copy(w, res.Body())
 				require.NoError(t, err)
 			},
+			rngHeader: &metadata.Range{Offset: 10, Length: &indexEncodedLength},
 			auth: &types.RetrievalAuth{
 				Issuer:   testutil.Service,
 				Audience: testutil.Service,
@@ -123,8 +124,8 @@ func TestBlobIndexLookup__Find(t *testing.T) {
 							Digest: cid.Hash(),
 						},
 						Range: content.Range{
-							Start: 0,
-							End:   uint64(len(indexBytes)),
+							Start: 10,
+							End:   indexEncodedLength - 1,
 						},
 					},
 				),
