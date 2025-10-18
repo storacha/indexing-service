@@ -18,6 +18,7 @@
     {
       "name": "provider-caching",
       "fifo": false,
+      "highThroughput": false,
       "messageRetentionSeconds": 86400
     }
   ],
