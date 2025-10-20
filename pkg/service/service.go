@@ -253,7 +253,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 								Blob: content.BlobDigest{Digest: lcCaveats.Content.Hash()},
 								Range: content.Range{
 									Start: lcCaveats.Range.Offset,
-									End:   lcCaveats.Range.Offset + *lcCaveats.Range.Length,
+									End:   lcCaveats.Range.Offset + *lcCaveats.Range.Length - 1,
 								},
 							})
 							a := types.NewRetrievalAuth(is.id, claim.Issuer(), cap, proofs)
