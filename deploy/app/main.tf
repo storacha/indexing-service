@@ -40,14 +40,13 @@ provider "aws" {
 
 
 module "app" {
-  source             = "github.com/storacha/storoku//app?ref=v0.4.6"
-  private_key        = var.private_key
-  httpport           = 8080
-  principal_mapping  = var.principal_mapping
-  did                = var.did
-  app                = var.app
-  appState           = var.app
-  deployment_config  = local.deployment_config
+  source = "github.com/storacha/storoku//app?ref=v0.5.0"
+  private_key = var.private_key
+  httpport = 8080
+  principal_mapping = var.principal_mapping
+  did = var.did
+  app = var.app
+  appState = var.app
   write_to_container = false
   environment        = terraform.workspace
   network            = var.network
@@ -55,8 +54,9 @@ module "app" {
   # in the vpc as opposed to set in the dockerfile, enter them here
   # NOTE: do not put sensitive data in env-vars. use secrets
   deployment_env_vars = []
-  image_tag           = var.image_tag
-  create_db           = false
+  image_tag = var.image_tag
+  deployment_config = local.deployment_config
+  create_db = false
   # enter secret values your app will use here -- these will be available
   # as env vars in the container at runtime
   secrets = {
