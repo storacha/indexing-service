@@ -32,40 +32,25 @@ func NewBlobIndexLookup(httpClient *http.Client) BlobIndexLookup {
 
 // Find fetches the blob index from the given fetchURL
 func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, result model.ProviderResult, request types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
-	// If retrieval authroization details were provided, make a UCAN authorized
-	// retrieval request.
+	var body io.ReadCloser
 	if request.Auth != nil {
-		body, err := doAuthorizedRetrieval(ctx, s.httpClient, request)
+		// If retrieval authroization details were provided, make a UCAN authorized
+		// retrieval request.
+		b, err := doAuthorizedRetrieval(ctx, s.httpClient, request)
 		if err != nil {
 			return nil, fmt.Errorf("executing authorized retrieval: %w", err)
 		}
-		defer body.Close()
-		return blobindex.Extract(body)
-	}
-
-	// attempt to fetch the index from provided url
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, request.URL.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("constructing request: %w", err)
-	}
-	rng := request.Range
-	if rng != nil {
-		rangeHeader := fmt.Sprintf("bytes=%d-", rng.Offset)
-		if rng.Length != nil {
-			rangeHeader += strconv.FormatUint(rng.Offset+*rng.Length-1, 10)
+		body = b
+	} else {
+		// Otherwise, attempt a legacy public retrieval with no authorization.
+		b, err := doPublicRetrieval(ctx, s.httpClient, request)
+		if err != nil {
+			return nil, fmt.Errorf("executing public retrieval: %w", err)
 		}
-		httpReq.Header.Set("Range", rangeHeader)
+		body = b
 	}
-	resp, err := s.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch index: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), request.URL.String())
-	}
-	defer resp.Body.Close()
-	return blobindex.Extract(resp.Body)
+	defer body.Close()
+	return blobindex.Extract(body)
 }
 
 func doAuthorizedRetrieval(ctx context.Context, httpClient *http.Client, request types.RetrievalRequest) (io.ReadCloser, error) {
@@ -125,4 +110,29 @@ func doAuthorizedRetrieval(ctx context.Context, httpClient *http.Client, request
 	}
 
 	return hres.Body(), nil
+}
+
+func doPublicRetrieval(ctx context.Context, httpClient *http.Client, request types.RetrievalRequest) (io.ReadCloser, error) {
+	// attempt to fetch the index from provided url
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, request.URL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("constructing request: %w", err)
+	}
+	rng := request.Range
+	if rng != nil {
+		rangeHeader := fmt.Sprintf("bytes=%d-", rng.Offset)
+		if rng.Length != nil {
+			rangeHeader += strconv.FormatUint(rng.Offset+*rng.Length-1, 10)
+		}
+		httpReq.Header.Set("Range", rangeHeader)
+	}
+	resp, err := httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch index: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), request.URL.String())
+	}
+	return resp.Body, nil
 }
