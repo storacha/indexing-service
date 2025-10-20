@@ -34,7 +34,7 @@ func NewBlobIndexLookup(httpClient *http.Client) BlobIndexLookup {
 func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, result model.ProviderResult, request types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
 	var body io.ReadCloser
 	if request.Auth != nil {
-		// If retrieval authroization details were provided, make a UCAN authorized
+		// If retrieval authorization details were provided, make a UCAN authorized
 		// retrieval request.
 		b, err := doAuthorizedRetrieval(ctx, s.httpClient, request)
 		if err != nil {
