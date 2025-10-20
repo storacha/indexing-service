@@ -10,6 +10,7 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/indexing-service/pkg/internal/queuepoller"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -96,7 +97,7 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,
 		mockCacher,
-		providercacher.WithJobBatchSize(batchSize),
+		queuepoller.WithJobBatchSize(batchSize),
 	)
 	require.NoError(t, err)
 

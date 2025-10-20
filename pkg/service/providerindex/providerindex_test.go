@@ -641,7 +641,7 @@ func TestPublish(t *testing.T) {
 		mockBatcher.EXPECT().Add(extmocks.AnyContext, digest, result).Return(nil)
 		mockBatcher.EXPECT().SetExpirable(extmocks.AnyContext, digest, false).Return(nil)
 		mockBatcher.EXPECT().Commit(extmocks.AnyContext).Return(nil)
-		mockIpniPublisher.EXPECT().Publish(extmocks.AnyContext, provider, contextID, anyDigestSeq, meta).Return(testutil.RandomCID(t), publisher.ErrAlreadyAdvertised)
+		mockIpniPublisher.EXPECT().Publish(extmocks.AnyContext, provider, contextID, anyDigestSeq, meta).Return(publisher.ErrAlreadyAdvertised)
 
 		err = providerIndex.Publish(context.Background(), provider, contextID, slices.Values([]multihash.Multihash{digest}), meta)
 		require.NoError(t, err)

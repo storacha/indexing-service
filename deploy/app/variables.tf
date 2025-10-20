@@ -5,7 +5,7 @@ variable "app" {
 
 variable "allowed_account_id" {
   description = "account id used for AWS"
-  type = string
+  type        = string
 }
 
 variable "region" {
@@ -15,17 +15,17 @@ variable "region" {
 
 variable "private_key" {
   description = "private_key for the peer for this deployment"
-  type = string
+  type        = string
 }
 
 variable "did" {
   description = "DID for this deployment (did:web:... for example)"
-  type = string
+  type        = string
 }
 
 variable "image_tag" {
   description = "ECR image tag to deploy with"
-  type = string
+  type        = string
 }
 
 variable "principal_mapping" {
@@ -36,12 +36,12 @@ variable "principal_mapping" {
 
 variable "env_files" {
   description = "list of environment variable files to upload"
-  type = list(string)
-  default = []
+  type        = list(string)
+  default     = []
 }
 
 variable "domain_base" {
-  type = string
+  type    = string
   default = ""
 }
 

@@ -1,72 +1,66 @@
-issue-845-fix: True
-resolve-type-alias: False
-with-expecter: True
-inpackage: True
+dir: '{{.InterfaceDir}}'
+structname: Mock{{.InterfaceName}}
+template: testify
+template-data:
+  unroll-variadic: true
 filename: "mock_{{.InterfaceName}}.go"
-dir: "{{.InterfaceDir}}"
-mockname: "Mock{{.InterfaceName}}"
 packages:
-  github.com/storacha/indexing-service/pkg/service/blobindexlookup:
-    interfaces:
-      BlobIndexLookup:
-  github.com/storacha/indexing-service/pkg/service/contentclaims:
-    config:
-      filename: "mock_ContentClaims{{.InterfaceName}}.go"
-      mockname: "MockContentClaims{{.InterfaceName}}"
-    interfaces:
-      Finder:
-      Service:
-  github.com/storacha/indexing-service/pkg/service/providercacher:
-    interfaces:
-      CachingQueue:
-      ProviderCacher:
-  github.com/storacha/indexing-service/pkg/service/providerindex:
-    interfaces:
-      ProviderIndex:
-  github.com/storacha/indexing-service/pkg/service/providerindex/legacy:
-    interfaces:
-      ContentToClaimsMapper:
-      ClaimsFinder:
-  github.com/storacha/indexing-service/pkg/types:
-    interfaces:
-      ContentClaimsCache:
-      ContentClaimsStore:
-      ProviderStore:
-      NoProviderStore:
-      Service:
-      ValueSetCacheBatcher:
   github.com/aws/aws-sdk-go-v2/service/dynamodb:
     interfaces:
       QueryAPIClient:
         config:
-          inpackage: False
-          dir: "pkg/internal/extmocks"
-          outpkg: "extmocks"
+          dir: pkg/internal/extmocks
+          structname: MockDynamoDBQueryClient
           filename: mock_DynamoDBQueryClient.go
-          mockname: MockDynamoDBQueryClient
-  github.com/ipni/go-libipni/find/client:
-    interfaces:
-      Finder:
-        config:
-          inpackage: False
-          dir: "pkg/internal/extmocks"
-          outpkg: "extmocks"
-          filename: mock_IpniFinder.go
-          mockname: MockIpniFinder
-  github.com/storacha/ipni-publisher/pkg/publisher:
-    interfaces:
-      Publisher:
-        config:
-          inpackage: False
-          dir: "pkg/internal/extmocks"
-          outpkg: "extmocks"
-          filename: mock_IpniPublisher.go
-          mockname: MockIpniPublisher
+          pkgname: extmocks
   github.com/ipfs/go-log/v2:
     interfaces:
       EventLogger:
         config:
-          inpackage: False
-          dir: "pkg/internal/extmocks"
-          outpkg: "extmocks"
-
+          dir: pkg/internal/extmocks
+          pkgname: extmocks
+  github.com/ipni/go-libipni/find/client:
+    interfaces:
+      Finder:
+        config:
+          dir: pkg/internal/extmocks
+          structname: MockIpniFinder
+          filename: mock_IpniFinder.go
+          pkgname: extmocks
+  github.com/storacha/indexing-service/pkg/service/blobindexlookup:
+    interfaces:
+      BlobIndexLookup: {}
+  github.com/storacha/indexing-service/pkg/service/contentclaims:
+    config:
+      structname: MockContentClaims{{.InterfaceName}}
+      filename: "mock_ContentClaims{{.InterfaceName}}.go"
+    interfaces:
+      Finder: {}
+      Service: {}
+  github.com/storacha/indexing-service/pkg/service/providercacher:
+    interfaces:
+      CachingQueue: {}
+      ProviderCacher: {}
+  github.com/storacha/indexing-service/pkg/service/providerindex:
+    interfaces:
+      ProviderIndex: {}
+  github.com/storacha/indexing-service/pkg/service/providerindex/legacy:
+    interfaces:
+      ClaimsFinder: {}
+      ContentToClaimsMapper: {}
+  github.com/storacha/indexing-service/pkg/types:
+    interfaces:
+      ContentClaimsCache: {}
+      ContentClaimsStore: {}
+      NoProviderStore: {}
+      ProviderStore: {}
+      Service: {}
+      ValueSetCacheBatcher: {}
+  github.com/storacha/go-libstoracha/ipnipublisher/publisher:
+    interfaces:
+      AsyncPublisher:
+        config:
+          dir: pkg/internal/extmocks
+          structname: MockIpniPublisher
+          pkgname: extmocks
+          filename: mock_IpniPublisher.go
