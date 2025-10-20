@@ -226,7 +226,7 @@ type RetrievalAuth struct {
 	Issuer ucan.Signer
 	// Identity of the storage node to retrieve data from.
 	Audience ucan.Principal
-	// Retrieval ability, resource (typially the space) and caveats.
+	// Retrieval ability, resource (typically the space) and caveats.
 	Capability ucan.Capability[ucan.CaveatBuilder]
 	// Delegations from the client to the indexing service authorizing retrieval.
 	Proofs []delegation.Proof
