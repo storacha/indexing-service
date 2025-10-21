@@ -228,7 +228,8 @@ type RetrievalAuth struct {
 	Audience ucan.Principal
 	// Retrieval ability, resource (typically the space) and caveats.
 	Capability ucan.Capability[ucan.CaveatBuilder]
-	// Delegations from the client to the indexing service authorizing retrieval.
+	// Delegations from the client (e.g. `space/content/retrieve`) or a storage
+	// node (e.g. `blob/retrieve`) to the indexing service authorizing retrieval.
 	Proofs []delegation.Proof
 }
 
