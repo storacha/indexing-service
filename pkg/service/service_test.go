@@ -1,10 +1,12 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -12,19 +14,34 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
+	"github.com/ipni/go-libipni/maurl"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/bytemap"
+	"github.com/storacha/go-libstoracha/capabilities/access"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
+	"github.com/storacha/go-libstoracha/capabilities/space/content"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
 	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-libstoracha/testutil"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/ipld"
+	"github.com/storacha/go-ucanto/core/message"
+	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/receipt/ran"
+	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/ok"
+	"github.com/storacha/go-ucanto/did"
+	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	ucan_car "github.com/storacha/go-ucanto/transport/car"
+	ucan_http "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/internal/extmocks"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
@@ -50,9 +67,10 @@ func TestQuery(t *testing.T) {
 
 		contentLink := testutil.RandomCID(t)
 		contentHash := contentLink.(cidlink.Link).Hash()
+		space := testutil.RandomDID(t)
 
 		// content will have a location claim, an index claim and an equals claim
-		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		indexDelegationCid, indexDelegation, indexResult, indexCid, index := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 		equalsDelegationCid, equalsDelegation, equalsResult, equivalentCid := buildTestEqualsClaim(t, contentLink.(cidlink.Link), providerAddr)
 
@@ -73,7 +91,8 @@ func TestQuery(t *testing.T) {
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, equalsDelegationCid, equalsClaimUrl).Return(equalsDelegation, nil)
 
 		// then attempt to find records for the index referenced in the index claim
-		indexLocationDelegationCid, indexLocationDelegation, indexLocationProviderResult := buildTestLocationClaim(t, indexCid, providerAddr)
+		indexSize := rand.Uint64N(5000)
+		indexLocationDelegationCid, indexLocationDelegation, indexLocationProviderResult := buildTestLocationClaim(t, indexCid, providerAddr, space, indexSize)
 
 		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
 			Hash:         indexCid.Hash(),
@@ -86,10 +105,11 @@ func TestQuery(t *testing.T) {
 
 		// and finally call the blob index lookup service to fetch the actual index
 		indexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexCid.Hash()))))(t)
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, indexBlobUrl, (*metadata.Range)(nil)).Return(index, nil)
+		retrievalReq := types.NewRetrievalRequest(indexBlobUrl, &metadata.Range{Length: &indexSize}, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, retrievalReq).Return(index, nil)
 
 		// similarly, the equals claim should make the service ask for the location claim of the equivalent content
-		equalsLocationDelegationCid, equalsLocationDelegation, equalsLocationProviderResult := buildTestLocationClaim(t, equivalentCid, providerAddr)
+		equalsLocationDelegationCid, equalsLocationDelegation, equalsLocationProviderResult := buildTestLocationClaim(t, equivalentCid, providerAddr, space, rand.Uint64N(5000))
 
 		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
 			Hash:         equivalentCid.Hash(),
@@ -100,9 +120,127 @@ func TestQuery(t *testing.T) {
 		equalsLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", equalsLocationDelegationCid.String())))(t)
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, equalsLocationDelegationCid, equalsLocationClaimUrl).Return(equalsLocationDelegation, nil)
 
-		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		result, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		result, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
+
+		require.NoError(t, err)
+
+		expectedClaims := map[cid.Cid]delegation.Delegation{
+			locationDelegationCid.Cid:       locationDelegation,
+			indexDelegationCid.Cid:          indexDelegation,
+			equalsDelegationCid.Cid:         equalsDelegation,
+			indexLocationDelegationCid.Cid:  indexLocationDelegation,
+			equalsLocationDelegationCid.Cid: equalsLocationDelegation,
+		}
+		expectedIndexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](1)
+		expectedIndexes.Set(types.EncodedContextID(indexLocationProviderResult.ContextID), index)
+		expectedResult := testutil.Must(queryresult.Build(expectedClaims, expectedIndexes))(t)
+
+		require.ElementsMatch(t, expectedResult.Claims(), result.Claims())
+		require.ElementsMatch(t, expectedResult.Indexes(), result.Indexes())
+	})
+
+	t.Run("happy path with authorized index retrieval", func(t *testing.T) {
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		providerAddr := &peer.AddrInfo{
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+			},
+		}
+
+		contentLink := testutil.RandomCID(t)
+		contentHash := contentLink.(cidlink.Link).Hash()
+
+		space := testutil.Must(ed25519.Generate())(t)
+		dlg := testutil.Must(delegation.Delegate(
+			space,
+			testutil.Service,
+			[]ucan.Capability[ucan.NoCaveats]{
+				ucan.NewCapability(content.RetrieveAbility, space.DID().String(), ucan.NoCaveats{}),
+			},
+		))(t)
+
+		// content will have a location claim, an index claim and an equals claim
+		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space.DID(), rand.Uint64N(5000))
+		indexDelegationCid, indexDelegation, indexResult, indexCid, index := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+		equalsDelegationCid, equalsDelegation, equalsResult, equivalentCid := buildTestEqualsClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		contentResults := []model.ProviderResult{locationProviderResult, indexResult, equalsResult}
+
+		// expect a call to find records for content
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Spaces:       []did.DID{space.DID()},
+			Hash:         contentHash,
+			TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+		}).Return(contentResults, nil)
+
+		// the results for content should make the IndexingService ask for all claims
+		locationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", locationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, locationDelegationCid, locationClaimUrl).Return(locationDelegation, nil)
+		indexClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", indexDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, indexDelegationCid, indexClaimUrl).Return(indexDelegation, nil)
+		equalsClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", equalsDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, equalsDelegationCid, equalsClaimUrl).Return(equalsDelegation, nil)
+
+		// then attempt to find records for the index referenced in the index claim
+		indexSize := rand.Uint64N(5000)
+		indexLocationDelegationCid, indexLocationDelegation, indexLocationProviderResult := buildTestLocationClaim(t, indexCid, providerAddr, space.DID(), indexSize)
+
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Spaces:       []did.DID{space.DID()},
+			Hash:         indexCid.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{indexLocationProviderResult}, nil)
+
+		// fetch the index's location claim
+		indexLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", indexLocationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, indexLocationDelegationCid, indexLocationClaimUrl).Return(indexLocationDelegation, nil)
+
+		// and finally call the blob index lookup service to fetch the actual index
+		indexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexCid.Hash()))))(t)
+		retrievalAuth := types.NewRetrievalAuth(
+			testutil.Service,
+			locationDelegation.Issuer(),
+			content.Retrieve.New(
+				space.DID().String(),
+				content.RetrieveCaveats{
+					Blob:  content.BlobDigest{Digest: indexCid.Hash()},
+					Range: content.Range{Start: 0, End: indexSize - 1},
+				},
+			),
+			[]delegation.Proof{delegation.FromDelegation(dlg)},
+		)
+		retrievalReq := types.NewRetrievalRequest(
+			indexBlobUrl,
+			&metadata.Range{Length: &indexSize},
+			&retrievalAuth,
+		)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, retrievalReq).Return(index, nil)
+
+		// similarly, the equals claim should make the service ask for the location claim of the equivalent content
+		equalsLocationDelegationCid, equalsLocationDelegation, equalsLocationProviderResult := buildTestLocationClaim(t, equivalentCid, providerAddr, space.DID(), rand.Uint64N(5000))
+
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Spaces:       []did.DID{space.DID()},
+			Hash:         equivalentCid.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{equalsLocationProviderResult}, nil)
+
+		// and fetch the equivalent content's location claim
+		equalsLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", equalsLocationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, equalsLocationDelegationCid, equalsLocationClaimUrl).Return(equalsLocationDelegation, nil)
+
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+
+		result, err := service.Query(t.Context(), types.Query{
+			Hashes:      []mh.Multihash{contentHash},
+			Match:       types.Match{Subject: []did.DID{space.DID()}},
+			Delegations: []delegation.Delegation{dlg},
+		})
 
 		require.NoError(t, err)
 
@@ -126,7 +264,7 @@ func TestQuery(t *testing.T) {
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 
-		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
 		contentHash := testutil.RandomMultihash(t)
 
@@ -143,7 +281,7 @@ func TestQuery(t *testing.T) {
 
 			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
 
-			_, err := service.Query(context.Background(), query)
+			_, err := service.Query(t.Context(), query)
 			require.NoError(t, err)
 		})
 
@@ -160,7 +298,7 @@ func TestQuery(t *testing.T) {
 
 			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
 
-			_, err := service.Query(context.Background(), query)
+			_, err := service.Query(t.Context(), query)
 			require.NoError(t, err)
 		})
 
@@ -177,7 +315,7 @@ func TestQuery(t *testing.T) {
 
 			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
 
-			_, err := service.Query(context.Background(), query)
+			_, err := service.Query(t.Context(), query)
 			require.NoError(t, err)
 		})
 	})
@@ -196,9 +334,9 @@ func TestQuery(t *testing.T) {
 			TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
 		}).Return([]model.ProviderResult{}, errors.New("provider index error"))
 
-		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		_, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		_, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
 
 		require.Error(t, err)
 	})
@@ -215,9 +353,10 @@ func TestQuery(t *testing.T) {
 
 		contentLink := testutil.RandomCID(t)
 		contentHash := contentLink.(cidlink.Link).Hash()
+		space := testutil.RandomDID(t)
 
 		// content will have a location claim
-		locationDelegationCid, _, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		locationDelegationCid, _, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 
 		contentResults := []model.ProviderResult{locationProviderResult}
 
@@ -230,9 +369,9 @@ func TestQuery(t *testing.T) {
 		// the results for content should make the IndexingService ask for the location claim, but that will fail
 		locationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", locationDelegationCid.String())))(t)
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, locationDelegationCid, locationClaimUrl).Return(nil, errors.New("content claims service error"))
-		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		_, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		_, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
 
 		require.Error(t, err)
 	})
@@ -250,9 +389,10 @@ func TestQuery(t *testing.T) {
 
 		contentLink := testutil.RandomCID(t)
 		contentHash := contentLink.(cidlink.Link).Hash()
+		space := testutil.RandomDID(t)
 
 		// content will have a location claim and an index claim
-		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		indexDelegationCid, indexDelegation, indexResult, indexCid, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
 		contentResults := []model.ProviderResult{locationProviderResult, indexResult}
@@ -270,7 +410,8 @@ func TestQuery(t *testing.T) {
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, indexDelegationCid, indexClaimUrl).Return(indexDelegation, nil)
 
 		// then attempt to find records for the index referenced in the index claim
-		indexLocationDelegationCid, indexLocationDelegation, indexLocationProviderResult := buildTestLocationClaim(t, indexCid, providerAddr)
+		indexSize := rand.Uint64N(5000)
+		indexLocationDelegationCid, indexLocationDelegation, indexLocationProviderResult := buildTestLocationClaim(t, indexCid, providerAddr, space, indexSize)
 
 		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
 			Hash:         indexCid.Hash(),
@@ -283,23 +424,26 @@ func TestQuery(t *testing.T) {
 
 		// and finally call the blob index lookup service to fetch the actual index, which will fail
 		indexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexCid.Hash()))))(t)
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, indexBlobUrl, (*metadata.Range)(nil)).Return(nil, errors.New("blob index lookup error"))
+		retrievalReq := types.NewRetrievalRequest(indexBlobUrl, &metadata.Range{Length: &indexSize}, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(indexLocationProviderResult.ContextID), indexResult, retrievalReq).Return(nil, errors.New("blob index lookup error"))
 
-		service := NewIndexingService(mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
 
-		_, err := service.Query(context.Background(), types.Query{Hashes: []mh.Multihash{contentHash}})
+		_, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
 
 		require.Error(t, err)
 	})
 }
 
-func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
-	locationClaim := cassert.Location.New(testutil.Service.DID().String(), cassert.LocationCaveats{
+func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo, space did.DID, size uint64) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
+	locationClaim := cassert.Location.New(testutil.Alice.DID().String(), cassert.LocationCaveats{
 		Content:  ctypes.FromHash(contentLink.Hash()),
 		Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
+		Space:    space,
+		Range:    &cassert.Range{Length: &size},
 	})
 
-	locationDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Alice, []ucan.Capability[cassert.LocationCaveats]{locationClaim}))(t)
+	locationDelegation := testutil.Must(delegation.Delegate(testutil.Alice, space, []ucan.Capability[cassert.LocationCaveats]{locationClaim}))(t)
 	locationDelegationCid := testutil.Must(cid.Prefix{
 		Version:  1,
 		Codec:    uint64(multicodec.Car),
@@ -310,6 +454,7 @@ func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr
 	locationMetadata := metadata.LocationCommitmentMetadata{
 		Shard:      &contentLink.Cid,
 		Claim:      locationDelegationCid,
+		Range:      &metadata.Range{Length: &size},
 		Expiration: time.Now().Add(time.Hour).Unix(),
 	}
 
@@ -383,6 +528,58 @@ func buildTestEqualsClaim(t *testing.T, contentLink cidlink.Link, providerAddr *
 	return cidlink.Link{Cid: equalsDelegationCid}, equalsDelegation, equalsProviderResults, equivalentCid.(cidlink.Link)
 }
 
+// startMockStorageNode starts a mock storage node that accepts `access/grant`
+// invocations. Actual `space/content/retrieve` and `blob/retrieve` invocations
+// are mocked by the tests so are not supported here.
+func startMockStorageNode(t *testing.T, id ucan.Signer) ma.Multiaddr {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req := ucan_http.NewRequest(r.Body, r.Header)
+		switch r.Method {
+		case http.MethodPost: // UCAN invocation for access/grant
+			codec := ucan_car.NewInboundCodec()
+			accept := testutil.Must(codec.Accept(req))(t)
+			msg := testutil.Must(accept.Decoder().Decode(req))(t)
+			bs := testutil.Must(blockstore.NewBlockReader(blockstore.WithBlocksIterator(msg.Blocks())))(t)
+			inv := testutil.Must(invocation.NewInvocationView(msg.Invocations()[0], bs))(t)
+			cap := inv.Capabilities()[0]
+			if cap.Can() != access.GrantAbility {
+				t.Fatal("unexpected invocation")
+			}
+			dlg := testutil.Must(delegation.Delegate(
+				id,
+				inv.Issuer(),
+				[]ucan.Capability[ucan.NoCaveats]{
+					ucan.NewCapability("*", id.DID().String(), ucan.NoCaveats{}),
+				},
+			))(t)
+			dlgsModel := access.DelegationsModel{
+				Keys: []string{dlg.Link().String()},
+				Values: map[string][]byte{
+					dlg.Link().String(): testutil.Must(io.ReadAll(dlg.Archive()))(t),
+				},
+			}
+			out := result.Ok[access.GrantOk, ipld.Builder](access.GrantOk{Delegations: dlgsModel})
+			rcpt, err := receipt.Issue(id, out, ran.FromInvocation(inv))
+			require.NoError(t, err)
+			msg, err = message.Build(nil, []receipt.AnyReceipt{rcpt})
+			require.NoError(t, err)
+			resp, err := accept.Encoder().Encode(msg)
+			require.NoError(t, err)
+			for key, values := range resp.Headers() {
+				for _, val := range values {
+					w.Header().Add(key, val)
+				}
+			}
+			_ = testutil.Must(io.Copy(w, resp.Body()))(t)
+		default:
+			t.Fatal("unexpected invocation")
+		}
+	}))
+	t.Cleanup(httpServer.Close)
+	addr := testutil.Must(maurl.FromURL(testutil.Must(url.Parse(httpServer.URL))(t)))(t)
+	return ma.Join(addr, testutil.Must(ma.NewMultiaddr("/http-path/%2Fblobs%2F%7Bblob%7D"))(t))
+}
+
 func TestPublishIndexClaim(t *testing.T) {
 	t.Run("does not publish unknown claims", func(t *testing.T) {
 		claim, err := delegation.Delegate(
@@ -393,7 +590,7 @@ func TestPublishIndexClaim(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		err = Publish(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
+		err = Publish(t.Context(), testutil.Service, nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
 	})
 
@@ -402,15 +599,19 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 			},
 		}
 		// content will have a location claim, an index claim
-		locationDelegationCid, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		locationDelegationCid, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		_, indexDelegation, _, indexLink, shardIndex := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
 		// expect a call to cache the index claim using claims.Publish
@@ -429,7 +630,7 @@ func TestPublishIndexClaim(t *testing.T) {
 
 		// expect the blob index lookup service to be called once to fetch the shard index
 		mockBlobIndexLookup.EXPECT().Find(
-			extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+			extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything,
 		).Return(shardIndex, nil)
 
 		// expect the index claim to be published
@@ -441,7 +642,61 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		require.NoError(t, err)
+	})
+
+	t.Run("publish index claim with service authorized retrieval", func(t *testing.T) {
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
+
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
+		blobAddr := startMockStorageNode(t, testutil.Alice)
+
+		providerAddr := &peer.AddrInfo{
+			ID: peerID,
+			Addrs: []ma.Multiaddr{
+				blobAddr,
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+			},
+		}
+		// content will have a location claim, an index claim
+		locationDelegationCid, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
+		_, indexDelegation, _, indexLink, shardIndex := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+
+		// expect a call to cache the index claim using claims.Publish
+		mockClaimsService.EXPECT().Publish(extmocks.AnyContext, indexDelegation).Return(nil)
+
+		// expect a call to find records for index location commitment
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Hash:         indexLink.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{locationResult}, nil)
+
+		// expect the claim service to be called for each result from providerIndex.Find
+		mockClaimsService.EXPECT().Find(
+			extmocks.AnyContext, locationDelegationCid, mock.AnythingOfType("*url.URL"),
+		).Return(locationDelegation, nil)
+
+		// expect the blob index lookup service to be called once to fetch the shard index
+		mockBlobIndexLookup.EXPECT().Find(
+			extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything,
+		).Return(shardIndex, nil)
+
+		// expect the index claim to be published
+		digests := bytemap.NewByteMap[mh.Multihash, struct{}](-1)
+		for _, slices := range shardIndex.Shards().Iterator() {
+			for d := range slices.Iterator() {
+				digests.Set(d, struct{}{})
+			}
+		}
+		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.NoError(t, err)
 	})
 
@@ -465,7 +720,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to publish the claim
-		err = Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
+		err = Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
 
 		// Expect an error indicating missing capabilities
 		require.Error(t, err)
@@ -489,7 +744,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to publish the claim
-		err = Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyIndexClaim)
+		err = Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyIndexClaim)
 
 		// Expect an error indicating a problem with reading the index claim caveats
 		require.Error(t, err)
@@ -515,7 +770,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockClaimsService.EXPECT().Publish(extmocks.AnyContext, indexDelegation).Return(fmt.Errorf("failed to cache claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with caching the claim
 		require.Error(t, err)
@@ -547,7 +802,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{}, nil) // no location commitments found
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating no location commitments found
 		require.Error(t, err)
@@ -579,7 +834,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{}, fmt.Errorf("failed to find location commitments"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with finding location commitments
 		require.Error(t, err)
@@ -611,7 +866,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{{}}, nil)
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with fetching the blob index
 		require.Error(t, err)
@@ -643,7 +898,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{indexResult}, nil) // this is the wrong claim type
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with the metadata type
 		require.Error(t, err)
@@ -655,6 +910,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
 
 		providerAddr := &peer.AddrInfo{
 			Addrs: []ma.Multiaddr{
@@ -664,7 +920,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 
 		// content will have a location claim, an index claim
-		_, _, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, _, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		_, indexDelegation, _, indexLink, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
 		// Simulate caching the claim in claims.Publish
@@ -677,7 +933,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 
 		// Expect an error indicating a problem with building the retrieval URL
 		require.Error(t, err)
@@ -689,8 +945,12 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				// Only the blob URL is provided, it is missing the claim URL which is used to build the claim URL
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
@@ -698,7 +958,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 
 		// content will have a location claim, an index claim
-		_, _, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, _, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		_, indexDelegation, _, indexLink, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
 		// Simulate caching the claim in claims.Publish
@@ -711,10 +971,10 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fetching blob index: verifying claim: building claim URL: no {claim} endpoint found")
 	})
@@ -724,8 +984,12 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
@@ -733,7 +997,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 
 		// content will have a location claim, an index claim
-		_, _, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, _, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		_, indexDelegation, _, indexLink, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
 		// Simulate caching the claim in claims.Publish
@@ -746,13 +1010,13 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 		// Simulate a failure from claims.Find
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("failed to find claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "fetching blob index: verifying claim: failed to find claim")
 	})
@@ -762,8 +1026,12 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
@@ -771,7 +1039,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 
 		// content will have a location claim, an index claim
-		_, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		_, indexDelegation, _, indexLink, shardIndex := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
 		// Simulate caching the claim in claims.Publish
@@ -784,7 +1052,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
 
 		// Simulate a failure from claims.Find
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything).Return(locationDelegation, nil)
@@ -793,7 +1061,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "publishing index claim: failed to publish claim")
 	})
@@ -803,8 +1071,12 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
 
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
 		providerAddr := &peer.AddrInfo{
+			ID: peerID,
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
@@ -812,7 +1084,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 
 		// content will have a location claim, an index claim
-		_, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		_, indexDelegation, _, indexLink, shardIndex := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
 
 		// Simulate caching the claim in claims.Publish
@@ -825,7 +1097,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}).Return([]model.ProviderResult{locationResult}, nil)
 
 		// Simulate a successful result from blobIndexLookup.Find
-		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything).Return(shardIndex, nil)
 
 		// Simulate a failure from claims.Find
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, mock.Anything, mock.Anything).Return(locationDelegation, nil)
@@ -834,7 +1106,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
 
 		// Attempt to publish the claim
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "publishing index claim: failed to publish claim")
 	})
@@ -864,7 +1136,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		// Simulate a successful result from provIndex.Publish
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
 		require.NoError(t, err)
 	})
 
@@ -885,7 +1157,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to publish the claim
-		err = Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyEqualsClaim)
+		err = Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyEqualsClaim)
 
 		// Expect an error indicating a problem with reading the claim caveats
 		require.Error(t, err)
@@ -911,7 +1183,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		// Simulate a failure from claims.Publish
 		mockClaimsService.EXPECT().Publish(extmocks.AnyContext, equalsDelegation).Return(fmt.Errorf("failed to publish claim"))
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "caching equals claim with claim service: failed to publish claim")
 	})
@@ -938,7 +1210,7 @@ func TestPublishEqualsClaim(t *testing.T) {
 		// Simulate a failure from provIndex.Publish
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("failed to publish claim"))
 
-		err := Publish(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
+		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, equalsDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "publishing equals claim: failed to publish claim")
 	})
@@ -956,7 +1228,7 @@ func TestCacheClaim(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		err = Cache(context.Background(), nil, nil, nil, peer.AddrInfo{}, claim)
+		err = Cache(t.Context(), nil, nil, nil, peer.AddrInfo{}, claim)
 		require.ErrorIs(t, err, ErrUnrecognizedClaim)
 	})
 
@@ -965,13 +1237,15 @@ func TestCacheClaim(t *testing.T) {
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
+		space := testutil.RandomDID(t)
+
 		providerAddr := &peer.AddrInfo{
 			Addrs: []ma.Multiaddr{
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 			},
 		}
 
-		_, locationDelegation, _ := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr)
+		_, locationDelegation, _ := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
 		mockClaimsService.EXPECT().Cache(extmocks.AnyContext, locationDelegation).Return(nil)
 
 		anyContextID := mock.AnythingOfType("string")
@@ -979,7 +1253,7 @@ func TestCacheClaim(t *testing.T) {
 		anyMetadata := mock.AnythingOfType("metadata.Metadata")
 		mockProviderIndex.EXPECT().Cache(extmocks.AnyContext, *providerAddr, anyContextID, anyMultihash, anyMetadata).Return(nil)
 
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
 
@@ -1001,7 +1275,7 @@ func TestCacheClaim(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
+		err = Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, claim)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), fmt.Sprintf("missing capabilities in claim: %s", claim.Link()))
 	})
@@ -1022,7 +1296,7 @@ func TestCacheClaim(t *testing.T) {
 		require.NoError(t, err)
 
 		// Attempt to cache the claim, which will fail
-		err = Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyLocationClaim)
+		err = Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, faultyLocationClaim)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "reading index claim data")
 	})
@@ -1056,7 +1330,7 @@ func TestCacheClaim(t *testing.T) {
 		mockClaimsService.EXPECT().Cache(extmocks.AnyContext, locationDelegation).Return(nil)
 
 		// Cache the claim with expiration
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
 
@@ -1090,7 +1364,7 @@ func TestCacheClaim(t *testing.T) {
 		mockClaimsService.EXPECT().Cache(extmocks.AnyContext, locationDelegation).Return(nil)
 
 		// Cache the claim with expiration
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.NoError(t, err)
 	})
 
@@ -1120,7 +1394,7 @@ func TestCacheClaim(t *testing.T) {
 		)
 
 		// Attempt to cache the claim
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "something went wrong while caching claim in claims.Cache")
 	})
@@ -1155,7 +1429,7 @@ func TestCacheClaim(t *testing.T) {
 		)
 
 		// Attempt to cache the claim
-		err := Cache(context.Background(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
+		err := Cache(t.Context(), mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, locationDelegation)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "something went wrong while caching claim in providerIndex.Cache")
 	})

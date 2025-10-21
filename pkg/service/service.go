@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipld/go-ipld-prime"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipni/go-libipni/find/model"
@@ -19,11 +20,20 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/advertisement"
+	"github.com/storacha/go-libstoracha/capabilities/access"
 	"github.com/storacha/go-libstoracha/capabilities/assert"
+	"github.com/storacha/go-libstoracha/capabilities/blob"
+	"github.com/storacha/go-libstoracha/capabilities/space/content"
 	"github.com/storacha/go-libstoracha/metadata"
+	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/iterable"
+	"github.com/storacha/go-ucanto/core/result"
+	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
+	"github.com/storacha/go-ucanto/transport/http"
+	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/validator"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -48,10 +58,13 @@ const (
 	blobCIDUrlPlaceholder = "{blobCID}"
 )
 
+var log = logging.Logger("service")
+
 var ErrUnrecognizedClaim = errors.New("unrecognized claim type")
 
 // IndexingService implements read/write logic for indexing data with IPNI, content claims, sharded dag indexes, and a cache layer
 type IndexingService struct {
+	id              ucan.Signer
 	blobIndexLookup blobindexlookup.BlobIndexLookup
 	claims          contentclaims.Service
 	providerIndex   providerindex.ProviderIndex
@@ -216,7 +229,39 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					}
 
 					s.AddEvent("fetching index")
-					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, url, typedProtocol.Range)
+					var auth *types.RetrievalAuth
+					match, err := assert.Location.Match(validator.NewSource(claim.Capabilities()[0], claim))
+					if err != nil {
+						return fmt.Errorf("failed to match claim to location commitment: %w", err)
+					}
+					lcCaveats := match.Value().Nb()
+					space := lcCaveats.Space
+					dlgs := state.Access().q.Delegations
+					// Authorized retrieval requires a space in the location claim, a
+					// delegation for the retrieval, and an absolute byte range to extract.
+					if space != did.Undef && len(dlgs) > 0 && lcCaveats.Range != nil && lcCaveats.Range.Length != nil {
+						var proofs []delegation.Proof
+						for _, d := range dlgs {
+							for _, c := range d.Capabilities() {
+								if c.Can() == content.Retrieve.Can() && c.With() == space.String() {
+									proofs = append(proofs, delegation.FromDelegation(d))
+								}
+							}
+						}
+						if len(proofs) > 0 {
+							cap := content.Retrieve.New(space.String(), content.RetrieveCaveats{
+								Blob: content.BlobDigest{Digest: lcCaveats.Content.Hash()},
+								Range: content.Range{
+									Start: lcCaveats.Range.Offset,
+									End:   lcCaveats.Range.Offset + *lcCaveats.Range.Length - 1,
+								},
+							})
+							a := types.NewRetrievalAuth(is.id, claim.Issuer(), cap, proofs)
+							auth = &a
+						}
+					}
+					req := types.NewRetrievalRequest(url, typedProtocol.Range, auth)
+					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, req)
 					if err != nil {
 						telemetry.Error(s, err, "fetching index blob")
 						return err
@@ -343,7 +388,7 @@ func (is *IndexingService) Cache(ctx context.Context, provider peer.AddrInfo, cl
 // The service should lookup the index cid location claim, and fetch the ShardedDagIndexView, then use the hashes inside
 // to assemble all the multihashes in the index advertisement
 func (is *IndexingService) Publish(ctx context.Context, claim delegation.Delegation) error {
-	return Publish(ctx, is.blobIndexLookup, is.claims, is.providerIndex, is.provider, claim)
+	return Publish(ctx, is.id, is.blobIndexLookup, is.claims, is.providerIndex, is.provider, claim)
 }
 
 // Option configures an IndexingService
@@ -357,13 +402,14 @@ func WithConcurrency(concurrency int) Option {
 }
 
 // NewIndexingService returns a new indexing service
-func NewIndexingService(blobIndexLookup blobindexlookup.BlobIndexLookup, claims contentclaims.Service, publicAddrInfo peer.AddrInfo, providerIndex providerindex.ProviderIndex, options ...Option) *IndexingService {
+func NewIndexingService(id ucan.Signer, blobIndexLookup blobindexlookup.BlobIndexLookup, claims contentclaims.Service, publicAddrInfo peer.AddrInfo, providerIndex providerindex.ProviderIndex, options ...Option) *IndexingService {
 	provider := peer.AddrInfo{ID: publicAddrInfo.ID}
 	for _, addr := range publicAddrInfo.Addrs {
 		claimSuffix, _ := multiaddr.NewMultiaddr("/http-path/" + url.PathEscape("claim/"+ClaimUrlPlaceholder))
 		provider.Addrs = append(provider.Addrs, multiaddr.Join(addr, claimSuffix))
 	}
 	is := &IndexingService{
+		id:              id,
 		blobIndexLookup: blobIndexLookup,
 		claims:          claims,
 		provider:        provider,
@@ -448,7 +494,7 @@ func cacheLocationCommitment(ctx context.Context, claims contentclaims.Service, 
 	return nil
 }
 
-func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+func Publish(ctx context.Context, id ucan.Signer, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	ctx, s := telemetry.StartSpan(ctx, "IndexingService.Publish")
 	defer s.End()
 
@@ -462,7 +508,7 @@ func Publish(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, cla
 		return publishEqualsClaim(ctx, claims, provIndex, provider, claim)
 	case assert.IndexAbility:
 		s.SetAttributes(attribute.KeyValue{Key: "claim", Value: attribute.StringValue("assert/index")})
-		return publishIndexClaim(ctx, blobIndex, claims, provIndex, provider, claim)
+		return publishIndexClaim(ctx, id, blobIndex, claims, provIndex, provider, claim)
 	default:
 		return ErrUnrecognizedClaim
 	}
@@ -505,7 +551,7 @@ func publishEqualsClaim(ctx context.Context, claims contentclaims.Service, provI
 	return nil
 }
 
-func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
+func publishIndexClaim(ctx context.Context, id ucan.Signer, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, provIndex providerindex.ProviderIndex, provider peer.AddrInfo, claim delegation.Delegation) error {
 	capability := claim.Capabilities()[0]
 	nb, rerr := assert.IndexCaveatsReader.Read(capability.Nb())
 	if rerr != nil {
@@ -531,7 +577,7 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	var idx blobindex.ShardedDagIndex
 	var ferr error
 	for _, r := range results {
-		idx, ferr = fetchBlobIndex(ctx, blobIndex, claims, nb.Index, r)
+		idx, ferr = fetchBlobIndex(ctx, id, blobIndex, claims, nb.Index, r, claim)
 		if ferr != nil {
 			continue
 		}
@@ -570,7 +616,15 @@ func publishIndexClaim(ctx context.Context, blobIndex blobindexlookup.BlobIndexL
 	return nil
 }
 
-func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLookup, claims contentclaims.Service, blob ipld.Link, result model.ProviderResult) (blobindex.ShardedDagIndex, error) {
+func fetchBlobIndex(
+	ctx context.Context,
+	id ucan.Signer,
+	blobIndex blobindexlookup.BlobIndexLookup,
+	claims contentclaims.Service,
+	blobLink ipld.Link,
+	result model.ProviderResult,
+	cause invocation.Invocation, // supporting context (typically `assert/index`)
+) (blobindex.ShardedDagIndex, error) {
 	meta := metadata.MetadataContext.New()
 	err := meta.UnmarshalBinary(result.Metadata)
 	if err != nil {
@@ -584,12 +638,17 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 	}
 
 	if lcmeta.Shard != nil {
-		blob = cidlink.Link{Cid: *lcmeta.Shard}
+		blobLink = cidlink.Link{Cid: *lcmeta.Shard}
 	}
 
-	blobURL, err := fetchRetrievalURL(*result.Provider, link.ToCID(blob))
+	blobURL, err := fetchRetrievalURL(*result.Provider, link.ToCID(blobLink))
 	if err != nil {
 		return nil, fmt.Errorf("building retrieval URL: %w", err)
+	}
+
+	aud, err := peerToPrincipal(result.Provider.ID)
+	if err != nil {
+		return nil, fmt.Errorf("converting provider peer ID to UCAN principal: %w", err)
 	}
 
 	var wg sync.WaitGroup
@@ -617,8 +676,30 @@ func fetchBlobIndex(ctx context.Context, blobIndex blobindexlookup.BlobIndexLook
 		}
 	}()
 
+	// Try to obtain a retrieval delegation. If this fails then fallback to trying
+	// to request without auth. Note: it'll fail for non-UCAN authorized retrieval
+	// nodes (legacy).
+	dlg, err := requestBlobRetrieveDelegation(ctx, blobURL, id, aud, cause)
+	if err != nil {
+		log.Debugw("requesting blob/retrieve delegation", "aud", aud.DID(), "endpoint", blobURL.String(), "err", err)
+	}
+
+	var auth *types.RetrievalAuth
+	if dlg != nil {
+		cap := blob.Retrieve.New(
+			aud.DID().String(),
+			blob.RetrieveCaveats{
+				Blob: blob.Blob{Digest: link.ToCID(blobLink).Hash()},
+			},
+		)
+		prfs := []delegation.Proof{delegation.FromDelegation(dlg)}
+		a := types.NewRetrievalAuth(id, aud, cap, prfs)
+		auth = &a
+	}
+
+	req := types.NewRetrievalRequest(blobURL, lcmeta.Range, auth)
 	// Note: the ContextID here is of a location commitment provider
-	idx, err := blobIndex.Find(ctx, result.ContextID, result, blobURL, lcmeta.Range)
+	idx, err := blobIndex.Find(ctx, result.ContextID, result, req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching index: %w", err)
 	}
@@ -659,4 +740,90 @@ func validateLocationCommitment(ctx context.Context, claim delegation.Delegation
 	}
 
 	return auth, nil
+}
+
+// peerToPrincipal converts a peer ID into a UCAN principal object. Currently
+// supports only ed25519 keys.
+func peerToPrincipal(peer peer.ID) (ucan.Principal, error) {
+	pk, err := peer.ExtractPublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("extracting public key from peer ID: %w", err)
+	}
+	pubBytes, err := pk.Raw()
+	if err != nil {
+		return nil, fmt.Errorf("extracting raw bytes of public key: %w", err)
+	}
+	v, err := verifier.FromRaw(pubBytes)
+	if err != nil {
+		return nil, fmt.Errorf("decoding raw ed25519 public key: %w", err)
+	}
+	return v, nil
+}
+
+// requestBlobRetrieveDelegation obtains a delegation for `blob/retrieve` from a
+// node by invoking `access/grant`, using the passed cause invocation as
+// evidence that the delegation should be granted.
+func requestBlobRetrieveDelegation(
+	ctx context.Context,
+	endpoint *url.URL,
+	issuer ucan.Signer,
+	audience ucan.Principal,
+	cause invocation.Invocation,
+) (delegation.Delegation, error) {
+	inv, err := access.Grant.Invoke(
+		issuer,
+		audience,
+		issuer.DID().String(),
+		access.GrantCaveats{
+			Att:   []access.CapabilityRequest{{Can: blob.Retrieve.Can()}},
+			Cause: cause.Link(),
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating %s invocation: %w", access.GrantAbility, err)
+	}
+	for b, err := range cause.Export() {
+		if err != nil {
+			return nil, fmt.Errorf("exporting blocks: %w", err)
+		}
+		if err = inv.Attach(b); err != nil {
+			return nil, fmt.Errorf("attaching blocks: %w", err)
+		}
+	}
+
+	conn, err := client.NewConnection(audience, http.NewChannel(endpoint))
+	if err != nil {
+		return nil, fmt.Errorf("creating connection to %s: %w", audience.DID(), err)
+	}
+
+	resp, err := client.Execute(ctx, []invocation.Invocation{inv}, conn)
+	if err != nil {
+		return nil, fmt.Errorf("executing %s invocation: %w", access.GrantAbility, err)
+	}
+
+	rcptLink, ok := resp.Get(inv.Link())
+	if !ok {
+		return nil, fmt.Errorf("missing %s receipt: %s", access.GrantAbility, inv.Link())
+	}
+
+	rcptReader, err := access.NewGrantReceiptReader()
+	if err != nil {
+		return nil, err
+	}
+
+	rcpt, err := rcptReader.Read(rcptLink, resp.Blocks())
+	if err != nil {
+		return nil, fmt.Errorf("reading %s receipt: %w", access.GrantAbility, err)
+	}
+
+	return result.MatchResultR2(
+		rcpt.Out(),
+		func(o access.GrantOk) (delegation.Delegation, error) {
+			dlgBytes := o.Delegations.Values[o.Delegations.Keys[0]]
+			return delegation.Extract(dlgBytes)
+		},
+		func(x access.GrantError) (delegation.Delegation, error) {
+			return nil, x
+		},
+	)
 }

@@ -6,11 +6,9 @@ package blobindexlookup
 
 import (
 	"context"
-	"net/url"
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/go-libstoracha/blobindex"
-	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -43,8 +41,8 @@ func (_m *MockBlobIndexLookup) EXPECT() *MockBlobIndexLookup_Expecter {
 }
 
 // Find provides a mock function for the type MockBlobIndexLookup
-func (_mock *MockBlobIndexLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL *url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error) {
-	ret := _mock.Called(ctx, contextID, provider, fetchURL, rng)
+func (_mock *MockBlobIndexLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, req types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
+	ret := _mock.Called(ctx, contextID, provider, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Find")
@@ -52,18 +50,18 @@ func (_mock *MockBlobIndexLookup) Find(ctx context.Context, contextID types.Enco
 
 	var r0 blobindex.ShardedDagIndexView
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.EncodedContextID, model.ProviderResult, *url.URL, *metadata.Range) (blobindex.ShardedDagIndexView, error)); ok {
-		return returnFunc(ctx, contextID, provider, fetchURL, rng)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.EncodedContextID, model.ProviderResult, types.RetrievalRequest) (blobindex.ShardedDagIndexView, error)); ok {
+		return returnFunc(ctx, contextID, provider, req)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.EncodedContextID, model.ProviderResult, *url.URL, *metadata.Range) blobindex.ShardedDagIndexView); ok {
-		r0 = returnFunc(ctx, contextID, provider, fetchURL, rng)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.EncodedContextID, model.ProviderResult, types.RetrievalRequest) blobindex.ShardedDagIndexView); ok {
+		r0 = returnFunc(ctx, contextID, provider, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(blobindex.ShardedDagIndexView)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.EncodedContextID, model.ProviderResult, *url.URL, *metadata.Range) error); ok {
-		r1 = returnFunc(ctx, contextID, provider, fetchURL, rng)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.EncodedContextID, model.ProviderResult, types.RetrievalRequest) error); ok {
+		r1 = returnFunc(ctx, contextID, provider, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -79,13 +77,12 @@ type MockBlobIndexLookup_Find_Call struct {
 //   - ctx context.Context
 //   - contextID types.EncodedContextID
 //   - provider model.ProviderResult
-//   - fetchURL *url.URL
-//   - rng *metadata.Range
-func (_e *MockBlobIndexLookup_Expecter) Find(ctx interface{}, contextID interface{}, provider interface{}, fetchURL interface{}, rng interface{}) *MockBlobIndexLookup_Find_Call {
-	return &MockBlobIndexLookup_Find_Call{Call: _e.mock.On("Find", ctx, contextID, provider, fetchURL, rng)}
+//   - req types.RetrievalRequest
+func (_e *MockBlobIndexLookup_Expecter) Find(ctx interface{}, contextID interface{}, provider interface{}, req interface{}) *MockBlobIndexLookup_Find_Call {
+	return &MockBlobIndexLookup_Find_Call{Call: _e.mock.On("Find", ctx, contextID, provider, req)}
 }
 
-func (_c *MockBlobIndexLookup_Find_Call) Run(run func(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL *url.URL, rng *metadata.Range)) *MockBlobIndexLookup_Find_Call {
+func (_c *MockBlobIndexLookup_Find_Call) Run(run func(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, req types.RetrievalRequest)) *MockBlobIndexLookup_Find_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -99,20 +96,15 @@ func (_c *MockBlobIndexLookup_Find_Call) Run(run func(ctx context.Context, conte
 		if args[2] != nil {
 			arg2 = args[2].(model.ProviderResult)
 		}
-		var arg3 *url.URL
+		var arg3 types.RetrievalRequest
 		if args[3] != nil {
-			arg3 = args[3].(*url.URL)
-		}
-		var arg4 *metadata.Range
-		if args[4] != nil {
-			arg4 = args[4].(*metadata.Range)
+			arg3 = args[3].(types.RetrievalRequest)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
-			arg4,
 		)
 	})
 	return _c
@@ -123,7 +115,7 @@ func (_c *MockBlobIndexLookup_Find_Call) Return(shardedDagIndexView blobindex.Sh
 	return _c
 }
 
-func (_c *MockBlobIndexLookup_Find_Call) RunAndReturn(run func(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL *url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error)) *MockBlobIndexLookup_Find_Call {
+func (_c *MockBlobIndexLookup_Find_Call) RunAndReturn(run func(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, req types.RetrievalRequest) (blobindex.ShardedDagIndexView, error)) *MockBlobIndexLookup_Find_Call {
 	_c.Call.Return(run)
 	return _c
 }
