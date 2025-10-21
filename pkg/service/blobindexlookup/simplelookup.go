@@ -2,15 +2,21 @@ package blobindexlookup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/go-libstoracha/blobindex"
-	"github.com/storacha/go-libstoracha/metadata"
+	rclient "github.com/storacha/go-ucanto/client/retrieval"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
+	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/receipt"
+	"github.com/storacha/go-ucanto/core/result"
+	fdm "github.com/storacha/go-ucanto/core/result/failure/datamodel"
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
@@ -25,27 +31,108 @@ func NewBlobIndexLookup(httpClient *http.Client) BlobIndexLookup {
 }
 
 // Find fetches the blob index from the given fetchURL
-func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, _ model.ProviderResult, fetchURL *url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error) {
+func (s *simpleLookup) Find(ctx context.Context, _ types.EncodedContextID, result model.ProviderResult, request types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
+	var body io.ReadCloser
+	if request.Auth != nil {
+		// If retrieval authorization details were provided, make a UCAN authorized
+		// retrieval request.
+		b, err := doAuthorizedRetrieval(ctx, s.httpClient, request)
+		if err != nil {
+			return nil, fmt.Errorf("executing authorized retrieval: %w", err)
+		}
+		body = b
+	} else {
+		// Otherwise, attempt a legacy public retrieval with no authorization.
+		b, err := doPublicRetrieval(ctx, s.httpClient, request)
+		if err != nil {
+			return nil, fmt.Errorf("executing public retrieval: %w", err)
+		}
+		body = b
+	}
+	defer body.Close()
+	return blobindex.Extract(body)
+}
+
+func doAuthorizedRetrieval(ctx context.Context, httpClient *http.Client, request types.RetrievalRequest) (io.ReadCloser, error) {
+	headers := http.Header{}
+	if request.Range != nil {
+		if request.Range.Length != nil {
+			headers.Set("Range", fmt.Sprintf("bytes=%d-%d", request.Range.Offset, request.Range.Offset+*request.Range.Length-1))
+		} else {
+			headers.Set("Range", fmt.Sprintf("bytes=%d-", request.Range.Offset))
+		}
+	}
+
+	conn, err := rclient.NewConnection(
+		request.Auth.Audience,
+		request.URL,
+		rclient.WithClient(httpClient),
+		rclient.WithHeaders(headers),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	iss, aud, cap := request.Auth.Issuer, request.Auth.Audience, request.Auth.Capability
+	inv, err := invocation.Invoke(iss, aud, cap, delegation.WithProof(request.Auth.Proofs...))
+	if err != nil {
+		return nil, err
+	}
+
+	xres, hres, err := rclient.Execute(ctx, inv, conn)
+	if err != nil {
+		return nil, fmt.Errorf("executing retrieval invocation: %w", err)
+	}
+
+	rcptLink, ok := xres.Get(inv.Link())
+	if !ok {
+		return nil, errors.New("execution response did not contain receipt for invocation")
+	}
+
+	bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(xres.Blocks()))
+	if err != nil {
+		return nil, fmt.Errorf("adding blocks to reader: %w", err)
+	}
+
+	rcpt, err := receipt.NewAnyReceipt(rcptLink, bs)
+	if err != nil {
+		return nil, fmt.Errorf("creating receipt: %w", err)
+	}
+
+	_, x := result.Unwrap(rcpt.Out())
+	if x != nil {
+		fail := fdm.Bind(x)
+		name := "Unnamed"
+		if fail.Name != nil {
+			name = *fail.Name
+		}
+		return nil, fmt.Errorf("execution resulted in failure: %s: %s", name, fail.Message)
+	}
+
+	return hres.Body(), nil
+}
+
+func doPublicRetrieval(ctx context.Context, httpClient *http.Client, request types.RetrievalRequest) (io.ReadCloser, error) {
 	// attempt to fetch the index from provided url
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL.String(), nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, request.URL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("constructing request: %w", err)
 	}
+	rng := request.Range
 	if rng != nil {
 		rangeHeader := fmt.Sprintf("bytes=%d-", rng.Offset)
 		if rng.Length != nil {
 			rangeHeader += strconv.FormatUint(rng.Offset+*rng.Length-1, 10)
 		}
-		req.Header.Set("Range", rangeHeader)
+		httpReq.Header.Set("Range", rangeHeader)
 	}
-	resp, err := s.httpClient.Do(req)
+	resp, err := httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch index: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		body, _ := io.ReadAll(resp.Body)
-
-		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), fetchURL.String())
+		return nil, fmt.Errorf("failure response fetching index. status: %s, message: %s, url: %s", resp.Status, string(body), request.URL.String())
 	}
-	return blobindex.Extract(resp.Body)
+	return resp.Body, nil
 }

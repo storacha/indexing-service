@@ -40,6 +40,11 @@ var queryCmd = &cli.Command{
 			Usage:   "type of query to perform ['standard' | 'location' | 'index_or_location']",
 			Value:   "standard",
 		},
+		&cli.StringFlag{
+			Name:    "delegation",
+			Aliases: []string{"d"},
+			Usage:   "a delegation allowing the indexer to fetch content from the space",
+		},
 	},
 	Action: func(cCtx *cli.Context) error {
 		serviceURL, err := url.Parse(cCtx.String("url"))
@@ -91,10 +96,20 @@ var queryCmd = &cli.Command{
 			}
 		}
 
+		var delegations []delegation.Delegation
+		if cCtx.IsSet("delegation") {
+			d, err := delegation.Parse(cCtx.String("delegation"))
+			if err != nil {
+				return fmt.Errorf("parsing delegation: %w", err)
+			}
+			delegations = append(delegations, d)
+		}
+
 		qr, err := c.QueryClaims(cCtx.Context, types.Query{
-			Type:   queryType,
-			Hashes: digests,
-			Match:  types.Match{Subject: spaces},
+			Type:        queryType,
+			Hashes:      digests,
+			Match:       types.Match{Subject: spaces},
+			Delegations: delegations,
 		})
 		if err != nil {
 			return fmt.Errorf("querying service: %w", err)

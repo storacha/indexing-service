@@ -33,6 +33,7 @@ import (
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
 	"github.com/storacha/go-ucanto/principal/signer"
 	"github.com/storacha/go-ucanto/server"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	ucanhttp "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/indexing-service/pkg/build"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
@@ -291,12 +292,36 @@ func GetClaimsHandler(service types.Querier) http.HandlerFunc {
 			spaces = append(spaces, space)
 		}
 
+		var dlgs []delegation.Delegation
+		agentMsgHeader := r.Header.Get(hcmsg.HeaderName)
+		if agentMsgHeader != "" {
+			msg, err := hcmsg.DecodeHeader(agentMsgHeader)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("decoding agent message: %s", err.Error()), http.StatusBadRequest)
+				return
+			}
+
+			for _, root := range msg.Invocations() {
+				dlg, ok, err := msg.Invocation(root)
+				if err != nil {
+					log.Warnf("failed to extract delegation from agent message: %w", err)
+					continue
+				}
+				if !ok {
+					log.Warnf("delegation not found in agent message: %s", root.String())
+					continue
+				}
+				dlgs = append(dlgs, dlg)
+			}
+		}
+
 		qr, err := service.Query(ctx, types.Query{
 			Type:   queryType,
 			Hashes: hashes,
 			Match: types.Match{
 				Subject: spaces,
 			},
+			Delegations: dlgs,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("processing query: %s", err.Error()), http.StatusInternalServerError)

@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	gohttp "net/http"
+	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
@@ -14,6 +15,7 @@ import (
 	"github.com/storacha/go-ucanto/client"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/core/receipt"
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
@@ -21,7 +23,8 @@ import (
 	unit "github.com/storacha/go-ucanto/core/result/ok"
 	udm "github.com/storacha/go-ucanto/core/result/ok/datamodel"
 	"github.com/storacha/go-ucanto/principal"
-	"github.com/storacha/go-ucanto/transport/http"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
+	ucan_http "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
@@ -36,7 +39,7 @@ type ErrFailedResponse struct {
 	Body       string
 }
 
-func errFromResponse(res *gohttp.Response) ErrFailedResponse {
+func errFromResponse(res *http.Response) ErrFailedResponse {
 	err := ErrFailedResponse{StatusCode: res.StatusCode}
 
 	message, merr := io.ReadAll(res.Body)
@@ -49,13 +52,14 @@ func errFromResponse(res *gohttp.Response) ErrFailedResponse {
 }
 
 func (e ErrFailedResponse) Error() string {
-	return fmt.Sprintf("http request failed, status: %d %s, message: %s", e.StatusCode, gohttp.StatusText(e.StatusCode), e.Body)
+	return fmt.Sprintf("http request failed, status: %d %s, message: %s", e.StatusCode, http.StatusText(e.StatusCode), e.Body)
 }
 
 type Client struct {
 	servicePrincipal ucan.Principal
 	serviceURL       url.URL
 	connection       client.Connection
+	httpClient       *http.Client
 }
 
 func (c *Client) execute(ctx context.Context, inv invocation.Invocation) error {
@@ -130,7 +134,27 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		q.Add("spaces", space.String())
 	}
 	url.RawQuery = q.Encode()
-	res, err := gohttp.DefaultClient.Get(url.String())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	// If there are query delegations, then add them to an X-Agent-Message header.
+	if len(query.Delegations) > 0 {
+		invs := make([]invocation.Invocation, 0, len(query.Delegations))
+		for _, d := range query.Delegations {
+			invs = append(invs, d)
+		}
+		msg, err := message.Build(invs, nil)
+		if err != nil {
+			return nil, fmt.Errorf("building agent message: %w", err)
+		}
+		headerValue, err := hcmsg.EncodeHeader(msg)
+		if err != nil {
+			return nil, fmt.Errorf("encoding %s header: %w", hcmsg.HeaderName, err)
+		}
+		req.Header.Set(hcmsg.HeaderName, headerValue)
+	}
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("sending query to server: %w", err)
 	}
@@ -140,11 +164,30 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	return queryresult.Extract(res.Body)
 }
 
-func New(servicePrincipal ucan.Principal, serviceURL url.URL) (*Client, error) {
-	channel := http.NewChannel(serviceURL.JoinPath(claimsPath))
+type Option func(*Client)
+
+// WithHTTPClient configures the HTTP client to use for making query requests
+// and invocations.
+func WithHTTPClient(httpClient *http.Client) Option {
+	return func(c *Client) {
+		c.httpClient = httpClient
+	}
+}
+
+func New(servicePrincipal ucan.Principal, serviceURL url.URL, options ...Option) (*Client, error) {
+	c := Client{
+		servicePrincipal: servicePrincipal,
+		serviceURL:       serviceURL,
+		httpClient:       &http.Client{Timeout: 30 * time.Second},
+	}
+	for _, opt := range options {
+		opt(&c)
+	}
+	channel := ucan_http.NewChannel(serviceURL.JoinPath(claimsPath), ucan_http.WithClient(c.httpClient))
 	conn, err := client.NewConnection(servicePrincipal, channel)
 	if err != nil {
 		return nil, fmt.Errorf("creating connection: %w", err)
 	}
-	return &Client{servicePrincipal, serviceURL, conn}, nil
+	c.connection = conn
+	return &c, nil
 }

@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/go-libstoracha/blobindex"
-	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/storacha/indexing-service/pkg/types"
 )
@@ -30,7 +28,7 @@ func WithCache(blobIndexLookup BlobIndexLookup, shardedDagIndexCache types.Shard
 	}
 }
 
-func (b *cachingLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, fetchURL *url.URL, rng *metadata.Range) (blobindex.ShardedDagIndexView, error) {
+func (b *cachingLookup) Find(ctx context.Context, contextID types.EncodedContextID, provider model.ProviderResult, req types.RetrievalRequest) (blobindex.ShardedDagIndexView, error) {
 	// attempt to read index from cache and return it if succesful
 	index, err := b.shardDagIndexCache.Get(ctx, contextID)
 	if err == nil {
@@ -43,7 +41,7 @@ func (b *cachingLookup) Find(ctx context.Context, contextID types.EncodedContext
 	}
 
 	// attempt to fetch the index from the underlying blob index lookup
-	index, err = b.blobIndexLookup.Find(ctx, contextID, provider, fetchURL, rng)
+	index, err = b.blobIndexLookup.Find(ctx, contextID, provider, req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching underlying index: %w", err)
 	}

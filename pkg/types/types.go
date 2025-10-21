@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipni/go-libipni/find/model"
@@ -12,9 +13,11 @@ import (
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/did"
+	"github.com/storacha/go-ucanto/ucan"
 )
 
 // ContextID describes the data used to calculate a context id for IPNI
@@ -143,6 +146,13 @@ type Query struct {
 	Type   QueryType
 	Hashes []mh.Multihash
 	Match  Match
+	// Delegations allowing the indexer to retrieve bytes from the network. These
+	// are typically `space/content/retrieve` delegations for each subject (space)
+	// in the [Match] paremeter.
+	//
+	// Delegations are sent in the `X-Agent-Message` HTTP header and MUST NOT
+	// exceed 4kb in size.
+	Delegations []delegation.Delegation
 }
 
 // QueryResult is an encodable result of a query
@@ -180,4 +190,65 @@ type Service interface {
 	Getter
 	Publisher
 	Querier
+}
+
+// RetrievalRequest is all the details needed for retrieving data from the
+// network. At minimum it contains the URL to retrieve a blob from.
+//
+// Legacy retrievals will not carry any retrieval authorization information i.e.
+// the Auth field will be nil.
+type RetrievalRequest struct {
+	// URL where the blob may be requested from.
+	URL *url.URL
+	// Optional byte range to request.
+	Range *metadata.Range
+	// Optional UCAN authorization parameters.
+	Auth *RetrievalAuth
+}
+
+// NewRetrievalRequest creates a new [RetrievalRequest] object that contains all the
+// details required to retrieve a blob from the network.
+func NewRetrievalRequest(
+	url *url.URL,
+	byteRange *metadata.Range,
+	auth *RetrievalAuth,
+) RetrievalRequest {
+	return RetrievalRequest{url, byteRange, auth}
+}
+
+// RetrievalAuth are the details for a UCAN authorized content retrieval.
+//
+// The provided proofs are expected to contain the `space/content/retrieve`
+// delegated capability allowing content to be retrieved using UCAN
+// authorization.
+type RetrievalAuth struct {
+	// The Indexing Service UCAN signing key.
+	Issuer ucan.Signer
+	// Identity of the storage node to retrieve data from.
+	Audience ucan.Principal
+	// Retrieval ability, resource (typically the space) and caveats.
+	Capability ucan.Capability[ucan.CaveatBuilder]
+	// Delegations from the client (e.g. `space/content/retrieve`) or a storage
+	// node (e.g. `blob/retrieve`) to the indexing service authorizing retrieval.
+	Proofs []delegation.Proof
+}
+
+// NewRetrievalAuth creates a new [RetrievalAuth] object for UCAN authorizing
+// blob retrievals.
+func NewRetrievalAuth[C ucan.CaveatBuilder](
+	issuer ucan.Signer,
+	audience ucan.Principal,
+	capability ucan.Capability[C],
+	proofs []delegation.Proof,
+) RetrievalAuth {
+	return RetrievalAuth{
+		issuer,
+		audience,
+		ucan.NewCapability[ucan.CaveatBuilder](
+			capability.Can(),
+			capability.With(),
+			capability.Nb(),
+		),
+		proofs,
+	}
 }

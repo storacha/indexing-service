@@ -21,11 +21,16 @@ import (
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/bytemap"
+	"github.com/storacha/go-libstoracha/capabilities/space/content"
 	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/testutil"
 	"github.com/storacha/go-ucanto/core/delegation"
+	"github.com/storacha/go-ucanto/core/invocation"
+	"github.com/storacha/go-ucanto/core/message"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal/signer"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
+	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/service/contentclaims"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
@@ -217,6 +222,63 @@ func TestGetClaimsHandler(t *testing.T) {
 		res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&spaces=%s", svr.URL, digestutil.Format(randomHash), randomSubject.String()))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
+	})
+
+	t.Run("authorized retrieval from space", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash(t)
+		randomSubject := testutil.RandomPrincipal(t).DID()
+
+		dlg, err := delegation.Delegate(
+			testutil.Alice,
+			testutil.Service,
+			[]ucan.Capability[ucan.NoCaveats]{
+				ucan.NewCapability(content.RetrieveAbility, randomSubject.String(), ucan.NoCaveats{}),
+			},
+		)
+		require.NoError(t, err)
+
+		claims := map[cid.Cid]delegation.Delegation{}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, mock.AnythingOfType("Query")).Return(queryResult, nil)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		url := fmt.Sprintf("%s/claims?multihash=%s&spaces=%s", svr.URL, digestutil.Format(randomHash), randomSubject.String())
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		require.NoError(t, err)
+
+		msg, err := message.Build([]invocation.Invocation{dlg}, nil)
+		require.NoError(t, err)
+
+		headerValue, err := hcmsg.EncodeHeader(msg)
+		require.NoError(t, err)
+
+		req.Header.Set(hcmsg.HeaderName, headerValue)
+
+		res, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+	})
+
+	t.Run("invalid "+hcmsg.HeaderName, func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		svr := httptest.NewServer(GetClaimsHandler(mockService))
+		defer svr.Close()
+
+		url := fmt.Sprintf("%s/claims?multihash=%s", svr.URL, digestutil.Format(testutil.RandomMultihash(t)))
+		req, err := http.NewRequest(http.MethodGet, url, nil)
+		require.NoError(t, err)
+
+		req.Header.Set(hcmsg.HeaderName, "NOT AN AGENT MESSAGE")
+
+		res, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 
 	t.Run("invalid space", func(t *testing.T) {

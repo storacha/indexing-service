@@ -22,6 +22,7 @@ import (
 	"github.com/storacha/go-libstoracha/bytemap"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/capabilities/claim"
+	"github.com/storacha/go-libstoracha/capabilities/space/content"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
 	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/testutil"
@@ -33,8 +34,10 @@ import (
 	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/failure"
 	"github.com/storacha/go-ucanto/core/result/ok"
+	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal"
 	ucanserver "github.com/storacha/go-ucanto/server"
+	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/internal/link"
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
@@ -85,7 +88,7 @@ func TestClient(t *testing.T) {
 			),
 		)(t),
 	)
-	space := testutil.RandomPrincipal(t)
+	space := testutil.RandomSigner(t)
 
 	root, digest, bytes := testutil.RandomCAR(t, 128)
 	rootDigest := link.ToCID(root).Hash()
@@ -251,6 +254,59 @@ func TestClient(t *testing.T) {
 			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=index_or_location")
 		})
 	})
+
+	t.Run("query with delegation", func(t *testing.T) {
+		indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
+		indexingQueryServer := mockQueryServer(indexingQueryResults)
+		t.Cleanup(indexingQueryServer.Close)
+
+		c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
+		require.NoError(t, err)
+
+		claims := map[cid.Cid]delegation.Delegation{
+			link.ToCID(locationClaim.Link()):      locationClaim,
+			link.ToCID(indexLocationClaim.Link()): indexLocationClaim,
+		}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+		spaceDID := space.DID()
+		contextID := types.ContextID{Space: &spaceDID, Hash: rootDigest}
+		indexes.Set(testutil.Must(contextID.ToEncoded())(t), index)
+
+		indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
+
+		dlg, err := delegation.Delegate(
+			space,
+			indexingID,
+			[]ucan.Capability[ucan.NoCaveats]{
+				ucan.NewCapability(content.RetrieveAbility, space.DID().String(), ucan.NoCaveats{}),
+			},
+		)
+		require.NoError(t, err)
+
+		_, err = c.QueryClaims(context.Background(), types.Query{
+			Hashes:      []multihash.Multihash{rootDigest},
+			Match:       types.Match{Subject: []did.DID{spaceDID}},
+			Delegations: []delegation.Delegation{dlg},
+		})
+		require.NoError(t, err)
+
+		agentMsgHeader := indexingQueryServer.lastRequestedHeader.Get(hcmsg.HeaderName)
+		require.NotEmpty(t, agentMsgHeader)
+
+		msg, err := hcmsg.DecodeHeader(agentMsgHeader)
+		require.NoError(t, err)
+
+		lastURL := testutil.Must(url.Parse(indexingQueryServer.lastRequestedURL))(t)
+		require.NotEmpty(t, lastURL.Query().Get("spaces"))
+
+		dlg, _, err = msg.Invocation(msg.Invocations()[0])
+		require.NoError(t, err)
+
+		cap := dlg.Capabilities()[0]
+		require.Equal(t, content.RetrieveAbility, cap.Can())
+		require.Equal(t, spaceDID.String(), cap.With())
+		// Authorized-ish!
+	})
 }
 
 func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(inv invocation.Invocation)) ucanserver.ServerView[ucanserver.Service] {
@@ -293,7 +349,8 @@ func mockUCANService(t *testing.T, id principal.Signer, notifyInvocation func(in
 
 type mockServer struct {
 	*httptest.Server
-	lastRequestedURL string
+	lastRequestedURL    string
+	lastRequestedHeader http.Header
 }
 
 func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryResult]) *mockServer {
@@ -301,6 +358,7 @@ func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryRes
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ms.lastRequestedURL = r.URL.String()
+		ms.lastRequestedHeader = r.Header
 
 		mhStrings := r.URL.Query()["multihash"]
 		if len(mhStrings) != 1 {
