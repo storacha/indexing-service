@@ -165,6 +165,7 @@ func newDynamoClient(t *testing.T, endpoint *url.URL) *dynamodb.Client {
 		}),
 		func(o *config.LoadOptions) error {
 			o.Region = "us-east-1"
+			o.RetryMaxAttempts = 10
 			return nil
 		},
 	)
