@@ -473,7 +473,7 @@ func (a AuthFact) ToIPLD() (map[string]ipld.Node, error) {
 	if err := nb.AssignLink(a.Auth); err != nil {
 		return nil, err
 	}
-	return map[string]ipld.Node{"auth": nb.Build()}, nil
+	return map[string]ipld.Node{"retrievalAuth": nb.Build()}, nil
 }
 
 func buildTestIndexClaimWithAuth(t *testing.T, contentLink cidlink.Link, indexLink cidlink.Link, providerAddr *peer.AddrInfo, auth delegation.Delegation) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
