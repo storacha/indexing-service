@@ -20,19 +20,15 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/advertisement"
-	"github.com/storacha/go-libstoracha/capabilities/access"
 	"github.com/storacha/go-libstoracha/capabilities/assert"
-	"github.com/storacha/go-libstoracha/capabilities/blob"
 	"github.com/storacha/go-libstoracha/capabilities/space/content"
 	"github.com/storacha/go-libstoracha/metadata"
-	"github.com/storacha/go-ucanto/client"
+	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/iterable"
-	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/did"
 	"github.com/storacha/go-ucanto/principal/ed25519/verifier"
-	"github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/go-ucanto/validator"
 	"go.opentelemetry.io/otel/attribute"
@@ -676,28 +672,27 @@ func fetchBlobIndex(
 		}
 	}()
 
-	// Try to obtain a retrieval delegation. If this fails then fallback to trying
-	// to request without auth. Note: it'll fail for non-UCAN authorized retrieval
-	// nodes (legacy).
-	dlg, err := requestBlobRetrieveDelegation(ctx, blobURL, id, aud, cause)
+	// Try to extract a space/content/retrieve delegation from the assert/index
+	// invocation. If this fails then fallback to trying to request without auth.
+	// Note: it'll fail for non-UCAN authorized retrieval nodes (legacy).
+	cap, dlg, err := extractContentRetrieveDelegation(cause)
 	if err != nil {
-		log.Debugw("requesting blob/retrieve delegation", "aud", aud.DID(), "endpoint", blobURL.String(), "err", err)
+		log.Debugw("extracting space/content/retrieve delegation", "err", err)
 	}
 
+	byteRange := lcmeta.Range
 	var auth *types.RetrievalAuth
 	if dlg != nil {
-		cap := blob.Retrieve.New(
-			aud.DID().String(),
-			blob.RetrieveCaveats{
-				Blob: blob.Blob{Digest: link.ToCID(blobLink).Hash()},
-			},
-		)
+		cap := content.Retrieve.New(aud.DID().String(), cap.Nb())
 		prfs := []delegation.Proof{delegation.FromDelegation(dlg)}
 		a := types.NewRetrievalAuth(id, aud, cap, prfs)
+		offset := cap.Nb().Range.Start
+		length := cap.Nb().Range.End - cap.Nb().Range.Start + 1
+		byteRange = &metadata.Range{Offset: offset, Length: &length}
 		auth = &a
 	}
 
-	req := types.NewRetrievalRequest(blobURL, lcmeta.Range, auth)
+	req := types.NewRetrievalRequest(blobURL, byteRange, auth)
 	// Note: the ContextID here is of a location commitment provider
 	idx, err := blobIndex.Find(ctx, result.ContextID, result, req)
 	if err != nil {
@@ -763,67 +758,39 @@ func peerToPrincipal(peer peer.ID) (ucan.Principal, error) {
 // requestBlobRetrieveDelegation obtains a delegation for `blob/retrieve` from a
 // node by invoking `access/grant`, using the passed cause invocation as
 // evidence that the delegation should be granted.
-func requestBlobRetrieveDelegation(
-	ctx context.Context,
-	endpoint *url.URL,
-	issuer ucan.Signer,
-	audience ucan.Principal,
-	cause invocation.Invocation,
-) (delegation.Delegation, error) {
-	inv, err := access.Grant.Invoke(
-		issuer,
-		audience,
-		issuer.DID().String(),
-		access.GrantCaveats{
-			Att:   []access.CapabilityRequest{{Can: blob.Retrieve.Can()}},
-			Cause: cause.Link(),
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating %s invocation: %w", access.GrantAbility, err)
-	}
-	for b, err := range cause.Export() {
+func extractContentRetrieveDelegation(cause invocation.Invocation) (ucan.Capability[content.RetrieveCaveats], delegation.Delegation, error) {
+	var root ipld.Link
+	for _, f := range cause.Facts() {
+		authValue, ok := f["auth"]
+		if !ok {
+			continue
+		}
+		node, ok := authValue.(ipld.Node)
+		if !ok {
+			break
+		}
+		l, err := node.AsLink()
 		if err != nil {
-			return nil, fmt.Errorf("exporting blocks: %w", err)
+			log.Warnf("auth value is not an IPLD link")
+			break
 		}
-		if err = inv.Attach(b); err != nil {
-			return nil, fmt.Errorf("attaching blocks: %w", err)
-		}
+		root = l
+		break
 	}
-
-	conn, err := client.NewConnection(audience, http.NewChannel(endpoint))
+	if root == nil {
+		return nil, nil, errors.New("retrieval authorization delegation link not found in facts")
+	}
+	bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(cause.Blocks()))
 	if err != nil {
-		return nil, fmt.Errorf("creating connection to %s: %w", audience.DID(), err)
+		return nil, nil, err
 	}
-
-	resp, err := client.Execute(ctx, []invocation.Invocation{inv}, conn)
+	dlg, err := delegation.NewDelegationView(root, bs)
 	if err != nil {
-		return nil, fmt.Errorf("executing %s invocation: %w", access.GrantAbility, err)
+		return nil, nil, fmt.Errorf("creating retrieval authorization delegation: %w", err)
 	}
-
-	rcptLink, ok := resp.Get(inv.Link())
-	if !ok {
-		return nil, fmt.Errorf("missing %s receipt: %s", access.GrantAbility, inv.Link())
-	}
-
-	rcptReader, err := access.NewGrantReceiptReader()
+	match, err := content.Retrieve.Match(validator.NewSource(dlg.Capabilities()[0], dlg))
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("matching %s delegation: %w", content.RetrieveAbility, err)
 	}
-
-	rcpt, err := rcptReader.Read(rcptLink, resp.Blocks())
-	if err != nil {
-		return nil, fmt.Errorf("reading %s receipt: %w", access.GrantAbility, err)
-	}
-
-	return result.MatchResultR2(
-		rcpt.Out(),
-		func(o access.GrantOk) (delegation.Delegation, error) {
-			dlgBytes := o.Delegations.Values[o.Delegations.Keys[0]]
-			return delegation.Extract(dlgBytes)
-		},
-		func(x access.GrantError) (delegation.Delegation, error) {
-			return nil, x
-		},
-	)
+	return match.Value(), dlg, nil
 }

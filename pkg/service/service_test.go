@@ -5,16 +5,14 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/node/basicnode"
 	"github.com/ipni/go-libipni/find/model"
-	"github.com/ipni/go-libipni/maurl"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -22,26 +20,17 @@ import (
 	mh "github.com/multiformats/go-multihash"
 	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/bytemap"
-	"github.com/storacha/go-libstoracha/capabilities/access"
 	cassert "github.com/storacha/go-libstoracha/capabilities/assert"
 	"github.com/storacha/go-libstoracha/capabilities/space/content"
 	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
 	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-libstoracha/testutil"
-	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
-	"github.com/storacha/go-ucanto/core/invocation"
 	"github.com/storacha/go-ucanto/core/ipld"
-	"github.com/storacha/go-ucanto/core/message"
-	"github.com/storacha/go-ucanto/core/receipt"
-	"github.com/storacha/go-ucanto/core/receipt/ran"
-	"github.com/storacha/go-ucanto/core/result"
 	"github.com/storacha/go-ucanto/core/result/ok"
 	"github.com/storacha/go-ucanto/did"
 	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
-	ucan_car "github.com/storacha/go-ucanto/transport/car"
-	ucan_http "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
 	"github.com/storacha/indexing-service/pkg/internal/extmocks"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
@@ -470,12 +459,49 @@ func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr
 func buildTestIndexClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult, cidlink.Link, blobindex.ShardedDagIndexView) {
 	indexHash, index := testutil.RandomShardedDagIndexView(t, 32)
 	indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), indexHash)}
+	indexDelegationLink, indexDelegation, indexResult := buildTestIndexClaimWithAuth(t, contentLink, indexLink, providerAddr, nil)
+	return indexDelegationLink, indexDelegation, indexResult, indexLink, index
+}
+
+type AuthFact struct {
+	Auth ipld.Link
+}
+
+func (a AuthFact) ToIPLD() (map[string]ipld.Node, error) {
+	np := basicnode.Prototype.Link
+	nb := np.NewBuilder()
+	if err := nb.AssignLink(a.Auth); err != nil {
+		return nil, err
+	}
+	return map[string]ipld.Node{"auth": nb.Build()}, nil
+}
+
+func buildTestIndexClaimWithAuth(t *testing.T, contentLink cidlink.Link, indexLink cidlink.Link, providerAddr *peer.AddrInfo, auth delegation.Delegation) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
 	indexClaim := cassert.Index.New(testutil.Service.DID().String(), cassert.IndexCaveats{
 		Content: contentLink,
 		Index:   indexLink,
 	})
 
-	indexDelegation := testutil.Must(delegation.Delegate(testutil.Service, testutil.Service, []ucan.Capability[cassert.IndexCaveats]{indexClaim}))(t)
+	var options []delegation.Option
+	if auth != nil {
+		options = append(options, delegation.WithFacts([]ucan.FactBuilder{AuthFact{auth.Link()}}))
+	}
+
+	indexDelegation := testutil.Must(
+		delegation.Delegate(
+			testutil.Service,
+			testutil.Service,
+			[]ucan.Capability[cassert.IndexCaveats]{indexClaim},
+			options...,
+		),
+	)(t)
+	if auth != nil {
+		for b, err := range auth.Export() {
+			require.NoError(t, err)
+			err := indexDelegation.Attach(b)
+			require.NoError(t, err)
+		}
+	}
 	indexDelegationCid := testutil.Must(cid.Prefix{
 		Version:  1,
 		Codec:    uint64(multicodec.Car),
@@ -495,7 +521,7 @@ func buildTestIndexClaim(t *testing.T, contentLink cidlink.Link, providerAddr *p
 		Provider:  providerAddr,
 	}
 
-	return cidlink.Link{Cid: indexDelegationCid}, indexDelegation, indexResult, indexLink, index
+	return cidlink.Link{Cid: indexDelegationCid}, indexDelegation, indexResult
 }
 
 func buildTestEqualsClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo) (cidlink.Link, delegation.Delegation, model.ProviderResult, cidlink.Link) {
@@ -526,58 +552,6 @@ func buildTestEqualsClaim(t *testing.T, contentLink cidlink.Link, providerAddr *
 	}
 
 	return cidlink.Link{Cid: equalsDelegationCid}, equalsDelegation, equalsProviderResults, equivalentCid.(cidlink.Link)
-}
-
-// startMockStorageNode starts a mock storage node that accepts `access/grant`
-// invocations. Actual `space/content/retrieve` and `blob/retrieve` invocations
-// are mocked by the tests so are not supported here.
-func startMockStorageNode(t *testing.T, id ucan.Signer) ma.Multiaddr {
-	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req := ucan_http.NewRequest(r.Body, r.Header)
-		switch r.Method {
-		case http.MethodPost: // UCAN invocation for access/grant
-			codec := ucan_car.NewInboundCodec()
-			accept := testutil.Must(codec.Accept(req))(t)
-			msg := testutil.Must(accept.Decoder().Decode(req))(t)
-			bs := testutil.Must(blockstore.NewBlockReader(blockstore.WithBlocksIterator(msg.Blocks())))(t)
-			inv := testutil.Must(invocation.NewInvocationView(msg.Invocations()[0], bs))(t)
-			cap := inv.Capabilities()[0]
-			if cap.Can() != access.GrantAbility {
-				t.Fatal("unexpected invocation")
-			}
-			dlg := testutil.Must(delegation.Delegate(
-				id,
-				inv.Issuer(),
-				[]ucan.Capability[ucan.NoCaveats]{
-					ucan.NewCapability("*", id.DID().String(), ucan.NoCaveats{}),
-				},
-			))(t)
-			dlgsModel := access.DelegationsModel{
-				Keys: []string{dlg.Link().String()},
-				Values: map[string][]byte{
-					dlg.Link().String(): testutil.Must(io.ReadAll(dlg.Archive()))(t),
-				},
-			}
-			out := result.Ok[access.GrantOk, ipld.Builder](access.GrantOk{Delegations: dlgsModel})
-			rcpt, err := receipt.Issue(id, out, ran.FromInvocation(inv))
-			require.NoError(t, err)
-			msg, err = message.Build(nil, []receipt.AnyReceipt{rcpt})
-			require.NoError(t, err)
-			resp, err := accept.Encoder().Encode(msg)
-			require.NoError(t, err)
-			for key, values := range resp.Headers() {
-				for _, val := range values {
-					w.Header().Add(key, val)
-				}
-			}
-			_ = testutil.Must(io.Copy(w, resp.Body()))(t)
-		default:
-			t.Fatal("unexpected invocation")
-		}
-	}))
-	t.Cleanup(httpServer.Close)
-	addr := testutil.Must(maurl.FromURL(testutil.Must(url.Parse(httpServer.URL))(t)))(t)
-	return ma.Join(addr, testutil.Must(ma.NewMultiaddr("/http-path/%2Fblobs%2F%7Bblob%7D"))(t))
 }
 
 func TestPublishIndexClaim(t *testing.T) {
@@ -646,27 +620,43 @@ func TestPublishIndexClaim(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("publish index claim with service authorized retrieval", func(t *testing.T) {
+	t.Run("publish index claim with authorized retrieval", func(t *testing.T) {
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		contentLink := testutil.RandomCID(t)
-		space := testutil.RandomDID(t)
+		space := testutil.Must(ed25519.Generate())(t)
 
-		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Service.Raw()))(t)
+		priv := testutil.Must(crypto.UnmarshalEd25519PrivateKey(testutil.Alice.Raw()))(t)
 		peerID := testutil.Must(peer.IDFromPrivateKey(priv))(t)
-		blobAddr := startMockStorageNode(t, testutil.Alice)
 
 		providerAddr := &peer.AddrInfo{
 			ID: peerID,
 			Addrs: []ma.Multiaddr{
-				blobAddr,
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
 				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
 			},
 		}
+
+		indexDigest, shardIndex := testutil.RandomShardedDagIndexView(t, 32)
+		indexLink := cidlink.Link{Cid: cid.NewCidV1(uint64(multicodec.Car), indexDigest)}
+		indexBytes := testutil.Must(io.ReadAll(testutil.Must(shardIndex.Archive())(t)))(t)
+		indexSize := uint64(len(indexBytes))
+		indexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexDigest))))(t)
+		retrievalDelegation, err := content.Retrieve.Delegate(
+			space,
+			testutil.Service,
+			space.DID().String(),
+			content.RetrieveCaveats{
+				Blob:  content.BlobDigest{Digest: indexDigest},
+				Range: content.Range{Start: 0, End: indexSize - 1},
+			},
+		)
+		require.NoError(t, err)
+
 		// content will have a location claim, an index claim
-		locationDelegationCid, locationDelegation, locationResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), providerAddr, space, rand.Uint64N(5000))
-		_, indexDelegation, _, indexLink, shardIndex := buildTestIndexClaim(t, contentLink.(cidlink.Link), providerAddr)
+		locationDelegationCid, locationDelegation, locationResult := buildTestLocationClaim(t, indexLink, providerAddr, space.DID(), rand.Uint64N(5000))
+		_, indexDelegation, _ := buildTestIndexClaimWithAuth(t, contentLink.(cidlink.Link), indexLink, providerAddr, retrievalDelegation)
 
 		// expect a call to cache the index claim using claims.Publish
 		mockClaimsService.EXPECT().Publish(extmocks.AnyContext, indexDelegation).Return(nil)
@@ -684,7 +674,19 @@ func TestPublishIndexClaim(t *testing.T) {
 
 		// expect the blob index lookup service to be called once to fetch the shard index
 		mockBlobIndexLookup.EXPECT().Find(
-			extmocks.AnyContext, mock.Anything, mock.Anything, mock.Anything,
+			extmocks.AnyContext,
+			mock.Anything,
+			mock.Anything,
+			mock.MatchedBy(func(req types.RetrievalRequest) bool {
+				return req.URL.String() == indexBlobUrl.String() &&
+					req.Range.Offset == 0 &&
+					*req.Range.Length == indexSize &&
+					req.Auth != nil &&
+					req.Auth.Audience.DID() == locationDelegation.Issuer().DID() &&
+					req.Auth.Capability.Can() == content.RetrieveAbility &&
+					len(req.Auth.Proofs) == 1 &&
+					req.Auth.Proofs[0].Link() == retrievalDelegation.Link()
+			}),
 		).Return(shardIndex, nil)
 
 		// expect the index claim to be published
@@ -696,7 +698,7 @@ func TestPublishIndexClaim(t *testing.T) {
 		}
 		mockProviderIndex.EXPECT().Publish(extmocks.AnyContext, *providerAddr, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		err := Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
+		err = Publish(t.Context(), testutil.Service, mockBlobIndexLookup, mockClaimsService, mockProviderIndex, *providerAddr, indexDelegation)
 		require.NoError(t, err)
 	})
 
