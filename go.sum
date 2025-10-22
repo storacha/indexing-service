@@ -470,6 +470,8 @@ github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaO
 github.com/mattn/go-isatty v0.0.3/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
+github.com/mdelapenya/tlscert v0.2.0 h1:7H81W6Z/4weDvZBNOfQte5GpIMo0lGYEeWbkGp5LJHI=
+github.com/mdelapenya/tlscert v0.2.0/go.mod h1:O4njj3ELLnJjGdkN7M/vIVCpZ+Cf0L6muqOG4tLSl8o=
 github.com/miekg/dns v1.0.14/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
 github.com/miekg/dns v1.1.63 h1:8M5aAw6OMZfFXTT7K5V0Eu5YiiL8l7nUAkyN6C9YwaY=
 github.com/miekg/dns v1.1.63/go.mod h1:6NGHfjhpmr5lt3XPLuyfDJi5AXbNIPM9PY6H6sF1Nfs=
@@ -697,12 +699,12 @@ github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/testcontainers/testcontainers-go v0.39.0 h1:uCUJ5tA+fcxbFAB0uP3pIK3EJ2IjjDUHFSZ1H1UxAts=
 github.com/testcontainers/testcontainers-go v0.39.0/go.mod h1:qmHpkG7H5uPf/EvOORKvS6EuDkBUPE3zpVGaH9NL7f8=
-github.com/testcontainers/testcontainers-go/modules/dynamodb v0.37.0 h1:t8W05ryS/vpYrSco2qBKnOCUWaF6qBICX/PbYXVyk4M=
-github.com/testcontainers/testcontainers-go/modules/dynamodb v0.37.0/go.mod h1:7dADlhl5YbYQKCum9zTAydXDgCJQHe3kXELBZ/po9Ss=
+github.com/testcontainers/testcontainers-go/modules/dynamodb v0.39.0 h1:BKFVMR10fh/B1Y3DekbRJxYQmKVxHj7AXeTA22cokBw=
+github.com/testcontainers/testcontainers-go/modules/dynamodb v0.39.0/go.mod h1:RaK8aWpvSw4UNZlyphv7/RHSlXATJMqjhJB8/x+npIo=
 github.com/testcontainers/testcontainers-go/modules/minio v0.39.0 h1:/c1Gb6jd2eBicjiMNKPZeGkDEdJCt0tFgX8xudQDUvA=
 github.com/testcontainers/testcontainers-go/modules/minio v0.39.0/go.mod h1:C+NYupQP71UNlWtI6Rs5I9c0VBcreJtPI2onhZkKnLI=
-github.com/testcontainers/testcontainers-go/modules/valkey v0.37.0 h1:eIf5TWPO7Oq/h2Hb6UVn5r/x0ucGRxcKkbNtqCRzH9k=
-github.com/testcontainers/testcontainers-go/modules/valkey v0.37.0/go.mod h1:bOuF2ueLQxiK44g7y90UT2lf3qitxUHV8ax2OHrPGT4=
+github.com/testcontainers/testcontainers-go/modules/valkey v0.39.0 h1:b5BwugyCMHrFfZYCSFKY9IHMhoWtR+REcN2ddcCQv6g=
+github.com/testcontainers/testcontainers-go/modules/valkey v0.39.0/go.mod h1:lgNiE/W5RPjOu1S8fZ9Z9e63JU8wyaxNQ43Umv6kroQ=
 github.com/tklauser/go-sysconf v0.3.14 h1:g5vzr9iPFFz24v2KZXs/pvpvh8/V9Fw6vQK5ZZb78yU=
 github.com/tklauser/go-sysconf v0.3.14/go.mod h1:1ym4lWMLUOhuBOPGtRcJm7tEGX4SCYNEEEtghGG/8uY=
 github.com/tklauser/numcpus v0.8.0 h1:Mx4Wwe/FjZLeQsK/6kt2EOepwwSl7SmJrK5bV/dXYgY=
@@ -712,8 +714,8 @@ github.com/ucan-wg/go-ucan v0.0.0-20240916120445-37f52863156c/go.mod h1:IiRc1OKW
 github.com/urfave/cli v1.22.10/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/urfave/cli/v2 v2.27.7 h1:bH59vdhbjLv3LAvIu6gd0usJHgoTTPhCFib8qqOwXYU=
 github.com/urfave/cli/v2 v2.27.7/go.mod h1:CyNAG/xg+iAOg0N4MPGZqVmv2rCoP267496AOXUZjA4=
-github.com/valkey-io/valkey-go v1.0.41 h1:pWgh9MP24Vl0ANZ0KxEMwB/LHvTUKwlm2SPuWIrSlFw=
-github.com/valkey-io/valkey-go v1.0.41/go.mod h1:LXqAbjygRuA1YRocojTslAGx2dQB4p8feaseGviWka4=
+github.com/valkey-io/valkey-go v1.0.59 h1:W67Z0UY+Qqk3k8NKkFCFlM3X4yQUniixl7dSJAch2Qo=
+github.com/valkey-io/valkey-go v1.0.59/go.mod h1:bHmwjIEOrGq/ubOJfh5uMRs7Xj6mV3mQ/ZXUbmqpjqY=
 github.com/warpfork/go-testmark v0.12.1 h1:rMgCpJfwy1sJ50x0M0NgyphxYYPMOODIJHhsXyEHU0s=
 github.com/warpfork/go-testmark v0.12.1/go.mod h1:kHwy7wfvGSPh1rQJYKayD4AbtNaeyZdcGi9tNJTaa5Y=
 github.com/warpfork/go-wish v0.0.0-20220906213052-39a1cc7a02d0 h1:GDDkbFiaK8jsSDJfjId/PEGEShv6ugrt4kYsC5UIDaQ=
