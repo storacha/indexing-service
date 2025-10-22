@@ -755,13 +755,13 @@ func peerToPrincipal(peer peer.ID) (ucan.Principal, error) {
 	return v, nil
 }
 
-// requestBlobRetrieveDelegation obtains a delegation for `blob/retrieve` from a
-// node by invoking `access/grant`, using the passed cause invocation as
-// evidence that the delegation should be granted.
-func extractContentRetrieveDelegation(cause invocation.Invocation) (ucan.Capability[content.RetrieveCaveats], delegation.Delegation, error) {
+// extractContentRetrieveDelegation extracts a `space/content/retrieve`
+// delegation attached to the passed invocation (typically an `assert/index`).
+// The delegation is expected to be linked from facts by a "retrievalAuth" key.
+func extractContentRetrieveDelegation(assertion invocation.Invocation) (ucan.Capability[content.RetrieveCaveats], delegation.Delegation, error) {
 	var root ipld.Link
-	for _, f := range cause.Facts() {
-		authValue, ok := f["auth"]
+	for _, f := range assertion.Facts() {
+		authValue, ok := f["retrievalAuth"]
 		if !ok {
 			continue
 		}
@@ -780,7 +780,7 @@ func extractContentRetrieveDelegation(cause invocation.Invocation) (ucan.Capabil
 	if root == nil {
 		return nil, nil, errors.New("retrieval authorization delegation link not found in facts")
 	}
-	bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(cause.Blocks()))
+	bs, err := blockstore.NewBlockReader(blockstore.WithBlocksIterator(assertion.Blocks()))
 	if err != nil {
 		return nil, nil, err
 	}
