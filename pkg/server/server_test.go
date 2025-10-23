@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -356,6 +357,75 @@ func TestGetClaimsHandler(t *testing.T) {
 			res, err := http.Get(fmt.Sprintf("%s/claims?multihash=%s&type=invalid", svr.URL, digestutil.Format(randomHash)))
 			require.NoError(t, err)
 			require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		})
+	})
+
+	t.Run("gzip compression", func(t *testing.T) {
+		mockService := types.NewMockService(t)
+
+		randomHash := testutil.RandomMultihash(t)
+		query := types.Query{
+			Type:   types.QueryTypeStandard,
+			Hashes: []multihash.Multihash{randomHash},
+			Match: types.Match{
+				Subject: []did.DID{},
+			},
+		}
+
+		locationClaim := testutil.RandomLocationDelegation(t)
+		indexClaim := testutil.RandomIndexDelegation(t)
+		claims := map[cid.Cid]delegation.Delegation{
+			link.ToCID(locationClaim.Link()): locationClaim,
+			link.ToCID(indexClaim.Link()):    indexClaim,
+		}
+		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](1)
+		indexHash, index := testutil.RandomShardedDagIndexView(t, 32)
+		indexContextID := testutil.Must(types.ContextID{
+			Hash: indexHash,
+		}.ToEncoded())(t)
+		indexes.Set(indexContextID, index)
+		queryResult := testutil.Must(queryresult.Build(claims, indexes))(t)
+		mockService.EXPECT().Query(mock.Anything, query).Return(queryResult, nil).Times(2)
+
+		svr := httptest.NewServer(withGzip(GetClaimsHandler(mockService)))
+		defer svr.Close()
+
+		t.Run("with gzip accept-encoding", func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/claims?multihash=%s", svr.URL, digestutil.Format(randomHash)), nil)
+			require.NoError(t, err)
+			req.Header.Set("Accept-Encoding", "gzip")
+
+			res, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, res.StatusCode)
+			require.Equal(t, "gzip", res.Header.Get("Content-Encoding"))
+
+			// Decompress the response
+			gzReader, err := gzip.NewReader(res.Body)
+			require.NoError(t, err)
+			defer gzReader.Close()
+
+			result, err := queryresult.Extract(gzReader)
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, queryResult.Claims(), result.Claims())
+			require.ElementsMatch(t, queryResult.Indexes(), result.Indexes())
+		})
+
+		t.Run("without gzip accept-encoding", func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/claims?multihash=%s", svr.URL, digestutil.Format(randomHash)), nil)
+			require.NoError(t, err)
+
+			res, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, res.StatusCode)
+			require.Empty(t, res.Header.Get("Content-Encoding"))
+
+			result, err := queryresult.Extract(res.Body)
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, queryResult.Claims(), result.Claims())
+			require.ElementsMatch(t, queryResult.Indexes(), result.Indexes())
 		})
 	})
 }
