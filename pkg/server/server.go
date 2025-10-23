@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -150,7 +151,7 @@ func NewServer(indexer types.Service, opts ...Option) (*http.ServeMux, error) {
 	// temporary fix: post claims handler accessible at POST / too
 	maybeInstrumentAndAdd(mux, "POST /", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "POST /claims", PostClaimsHandler(c.id, indexer, c.contentClaimsOptions...), c.enableTelemetry)
-	maybeInstrumentAndAdd(mux, "GET /claims", GetClaimsHandler(indexer), c.enableTelemetry)
+	maybeInstrumentAndAdd(mux, "GET /claims", withGzip(GetClaimsHandler(indexer)), c.enableTelemetry)
 	maybeInstrumentAndAdd(mux, "GET /.well-known/did.json", GetDIDDocument(c.id), c.enableTelemetry)
 	if c.ipniConfig != nil {
 		maybeInstrumentAndAdd(mux, "GET /cid/{cid}", GetIPNICIDHandler(indexer, c.ipniConfig), c.enableTelemetry)
@@ -171,6 +172,38 @@ func maybeInstrumentAndAdd(mux *http.ServeMux, route string, handler http.Handle
 		mux.Handle(route, otelhttp.NewHandler(handler, route, otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents)))
 	} else {
 		mux.HandleFunc(route, handler)
+	}
+}
+
+// gzipResponseWriter wraps http.ResponseWriter to support gzip compression
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+}
+
+func (w gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+// withGzip wraps a handler to support gzip compression if the client accepts it
+func withGzip(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if client accepts gzip encoding
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			handler(w, r)
+			return
+		}
+
+		// Set the content encoding header
+		w.Header().Set("Content-Encoding", "gzip")
+
+		// Create gzip writer
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+
+		// Wrap the response writer
+		gzw := gzipResponseWriter{Writer: gz, ResponseWriter: w}
+		handler(gzw, r)
 	}
 }
 

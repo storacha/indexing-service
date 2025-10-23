@@ -1,6 +1,7 @@
 package client
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -138,6 +139,8 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
+	// Request gzip compression
+	req.Header.Set("Accept-Encoding", "gzip")
 	// If there are query delegations, then add them to an X-Agent-Message header.
 	if len(query.Delegations) > 0 {
 		invs := make([]invocation.Invocation, 0, len(query.Delegations))
@@ -161,7 +164,19 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return nil, errFromResponse(res)
 	}
-	return queryresult.Extract(res.Body)
+
+	// Handle gzip decompression if needed
+	var reader io.ReadCloser = res.Body
+	if res.Header.Get("Content-Encoding") == "gzip" {
+		gzReader, err := gzip.NewReader(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("creating gzip reader: %w", err)
+		}
+		defer gzReader.Close()
+		reader = gzReader
+	}
+
+	return queryresult.Extract(reader)
 }
 
 type Option func(*Client)
