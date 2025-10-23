@@ -50,14 +50,17 @@ func TestBlockIndexTableMapper(t *testing.T) {
 			expectedURL: bucketURL.JoinPath("/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq.car"),
 		},
 		{
-			name:   "b32 multihash key, dot storage bucket, nft prefix",
+			name:   "b32 multihash key, dot storage bucket, not migrated, nft prefix",
 			digest: testutil.Must(digestutil.Parse("zQmNUfyG3ynAkCzPFLsijsJwEFpPXqJZF1CJpT9GLYmgBBd"))(t),
 			record: BlockIndexRecord{
 				CarPath: "us-west-2/dotstorage-prod-1/raw/bafyreifvbqc4e5qphijgpj43qxk5ndw2vbfbhkzuuuvpo4cturr2dfk45e/nft-315318734258474846/ciqd7nsjnsrsi6pqulv5j46qel7gw6oeo644o5ef3zopne37xad5oui.car",
 				Offset:  128844,
 				Length:  200,
 			},
-			expectedURL: bucketURL.JoinPath("/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq/bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq.car"),
+			migratedShardCheck:  cidlink.Link{Cid: testutil.Must(cid.Parse("bagbaierah63es3fder47bixl2tz5aix6nn44i55zy52ilxs462jx7oah25iq"))(t)},
+			migratedShardResult: result.Ok[bool, error](false),
+			expectedURL:         nil,
+			noClaim:             true,
 		},
 		{
 			name:   "b32 multihash key, dot storage, migrated",

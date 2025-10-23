@@ -96,7 +96,7 @@ func (bit blockIndexTableMapper) GetClaims(ctx context.Context, contentHash mult
 			}
 
 			// check if shard is a web3.storage shard
-			if isLegacyDotStorage(parts, bit.bucketPrefixes) {
+			if isLegacyStorage(parts, bit.bucketPrefixes) {
 				// check if the shard has been migrated -- if not, skip it
 				migrated, err := bit.migratedShardChecker.ShardMigrated(ctx, shard)
 				if err != nil {
@@ -155,12 +155,12 @@ func (bit blockIndexTableMapper) GetClaims(ctx context.Context, contentHash mult
 	return claimCids, nil
 }
 
-func isLegacyDotStorage(parts []string, bucketPrefixes []string) bool {
+func isLegacyStorage(parts []string, bucketPrefixes []string) bool {
 	if len(parts) < 3 {
 		return false
 	}
 	for _, prefix := range bucketPrefixes {
-		if strings.Join(parts[:2], "/") == prefix && !strings.Contains(parts[4], "nft-") {
+		if strings.Join(parts[:2], "/") == prefix {
 			return true
 		}
 	}
