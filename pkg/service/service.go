@@ -93,9 +93,10 @@ func (j job) key() jobKey {
 }
 
 var targetClaims = map[types.QueryType][]multicodec.Code{
-	types.QueryTypeStandard:        {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
-	types.QueryTypeLocation:        {metadata.LocationCommitmentID},
-	types.QueryTypeIndexOrLocation: {metadata.IndexClaimID, metadata.LocationCommitmentID},
+	types.QueryTypeStandard:           {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+	types.QueryTypeStandardCompressed: {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+	types.QueryTypeLocation:           {metadata.LocationCommitmentID},
+	types.QueryTypeIndexOrLocation:    {metadata.IndexClaimID, metadata.LocationCommitmentID},
 }
 
 type queryResult struct {
@@ -306,6 +307,10 @@ func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.Quer
 	ctx, s := telemetry.StartSpan(ctx, "IndexingService.Query")
 	defer s.End()
 
+	if q.Type == types.QueryTypeStandardCompressed && len(q.Hashes) != 1 {
+		return nil, fmt.Errorf("invalid query: expected 1 hash for compressed query, got %d", len(q.Hashes))
+	}
+
 	initialJobs := make([]job, 0, len(q.Hashes))
 	for _, mh := range q.Hashes {
 		initialJobs = append(initialJobs, job{mh, nil, nil, q.Type})
@@ -320,6 +325,9 @@ func (is *IndexingService) Query(ctx context.Context, q types.Query) (types.Quer
 	}, is.jobHandler)
 	if err != nil {
 		return nil, err
+	}
+	if q.Type == types.QueryTypeStandardCompressed {
+		return queryresult.BuildCompressed(q.Hashes[0], is.id, qs.qr.Claims, qs.qr.Indexes)
 	}
 	return queryresult.Build(qs.qr.Claims, qs.qr.Indexes)
 }

@@ -113,6 +113,7 @@ const (
 	QueryTypeStandard QueryType = iota
 	QueryTypeLocation
 	QueryTypeIndexOrLocation
+	QueryTypeStandardCompressed
 )
 
 func (qt QueryType) String() string {
@@ -123,6 +124,8 @@ func (qt QueryType) String() string {
 		return "location"
 	case QueryTypeIndexOrLocation:
 		return "index_or_location"
+	case QueryTypeStandardCompressed:
+		return "standard_compressed"
 	default:
 		return "invalid"
 	}
@@ -136,6 +139,8 @@ func ParseQueryType(queryTypeStr string) (QueryType, error) {
 		return QueryTypeLocation, nil
 	case QueryTypeIndexOrLocation.String():
 		return QueryTypeIndexOrLocation, nil
+	case QueryTypeStandardCompressed.String():
+		return QueryTypeStandardCompressed, nil
 	default:
 		return 0, fmt.Errorf("invalid query type: %s", queryTypeStr)
 	}

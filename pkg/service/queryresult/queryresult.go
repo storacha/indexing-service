@@ -9,9 +9,12 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/multiformats/go-multicodec"
+	mh "github.com/multiformats/go-multihash"
 	multihash "github.com/multiformats/go-multihash/core"
 	"github.com/storacha/go-libstoracha/blobindex"
 	"github.com/storacha/go-libstoracha/bytemap"
+	"github.com/storacha/go-libstoracha/capabilities/assert"
+	ctypes "github.com/storacha/go-libstoracha/capabilities/types"
 	"github.com/storacha/go-ucanto/core/car"
 	"github.com/storacha/go-ucanto/core/dag/blockstore"
 	"github.com/storacha/go-ucanto/core/delegation"
@@ -19,6 +22,8 @@ import (
 	"github.com/storacha/go-ucanto/core/ipld/block"
 	"github.com/storacha/go-ucanto/core/ipld/codec/cbor"
 	"github.com/storacha/go-ucanto/core/ipld/hash/sha256"
+	"github.com/storacha/go-ucanto/ucan"
+	"github.com/storacha/go-ucanto/validator"
 	qdm "github.com/storacha/indexing-service/pkg/service/queryresult/datamodel"
 	"github.com/storacha/indexing-service/pkg/types"
 )
@@ -161,4 +166,66 @@ func Build(claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[typ
 	}
 
 	return &queryResult{root: rt, data: queryResultModel.Result0_1, blks: bs}, nil
+}
+
+// BuildCompressed returns a QueryResult that, when there is a matching index entry for the
+// targetMh, replaces the full index with a single location claim for the targetMh
+func BuildCompressed(targetMh mh.Multihash, principal ucan.Signer, claims map[cid.Cid]delegation.Delegation, indexes bytemap.ByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView]) (types.QueryResult, error) {
+
+	// our goal here is to remove indexes from the query result if there are any
+	// if there are no indexes, we can just build the regular query result
+	if indexes.Size() == 0 {
+		return Build(claims, indexes)
+	}
+
+	for _, index := range indexes.Iterator() {
+		for _, shard := range index.Shards().Iterator() {
+			if shard.Has(targetMh) {
+				pos := shard.Get(targetMh)
+				hasLocation := false
+				var locClaim assert.LocationCaveats
+				var expiration *ucan.UTCUnixTimestamp
+				for _, claim := range claims {
+					match, err := assert.Location.Match(validator.NewSource(claim.Capabilities()[0], claim))
+					if err != nil {
+						continue
+					}
+					hasLocation = true
+
+					locClaim = match.Value().Nb()
+					expiration = claim.Expiration()
+				}
+				if !hasLocation {
+					continue
+				}
+
+				newCaveats := assert.LocationCaveats{
+					Content:  ctypes.FromHash(targetMh),
+					Location: locClaim.Location,
+					Range:    &assert.Range{Offset: locClaim.Range.Offset + pos.Length, Length: &pos.Length},
+				}
+				var opts = []delegation.Option{}
+				if expiration != nil {
+					opts = append(opts, delegation.WithExpiration(*expiration))
+				}
+
+				claim, err := assert.Location.Delegate(
+					principal,
+					principal,
+					principal.DID().String(),
+					newCaveats,
+					opts...,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("delegating compressed location claim: %w", err)
+				}
+
+				newClaims := make(map[cid.Cid]delegation.Delegation)
+				newClaims[claim.Link().(cidlink.Link).Cid] = claim
+				return Build(newClaims, bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1))
+			}
+		}
+	}
+	// never found the MH in any index shard, just build the regular query result
+	return Build(claims, indexes)
 }
