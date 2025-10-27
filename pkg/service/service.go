@@ -691,7 +691,7 @@ func fetchBlobIndex(
 	byteRange := lcmeta.Range
 	var auth *types.RetrievalAuth
 	if dlg != nil {
-		cap := content.Retrieve.New(aud.DID().String(), cap.Nb())
+		cap := content.Retrieve.New(cap.With(), cap.Nb())
 		prfs := []delegation.Proof{delegation.FromDelegation(dlg)}
 		a := types.NewRetrievalAuth(id, aud, cap, prfs)
 		offset := cap.Nb().Range.Start
