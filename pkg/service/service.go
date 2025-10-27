@@ -685,7 +685,7 @@ func fetchBlobIndex(
 	// Note: it'll fail for non-UCAN authorized retrieval nodes (legacy).
 	cap, dlg, err := extractContentRetrieveDelegation(cause)
 	if err != nil {
-		log.Debugw("extracting space/content/retrieve delegation", "err", err)
+		log.Warnw("extracting space/content/retrieve delegation", "err", err)
 	}
 
 	byteRange := lcmeta.Range
