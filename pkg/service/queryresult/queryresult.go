@@ -203,6 +203,7 @@ func BuildCompressed(targetMh mh.Multihash, principal ucan.Signer, claims map[ci
 					Content:  ctypes.FromHash(targetMh),
 					Location: locClaim.Location,
 					Range:    &assert.Range{Offset: locClaim.Range.Offset + pos.Length, Length: &pos.Length},
+					Space:    locClaim.Space,
 				}
 				var opts = []delegation.Option{}
 				if expiration != nil {
