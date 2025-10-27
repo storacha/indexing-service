@@ -186,6 +186,7 @@ func FromEnv(ctx context.Context) Config {
 		Config: awsConfig,
 		Signer: id,
 		ServiceConfig: construct.ServiceConfig{
+			ID:         id,
 			PrivateKey: cryptoPrivKey,
 			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
 			ProvidersRedis: goredis.ClusterOptions{

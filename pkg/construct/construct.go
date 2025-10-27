@@ -16,7 +16,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	ipnifind "github.com/ipni/go-libipni/find/client"
 	"github.com/ipni/go-libipni/maurl"
-	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/storacha/go-libstoracha/ipnipublisher/notifier"
@@ -25,7 +25,7 @@ import (
 	"github.com/storacha/go-libstoracha/ipnipublisher/store"
 	"github.com/storacha/go-libstoracha/jobqueue"
 	"github.com/storacha/go-libstoracha/metadata"
-	ed25519 "github.com/storacha/go-ucanto/principal/ed25519/signer"
+	"github.com/storacha/go-ucanto/principal"
 	"github.com/storacha/indexing-service/pkg/redis"
 	"github.com/storacha/indexing-service/pkg/service"
 	"github.com/storacha/indexing-service/pkg/service/blobindexlookup"
@@ -44,6 +44,9 @@ var contentClaimsNamespace = datastore.NewKey("claims/")
 
 // ServiceConfig sets specific config values for the service
 type ServiceConfig struct {
+	// ID configures the identity for the service. Both ID and PrivateKey are the
+	// same key, the difference is that ID may be wrapped as a did:web.
+	ID principal.Signer
 
 	// PrivateKey configures the private key for the service.
 	PrivateKey crypto.PrivKey
@@ -499,19 +502,10 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 		publicAddrInfo.Addrs = append(publicAddrInfo.Addrs, addr)
 	}
 
-	skBytes, err := sc.PrivateKey.Raw()
-	if err != nil {
-		return nil, err
-	}
-	serviceID, err := ed25519.FromRaw(skBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	// with concurrency will still get overridden if a different walker setting is used
 	serviceOpts := append([]service.Option{service.WithConcurrency(15)}, cfg.opts...)
 
-	s.IndexingService = service.NewIndexingService(serviceID, blobIndexLookup, claims, publicAddrInfo, providerIndex, serviceOpts...)
+	s.IndexingService = service.NewIndexingService(sc.ID, blobIndexLookup, claims, publicAddrInfo, providerIndex, serviceOpts...)
 
 	return s, nil
 }

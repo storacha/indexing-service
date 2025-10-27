@@ -127,6 +127,7 @@ var serverCmd = &cli.Command{
 				}
 				opts = append(opts, ipniSrvOpts...)
 				var sc construct.ServiceConfig
+				sc.ID = id
 				sc.ProvidersRedis = redis.ClusterOptions{
 					Addrs:    []string{cCtx.String("redis-url")},
 					Password: cCtx.String("redis-passwd"),
