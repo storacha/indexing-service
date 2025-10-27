@@ -7,7 +7,6 @@ import (
 
 	"github.com/ipni/go-libipni/maurl"
 	"github.com/ipni/go-libipni/metadata"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/redis/go-redis/v9"
@@ -127,6 +126,7 @@ var serverCmd = &cli.Command{
 				}
 				opts = append(opts, ipniSrvOpts...)
 				var sc construct.ServiceConfig
+				sc.ID = id
 				sc.ProvidersRedis = redis.ClusterOptions{
 					Addrs:    []string{cCtx.String("redis-url")},
 					Password: cCtx.String("redis-passwd"),
@@ -151,12 +151,6 @@ var serverCmd = &cli.Command{
 				} else {
 					sc.IPNIDirectAnnounceURLs = presets.IPNIAnnounceURLs
 				}
-
-				privKey, err := crypto.UnmarshalEd25519PrivateKey(id.Raw())
-				if err != nil {
-					return fmt.Errorf("unmarshaling private key: %w", err)
-				}
-				sc.PrivateKey = privKey
 
 				indexer, err := construct.Construct(sc)
 				if err != nil {

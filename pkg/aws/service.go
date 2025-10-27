@@ -18,7 +18,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/getsentry/sentry-go"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/libp2p/go-libp2p/core/crypto"
 	goredis "github.com/redis/go-redis/v9"
 	publisherqueue "github.com/storacha/go-libstoracha/ipnipublisher/queue"
 	awspublisherqueue "github.com/storacha/go-libstoracha/ipnipublisher/queue/aws"
@@ -135,11 +134,6 @@ func FromEnv(ctx context.Context) Config {
 		}
 	}
 
-	cryptoPrivKey, err := crypto.UnmarshalEd25519PrivateKey(id.Raw())
-	if err != nil {
-		panic(fmt.Errorf("unmarshaling private key: %w", err))
-	}
-
 	ipniStoreKeyPrefix := os.Getenv("IPNI_STORE_KEY_PREFIX")
 	if len(ipniStoreKeyPrefix) == 0 {
 		ipniStoreKeyPrefix = "ipni/v1/ad/"
@@ -186,8 +180,8 @@ func FromEnv(ctx context.Context) Config {
 		Config: awsConfig,
 		Signer: id,
 		ServiceConfig: construct.ServiceConfig{
-			PrivateKey: cryptoPrivKey,
-			PublicURL:  strings.Split(mustGetEnv("PUBLIC_URL"), ","),
+			ID:        id,
+			PublicURL: strings.Split(mustGetEnv("PUBLIC_URL"), ","),
 			ProvidersRedis: goredis.ClusterOptions{
 				Addrs:                      []string{mustGetEnv("PROVIDERS_CACHE_URL")},
 				ReadOnly:                   true,
