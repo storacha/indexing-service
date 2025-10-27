@@ -684,6 +684,7 @@ func TestPublishIndexClaim(t *testing.T) {
 					req.Auth != nil &&
 					req.Auth.Audience.DID() == locationDelegation.Issuer().DID() &&
 					req.Auth.Capability.Can() == content.RetrieveAbility &&
+					req.Auth.Capability.With() == retrievalDelegation.Capabilities()[0].With() &&
 					len(req.Auth.Proofs) == 1 &&
 					req.Auth.Proofs[0].Link() == retrievalDelegation.Link()
 			}),
