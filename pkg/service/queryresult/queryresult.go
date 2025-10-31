@@ -199,10 +199,15 @@ func BuildCompressed(targetMh mh.Multihash, principal ucan.Signer, claims map[ci
 					continue
 				}
 
+				length := pos.Length
+				offset := pos.Offset
+				if locClaim.Range != nil {
+					offset = locClaim.Range.Offset + pos.Offset
+				}
 				newCaveats := assert.LocationCaveats{
 					Content:  ctypes.FromHash(targetMh),
 					Location: locClaim.Location,
-					Range:    &assert.Range{Offset: locClaim.Range.Offset + pos.Length, Length: &pos.Length},
+					Range:    &assert.Range{Offset: offset, Length: &length},
 					Space:    locClaim.Space,
 				}
 				var opts = []delegation.Option{}
