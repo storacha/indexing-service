@@ -735,6 +735,7 @@ func validateLocationCommitment(ctx context.Context, claim delegation.Delegation
 		validator.ProofUnavailable,     // probably don't want to resolve proofs...
 		verifier.Parse,                 // TODO: support verifiers for other key types?
 		validator.FailDIDKeyResolution, // probably don't want to resolve DID methods either
+		validator.NotExpiredNotTooEarly,
 	)
 
 	auth, err := validator.Access(ctx, claim, vctx)
