@@ -179,7 +179,7 @@ func BuildCompressed(targetMh mh.Multihash, principal ucan.Signer, claims map[ci
 	}
 
 	for _, index := range indexes.Iterator() {
-		for _, shard := range index.Shards().Iterator() {
+		for shardHash, shard := range index.Shards().Iterator() {
 			if shard.Has(targetMh) {
 				pos := shard.Get(targetMh)
 				hasLocation := false
@@ -190,6 +190,10 @@ func BuildCompressed(targetMh mh.Multihash, principal ucan.Signer, claims map[ci
 					if err != nil {
 						continue
 					}
+					if match.Value().Nb().Content.Hash().B58String() != shardHash.B58String() {
+						continue
+					}
+
 					hasLocation = true
 
 					locClaim = match.Value().Nb()

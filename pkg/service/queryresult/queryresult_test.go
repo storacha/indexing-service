@@ -74,9 +74,29 @@ func TestBuildCompressed(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		otherLocationURL, err := url.Parse("https://example2.com/shard.car")
+		require.NoError(t, err)
+		otherShardMH := testutil.RandomMultihash(t)
+		otherShardLength := uint64(8000)
+		otherShardClaim, err := assert.Location.Delegate(
+			principal,
+			principal,
+			principal.DID().String(),
+			assert.LocationCaveats{
+				Content:  ctypes.FromHash(otherShardMH),
+				Location: []url.URL{*otherLocationURL},
+				Range: &assert.Range{
+					Offset: 1000, // The shard starts at offset 1000
+					Length: &otherShardLength,
+				},
+			},
+		)
+		require.NoError(t, err)
+
 		// Build the claims map
 		claims := map[cid.Cid]delegation.Delegation{
-			link.ToCID(shardClaim.Link()): shardClaim,
+			link.ToCID(otherShardClaim.Link()): otherShardClaim,
+			link.ToCID(shardClaim.Link()):      shardClaim,
 		}
 
 		// Build the indexes map
