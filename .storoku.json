@@ -86,7 +86,8 @@
     }
   ],
   "networks": [
-    "warm"
+    "warm",
+    "forge"
   ],
   "writeToContainer": false
 }

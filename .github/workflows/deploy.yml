@@ -84,3 +84,25 @@ jobs:
       cloudflare-api-token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}
       honeycomb-api-key: ${{ secrets.PROD_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.PROD_SENTRY_DSN }}
+
+  forge-production:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      env: forge-prod
+      workspace: forge-prod
+      network: forge
+      did: did:web:indexer.forge.storacha.network
+      ipni-endpoint: ${{ vars.FORGE_PROD_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.FORGE_PROD_IPNI_ANNOUNCE_URLS }}
+      ipni-format-peer-id: ${{ vars.FORGE_PROD_IPNI_FORMAT_PEER_ID }}
+      ipni-format-endpoint: ${{ vars.FORGE_PROD_IPNI_FORMAT_ENDPOINT }}
+      apply: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && contains(github.ref, 'refs/tags')) }}
+    secrets:
+      aws-account-id: ${{ secrets.FORGE_PROD_AWS_ACCOUNT_ID }}
+      aws-region: ${{ secrets.FORGE_PROD_AWS_REGION }}
+      region: ${{ secrets.FORGE_PROD_AWS_REGION }}
+      private-key: ${{ secrets.FORGE_PROD_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.FORGE_PROD_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.FORGE_PROD_CLOUDFLARE_API_TOKEN }}
+      honeycomb-api-key: ${{ secrets.FORGE_PROD_HONEYCOMB_API_KEY }}
+      sentry-dsn: ${{ secrets.FORGE_PROD_SENTRY_DSN }}

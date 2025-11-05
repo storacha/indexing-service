@@ -56,7 +56,7 @@ module "shared" {
   }
   create_db = false
   caches = ["providers","no-providers","indexes","claims",]
-  networks = ["warm",]
+  networks = ["warm","forge",]
   app = var.app
   create_shared_dev_resources = var.create_shared_dev_resources
   zone_id = var.cloudflare_zone_id
