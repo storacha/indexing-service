@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/go-libstoracha/blobindex"
+	"github.com/storacha/go-libstoracha/queuepoller"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 )
 
@@ -100,7 +101,7 @@ func (s *SQSCachingQueue) sendMessage(ctx context.Context, msg cachingQueueMessa
 // Read reads a batch of jobs from the SQS queue.
 // Returns an empty slice if no jobs are available.
 // The caller must process jobs and delete them from the queue when done.
-func (s *SQSCachingQueue) Read(ctx context.Context, maxJobs int) ([]providercacher.ProviderCachingJob, error) {
+func (s *SQSCachingQueue) Read(ctx context.Context, maxJobs int) ([]queuepoller.WithID[providercacher.ProviderCachingJob], error) {
 	receiveOutput, err := s.sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 		QueueUrl:            aws.String(s.queueID),
 		MaxNumberOfMessages: int32(maxJobs),
@@ -111,10 +112,10 @@ func (s *SQSCachingQueue) Read(ctx context.Context, maxJobs int) ([]providercach
 	}
 
 	if len(receiveOutput.Messages) == 0 {
-		return []providercacher.ProviderCachingJob{}, nil
+		return []queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil
 	}
 
-	jobs := make([]providercacher.ProviderCachingJob, 0, len(receiveOutput.Messages))
+	jobs := make([]queuepoller.WithID[providercacher.ProviderCachingJob], 0, len(receiveOutput.Messages))
 	for _, msg := range receiveOutput.Messages {
 		job, err := s.decoder.DecodeMessage(ctx, aws.ToString(msg.ReceiptHandle), aws.ToString(msg.Body))
 		if err != nil {
@@ -162,23 +163,29 @@ func NewSQSCachingDecoder(cfg aws.Config, bucket string) *SQSCachingDecoder {
 }
 
 // DecodeMessage decodes a provider caching job from the SQS message body, reading the stored index from S3
-func (s *SQSCachingDecoder) DecodeMessage(ctx context.Context, receiptHandle string, messageBody string) (providercacher.ProviderCachingJob, error) {
+func (s *SQSCachingDecoder) DecodeMessage(ctx context.Context, receiptHandle string, messageBody string) (queuepoller.WithID[providercacher.ProviderCachingJob], error) {
 	var msg cachingQueueMessage
 	err := json.Unmarshal([]byte(messageBody), &msg)
 	if err != nil {
-		return providercacher.ProviderCachingJob{}, fmt.Errorf("deserializing message: %w", err)
+		return queuepoller.WithID[providercacher.ProviderCachingJob]{}, fmt.Errorf("deserializing message: %w", err)
 	}
 	received, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(msg.JobID.String()),
 	})
 	if err != nil {
-		return providercacher.ProviderCachingJob{}, fmt.Errorf("reading stored index CAR: %w", err)
+		return queuepoller.WithID[providercacher.ProviderCachingJob]{}, fmt.Errorf("reading stored index CAR: %w", err)
 	}
 	defer received.Body.Close()
 	index, err := blobindex.Extract(received.Body)
 	if err != nil {
-		return providercacher.ProviderCachingJob{}, fmt.Errorf("deserializing index: %w", err)
+		return queuepoller.WithID[providercacher.ProviderCachingJob]{}, fmt.Errorf("deserializing index: %w", err)
 	}
-	return providercacher.ProviderCachingJob{ID: receiptHandle, Provider: msg.Provider, Index: index}, nil
+	return queuepoller.WithID[providercacher.ProviderCachingJob]{
+		ID: receiptHandle,
+		Job: providercacher.ProviderCachingJob{
+			Provider: msg.Provider,
+			Index:    index,
+		},
+	}, nil
 }

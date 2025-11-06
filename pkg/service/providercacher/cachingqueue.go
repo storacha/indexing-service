@@ -5,7 +5,7 @@ import (
 
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/storacha/go-libstoracha/blobindex"
-	"github.com/storacha/indexing-service/pkg/internal/queuepoller"
+	"github.com/storacha/go-libstoracha/queuepoller"
 )
 
 type (
@@ -13,7 +13,6 @@ type (
 	CachingQueue       = queuepoller.Queue[ProviderCachingJob]
 
 	ProviderCachingJob struct {
-		ID       string
 		Provider model.ProviderResult
 		Index    blobindex.ShardedDagIndexView
 	}

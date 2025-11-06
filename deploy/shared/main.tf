@@ -49,7 +49,7 @@ provider "aws" {
 }
 
 module "shared" {
-  source = "github.com/storacha/storoku//shared?ref=v0.5.0"
+  source = "github.com/storacha/storoku//shared?ref=v0.5.1"
   providers = {
     aws = aws
     aws.dev = aws.dev

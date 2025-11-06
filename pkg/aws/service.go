@@ -80,6 +80,7 @@ type Config struct {
 	CachingBucket                     string
 	SQSPublishingQueueID              string
 	PublishingBucket                  string
+	SQSAdvertisementPublishingQueueID string
 	ChunkLinksTableName               string
 	MetadataTableName                 string
 	IPNIStoreBucket                   string
@@ -237,6 +238,7 @@ func FromEnv(ctx context.Context) Config {
 		CachingBucket:                     mustGetEnv("PROVIDER_CACHING_BUCKET_NAME"),
 		SQSPublishingQueueID:              mustGetEnv("IPNI_PUBLISHER_QUEUE_ID"),
 		PublishingBucket:                  mustGetEnv("IPNI_PUBLISHER_BUCKET_NAME"),
+		SQSAdvertisementPublishingQueueID: mustGetEnv("IPNI_ADVERTISEMENT_PUBLISHING_QUEUE_ID"),
 		ChunkLinksTableName:               mustGetEnv("CHUNK_LINKS_TABLE_ID"),
 		MetadataTableName:                 mustGetEnv("METADATA_TABLE_ID"),
 		IPNIStoreBucket:                   mustGetEnv("IPNI_STORE_BUCKET_NAME"),
