@@ -26,6 +26,12 @@
       "fifo": true,
       "highThroughput": true,
       "messageRetentionSeconds": 86400
+    },
+    {
+      "name": "ipni-advertisement-publishing",
+      "fifo": true,
+      "highThroughput": false,
+      "messageRetentionSeconds": 86400
     }
   ],
   "buckets": [

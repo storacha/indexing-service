@@ -1,6 +1,6 @@
 module github.com/storacha/indexing-service
 
-go 1.24.4
+go 1.25.3
 
 require (
 	github.com/aws/aws-lambda-go v1.49.0
@@ -31,7 +31,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/redis/go-redis/extra/redisotel/v9 v9.10.0
 	github.com/redis/go-redis/v9 v9.10.0
-	github.com/storacha/go-libstoracha v0.3.3
+	github.com/storacha/go-libstoracha v0.6.0
 	github.com/storacha/go-ucanto v0.7.2-0.20251119232529-559b0a57d38f
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.39.0

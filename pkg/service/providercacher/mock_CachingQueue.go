@@ -7,6 +7,7 @@ package providercacher
 import (
 	"context"
 
+	"github.com/storacha/go-libstoracha/queuepoller"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -152,23 +153,23 @@ func (_c *MockCachingQueue_Queue_Call) RunAndReturn(run func(ctx context.Context
 }
 
 // Read provides a mock function for the type MockCachingQueue
-func (_mock *MockCachingQueue) Read(ctx context.Context, maxJobs int) ([]ProviderCachingJob, error) {
+func (_mock *MockCachingQueue) Read(ctx context.Context, maxJobs int) ([]queuepoller.WithID[ProviderCachingJob], error) {
 	ret := _mock.Called(ctx, maxJobs)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Read")
 	}
 
-	var r0 []ProviderCachingJob
+	var r0 []queuepoller.WithID[ProviderCachingJob]
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]ProviderCachingJob, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]queuepoller.WithID[ProviderCachingJob], error)); ok {
 		return returnFunc(ctx, maxJobs)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []ProviderCachingJob); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []queuepoller.WithID[ProviderCachingJob]); ok {
 		r0 = returnFunc(ctx, maxJobs)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ProviderCachingJob)
+			r0 = ret.Get(0).([]queuepoller.WithID[ProviderCachingJob])
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, int) error); ok {
@@ -209,12 +210,12 @@ func (_c *MockCachingQueue_Read_Call) Run(run func(ctx context.Context, maxJobs 
 	return _c
 }
 
-func (_c *MockCachingQueue_Read_Call) Return(providerCachingJobs []ProviderCachingJob, err error) *MockCachingQueue_Read_Call {
-	_c.Call.Return(providerCachingJobs, err)
+func (_c *MockCachingQueue_Read_Call) Return(withIDs []queuepoller.WithID[ProviderCachingJob], err error) *MockCachingQueue_Read_Call {
+	_c.Call.Return(withIDs, err)
 	return _c
 }
 
-func (_c *MockCachingQueue_Read_Call) RunAndReturn(run func(ctx context.Context, maxJobs int) ([]ProviderCachingJob, error)) *MockCachingQueue_Read_Call {
+func (_c *MockCachingQueue_Read_Call) RunAndReturn(run func(ctx context.Context, maxJobs int) ([]queuepoller.WithID[ProviderCachingJob], error)) *MockCachingQueue_Read_Call {
 	_c.Call.Return(run)
 	return _c
 }

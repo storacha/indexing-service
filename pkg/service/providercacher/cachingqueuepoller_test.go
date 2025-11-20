@@ -10,7 +10,7 @@ import (
 	"github.com/ipni/go-libipni/find/model"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/storacha/go-libstoracha/blobindex"
-	"github.com/storacha/indexing-service/pkg/internal/queuepoller"
+	"github.com/storacha/go-libstoracha/queuepoller"
 	"github.com/storacha/indexing-service/pkg/service/providercacher"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ func TestCachingQueuePoller_StartStop(t *testing.T) {
 	mockQueue := providercacher.NewMockCachingQueue(t)
 	mockCacher := providercacher.NewMockProviderCacher(t)
 
-	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil)
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil)
 
 	poller, err := providercacher.NewCachingQueuePoller(
 		mockQueue,
@@ -48,10 +48,12 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 	)
 
 	// Create a single test job that will be used for all batches
-	testJob := providercacher.ProviderCachingJob{
-		ID:       "test-job",
-		Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("test-peer")}},
-		Index:    blobindex.NewShardedDagIndexView(nil, 0),
+	testJob := queuepoller.WithID[providercacher.ProviderCachingJob]{
+		ID: "test-job",
+		Job: providercacher.ProviderCachingJob{
+			Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("test-peer")}},
+			Index:    blobindex.NewShardedDagIndexView(nil, 0),
+		},
 	}
 
 	// Setup mocks
@@ -59,7 +61,7 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 	mockCacher := providercacher.NewMockProviderCacher(t)
 
 	// Set up Read to return batches of the same job
-	batch := make([]providercacher.ProviderCachingJob, batchSize)
+	batch := make([]queuepoller.WithID[providercacher.ProviderCachingJob], batchSize)
 	for i := range batchSize {
 		batch[i] = testJob
 	}
@@ -68,11 +70,11 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 	// ...a final partial batch...
 	mockQueue.EXPECT().Read(mock.Anything, batchSize).Return(batch[:lastBatchSize], nil).Once()
 	// ...and block to simulate long-polling with no more jobs available
-	mockQueue.EXPECT().Read(mock.Anything, batchSize).Return([]providercacher.ProviderCachingJob{}, nil).
+	mockQueue.EXPECT().Read(mock.Anything, batchSize).Return([]queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil).
 		Run(func(ctx context.Context, _ int) {
 			<-ctx.Done()
 		}).
-		Return([]providercacher.ProviderCachingJob{}, nil).
+		Return([]queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil).
 		Once()
 
 	// Set up processing barrier to ensure jobs run concurrently
@@ -81,7 +83,7 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 
 	// Expect CacheProviderForIndexRecords for each job
 	mockCacher.EXPECT().
-		CacheProviderForIndexRecords(mock.Anything, testJob.Provider, testJob.Index).
+		CacheProviderForIndexRecords(mock.Anything, testJob.Job.Provider, testJob.Job.Index).
 		Run(func(ctx context.Context, _ model.ProviderResult, _ blobindex.ShardedDagIndexView) {
 			defer wg.Done() // Signal that this job completed processing
 		}).
@@ -113,16 +115,20 @@ func TestCachingQueuePoller_BatchProcessing(t *testing.T) {
 
 func TestCachingQueuePoller_FailedJobsAreRetried(t *testing.T) {
 	// Setup test data
-	successfulJob := providercacher.ProviderCachingJob{
-		ID:       "successful-job",
-		Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("successful-peer")}},
-		Index:    blobindex.NewShardedDagIndexView(nil, 0),
+	successfulJob := queuepoller.WithID[providercacher.ProviderCachingJob]{
+		ID: "successful-job",
+		Job: providercacher.ProviderCachingJob{
+			Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("successful-peer")}},
+			Index:    blobindex.NewShardedDagIndexView(nil, 0),
+		},
 	}
 
-	failedJob := providercacher.ProviderCachingJob{
-		ID:       "failed-job",
-		Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("failed-peer")}},
-		Index:    blobindex.NewShardedDagIndexView(nil, 0),
+	failedJob := queuepoller.WithID[providercacher.ProviderCachingJob]{
+		ID: "failed-job",
+		Job: providercacher.ProviderCachingJob{
+			Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("failed-peer")}},
+			Index:    blobindex.NewShardedDagIndexView(nil, 0),
+		},
 	}
 
 	// Setup mocks
@@ -132,19 +138,19 @@ func TestCachingQueuePoller_FailedJobsAreRetried(t *testing.T) {
 	// Expect Read to be called.
 	// The first call returns our test jobs, subsequent calls block because there are no more jobs available
 	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return(
-		[]providercacher.ProviderCachingJob{successfulJob, failedJob}, nil,
+		[]queuepoller.WithID[providercacher.ProviderCachingJob]{successfulJob, failedJob}, nil,
 	).Once()
-	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil).
 		Run(func(ctx context.Context, _ int) {
 			<-ctx.Done()
 		}).
-		Return([]providercacher.ProviderCachingJob{}, nil).
+		Return([]queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil).
 		Once()
 
 	// Expect CacheProviderForIndexRecords to be called for both jobs, return an error for failedJob
-	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, successfulJob.Provider, successfulJob.Index).
+	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, successfulJob.Job.Provider, successfulJob.Job.Index).
 		Return(nil).Once()
-	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, failedJob.Provider, failedJob.Index).
+	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, failedJob.Job.Provider, failedJob.Job.Index).
 		Return(errors.New("processing error")).Once()
 
 	// Expect Delete to be called only for successfulJob
@@ -172,10 +178,12 @@ func TestCachingQueuePoller_FailedJobsAreRetried(t *testing.T) {
 
 func TestCachingQueuePoller_JobsTimingOutAreNotRetried(t *testing.T) {
 	// Setup test data
-	bigJob := providercacher.ProviderCachingJob{
-		ID:       "big-job",
-		Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("peer")}},
-		Index:    blobindex.NewShardedDagIndexView(nil, 0),
+	bigJob := queuepoller.WithID[providercacher.ProviderCachingJob]{
+		ID: "big-job",
+		Job: providercacher.ProviderCachingJob{
+			Provider: model.ProviderResult{Provider: &peer.AddrInfo{ID: peer.ID("peer")}},
+			Index:    blobindex.NewShardedDagIndexView(nil, 0),
+		},
 	}
 
 	// Setup mocks
@@ -185,17 +193,17 @@ func TestCachingQueuePoller_JobsTimingOutAreNotRetried(t *testing.T) {
 	// Expect Read to be called.
 	// The first call returns our test job, subsequent calls block because there are no more jobs available
 	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return(
-		[]providercacher.ProviderCachingJob{bigJob}, nil,
+		[]queuepoller.WithID[providercacher.ProviderCachingJob]{bigJob}, nil,
 	).Once()
-	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]providercacher.ProviderCachingJob{}, nil).
+	mockQueue.EXPECT().Read(mock.Anything, mock.Anything).Return([]queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil).
 		Run(func(ctx context.Context, _ int) {
 			<-ctx.Done()
 		}).
-		Return([]providercacher.ProviderCachingJob{}, nil).
+		Return([]queuepoller.WithID[providercacher.ProviderCachingJob]{}, nil).
 		Once()
 
 	// Expect CacheProviderForIndexRecords to be called for the job, returns a time out error
-	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, bigJob.Provider, bigJob.Index).
+	mockCacher.EXPECT().CacheProviderForIndexRecords(mock.Anything, bigJob.Job.Provider, bigJob.Job.Index).
 		Return(context.DeadlineExceeded).Once()
 
 	// Expect Delete to be called because the error is a time out
