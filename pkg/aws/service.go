@@ -105,7 +105,7 @@ type Config struct {
 	BaseTraceSampleRatio              float64
 	SentryDSN                         string
 	SentryEnvironment                 string
-	HoneycombAPIKey                   string
+	TelemetryEnabled                  bool
 	PrincipalMapping                  map[string]string
 	IPNIFormatPeerID                  string
 	IPNIFormatEndpoint                string
@@ -260,7 +260,7 @@ func FromEnv(ctx context.Context) Config {
 		BaseTraceSampleRatio:              mustGetFloat("BASE_TRACE_SAMPLE_RATIO"),
 		SentryDSN:                         os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:                 os.Getenv("SENTRY_ENVIRONMENT"),
-		HoneycombAPIKey:                   os.Getenv("HONEYCOMB_API_KEY"),
+		TelemetryEnabled:                  os.Getenv("TELEMETRY_DISABLED") == "",
 		IPNIFormatPeerID:                  os.Getenv("IPNI_FORMAT_PEER_ID"),
 		IPNIFormatEndpoint:                os.Getenv("IPNI_FORMAT_ENDPOINT"),
 		PrincipalMapping:                  principalMapping,
@@ -276,7 +276,7 @@ func Construct(cfg Config) (types.Service, error) {
 	indexesClient := goredis.NewClusterClient(&cfg.IndexesRedis)
 
 	// instrument HTTP and redis clients if telemetry is enabled
-	if cfg.HoneycombAPIKey != "" {
+	if cfg.TelemetryEnabled {
 		httpClient = telemetry.InstrumentHTTPClient(construct.DefaultHTTPClient())
 		providersClient = telemetry.InstrumentRedisClient(providersClient)
 		noProvidersClient = telemetry.InstrumentRedisClient(noProvidersClient)

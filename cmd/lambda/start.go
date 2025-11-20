@@ -22,7 +22,7 @@ func Start(makeHandler handlerFactory) {
 	cfg := aws.FromEnv(ctx)
 
 	// an empty API key disables instrumentation
-	if cfg.HoneycombAPIKey != "" {
+	if cfg.TelemetryEnabled {
 		var telemetryOpts []telemetry.TelemetryOption
 		if cfg.BaseTraceSampleRatio < 1.0 {
 			telemetryOpts = append(telemetryOpts, telemetry.WithBaseSampler(trace.TraceIDRatioBased(cfg.BaseTraceSampleRatio)))
