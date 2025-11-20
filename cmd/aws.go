@@ -57,8 +57,8 @@ var awsCmd = &cli.Command{
 			return fmt.Errorf("setting up IPNI options: %w", err)
 		}
 		srvOpts = append(srvOpts, ipniSrvOpts...)
-		// an empty API key disables instrumentation
-		if cfg.HoneycombAPIKey != "" {
+
+		if cfg.TelemetryEnabled {
 			var telemetryOpts []telemetry.TelemetryOption
 			if cfg.BaseTraceSampleRatio < 1.0 {
 				telemetryOpts = append(telemetryOpts, telemetry.WithBaseSampler(trace.TraceIDRatioBased(cfg.BaseTraceSampleRatio)))
@@ -107,7 +107,7 @@ var awsCmd = &cli.Command{
 func setupIPNIPipeline(cfg aws.Config) (*notifier.Notifier, error) {
 	// setup remote IPNI syncer
 	providersRedis := goredis.NewClusterClient(&cfg.ProvidersRedis)
-	if cfg.HoneycombAPIKey != "" {
+	if cfg.TelemetryEnabled {
 		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
 	}
 	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))
@@ -129,7 +129,7 @@ func setupProviderCacher(cfg aws.Config) (*providercacher.CachingQueuePoller, er
 	cachingQueue := aws.NewSQSCachingQueue(cfg.Config, cfg.SQSCachingQueueID, cfg.CachingBucket)
 
 	providersRedis := goredis.NewClusterClient(&cfg.ProvidersRedis)
-	if cfg.HoneycombAPIKey != "" {
+	if cfg.TelemetryEnabled {
 		providersRedis = telemetry.InstrumentRedisClient(providersRedis)
 	}
 	providerStore := redis.NewProviderStore(redis.NewClusterClientAdapter(providersRedis))

@@ -98,9 +98,11 @@ Optional. JSON array of IPNI node URLs to announce chain updates to.
 IPNI_ANNOUNCE_URLS=["https://cid.contact/announce"]
 ```
 
-#### `HONEYCOMB_API_KEY`
+#### `TELEMETRY_DISABLED`
 
-Setting this variable enables tracing for lambdas based on HTTP handlers. Currently, only Honeycomb is supported as the tracing backend. You can create a Honeycomb account and get an API key from the [Honeycomb website](https://www.honeycomb.io/).
+Telemetry is enabled by default. Set this variable to anything to disable it.
+
+When enabled, use the `HONEYCOMB_API_KEY` environment variable to have tracing data sent to Honeycomb. You can create a Honeycomb account and get an API key from the [Honeycomb website](https://www.honeycomb.io/). If a Honecomb API key is not provided, Storacha's default telemetry backend will be used.
 
 ### Deployment commands
 

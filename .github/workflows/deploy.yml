@@ -67,7 +67,6 @@ jobs:
       private-key: ${{ secrets.WARM_STAGING_PRIVATE_KEY }}
       cloudflare-zone-id: ${{ secrets.WARM_STAGING_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
-      honeycomb-api-key: ${{ secrets.WARM_STAGING_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.WARM_STAGING_SENTRY_DSN }}
 
   # apply prod on successful release, plan otherwise
@@ -111,5 +110,4 @@ jobs:
       private-key: ${{ secrets.FORGE_PROD_PRIVATE_KEY }}
       cloudflare-zone-id: ${{ secrets.FORGE_PROD_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.FORGE_PROD_CLOUDFLARE_API_TOKEN }}
-      honeycomb-api-key: ${{ secrets.FORGE_PROD_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.FORGE_PROD_SENTRY_DSN }}
