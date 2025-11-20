@@ -57,7 +57,7 @@ if [[ -z "${TELEMETRY_DISABLED-}" ]]; then
   else
     # HONEYCOMB_API_KEY not set, use Storacha's OTEL collector
     OTEL_SERVICE_NAME="${TF_WORKSPACE}-${TF_VAR_app}"
-    OTEL_EXPORTER_OTLP_ENDPOINT=https://telemetry.storacha.network:443/v1/traces
+    OTEL_EXPORTER_OTLP_ENDPOINT=https://telemetry.storacha.network:443
     OTEL_EXPORTER_OTLP_HEADERS=""
   fi
 fi
