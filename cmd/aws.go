@@ -151,8 +151,8 @@ func setupIPNIPublisher(cfg aws.Config) (*queue.PublishingQueuePoller, *queue.Ad
 	publishingQueue := awspublishingqueue.NewSQSPublishingQueue(cfg.Config, cfg.SQSPublishingQueueID, cfg.PublishingBucket)
 	advertisementPublishingQueue := awspublishingqueue.NewSQSAdvertisementPublishingQueue(cfg.Config, cfg.SQSAdvertisementPublishingQueueID)
 	store := setupIPNIPublisherStore(cfg)
-	advertismentQueuePublisher := queue.NewAdvertisementQueuePublisher(advertisementPublishingQueue, store)
-	publishingQueuePoller, err := queue.NewPublishingQueuePoller(publishingQueue, advertismentQueuePublisher)
+	advertisementQueuePublisher := queue.NewAdvertisementQueuePublisher(advertisementPublishingQueue, store)
+	publishingQueuePoller, err := queue.NewPublishingQueuePoller(publishingQueue, advertisementQueuePublisher)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating publishing queue poller: %w", err)
 	}
