@@ -32,7 +32,7 @@ require (
 	github.com/redis/go-redis/extra/redisotel/v9 v9.10.0
 	github.com/redis/go-redis/v9 v9.10.0
 	github.com/storacha/go-libstoracha v0.3.3
-	github.com/storacha/go-ucanto v0.7.0
+	github.com/storacha/go-ucanto v0.7.2-0.20251119232529-559b0a57d38f
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.39.0
 	github.com/testcontainers/testcontainers-go/modules/dynamodb v0.39.0
