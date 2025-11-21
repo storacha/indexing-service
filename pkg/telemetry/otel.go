@@ -39,7 +39,9 @@ func WithBaseSampler(baseSampler tracesdk.Sampler) TelemetryOption {
 // This function updates the configuration in place. It should be called before any AWS SDK clients are created.
 func SetupTelemetry(ctx context.Context, cfg *aws.Config, opts ...TelemetryOption) (func(context.Context), error) {
 	c := config{
-		baseSampler: tracesdk.AlwaysSample(),
+		// Default to only tracing when there is an incoming sampled parent (e.g. upstream service already tracing).
+		// This avoids generating root spans for ad-hoc Lambda invocations that arrive without trace headers.
+		baseSampler: tracesdk.NeverSample(),
 	}
 	for _, opt := range opts {
 		if err := opt(&c); err != nil {
@@ -68,10 +70,8 @@ func SetupTelemetry(ctx context.Context, cfg *aws.Config, opts ...TelemetryOptio
 	)
 	otel.SetTextMapPropagator(prop)
 
-	// We'll use a ParentBased(AlwaysSample) Sampler (which is the default, doing it explicitly here for readability).
-	// This means this service will export spans if the upstream service has sampled the request.
-	// Requests that are NOT coming from an upstream service, however, will always be sampled. This allows producing
-	// traces for manual queries, which is useful for debugging.
+	// Use ParentBased on the configured base sampler. With the default NeverSample base sampler, we emit spans only
+	// when the incoming request already has a sampled parent trace.
 	tp := tracesdk.NewTracerProvider(
 		tracesdk.WithSampler(tracesdk.ParentBased(c.baseSampler)),
 		tracesdk.WithBatcher(exp),
