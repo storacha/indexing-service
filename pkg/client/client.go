@@ -27,6 +27,11 @@ import (
 	hcmsg "github.com/storacha/go-ucanto/transport/headercar/message"
 	ucan_http "github.com/storacha/go-ucanto/transport/http"
 	"github.com/storacha/go-ucanto/ucan"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/storacha/indexing-service/pkg/service/queryresult"
 	"github.com/storacha/indexing-service/pkg/types"
 )
@@ -61,6 +66,7 @@ type Client struct {
 	serviceURL       url.URL
 	connection       client.Connection
 	httpClient       *http.Client
+	telemetryEnabled bool
 }
 
 func (c *Client) execute(ctx context.Context, inv invocation.Invocation) error {
@@ -125,6 +131,15 @@ func (c *Client) CacheClaim(ctx context.Context, issuer principal.Signer, cacheC
 }
 
 func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.QueryResult, error) {
+	var span trace.Span
+	if c.telemetryEnabled {
+		tracer := otel.Tracer("client")
+		ctx, span = tracer.Start(ctx, "client.QueryClaims",
+			trace.WithSpanKind(trace.SpanKindClient),
+		)
+		defer span.End()
+	}
+
 	url := c.serviceURL.JoinPath(claimsPath)
 	q := url.Query()
 	q.Add("type", query.Type.String())
@@ -137,7 +152,14 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	url.RawQuery = q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "creating request")
+		}
 		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	if c.telemetryEnabled {
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	}
 	// Request gzip compression
 	req.Header.Set("Accept-Encoding", "gzip")
@@ -159,9 +181,17 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	}
 	res, err := c.httpClient.Do(req)
 	if err != nil {
+		if span != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "sending query")
+		}
 		return nil, fmt.Errorf("sending query to server: %w", err)
 	}
 	if res.StatusCode < 200 || res.StatusCode > 299 {
+		if span != nil {
+			span.RecordError(errFromResponse(res))
+			span.SetStatus(codes.Error, "non-2xx response")
+		}
 		return nil, errFromResponse(res)
 	}
 
@@ -186,6 +216,13 @@ type Option func(*Client)
 func WithHTTPClient(httpClient *http.Client) Option {
 	return func(c *Client) {
 		c.httpClient = httpClient
+	}
+}
+
+// WithTelemetryEnabled toggles client-side tracing and context propagation.
+func WithTelemetryEnabled(enabled bool) Option {
+	return func(c *Client) {
+		c.telemetryEnabled = enabled
 	}
 }
 

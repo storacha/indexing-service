@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/url"
 
@@ -14,9 +15,11 @@ import (
 	"github.com/storacha/go-ucanto/core/delegation"
 	"github.com/storacha/go-ucanto/core/ipld"
 	"github.com/storacha/go-ucanto/did"
-	"github.com/storacha/indexing-service/pkg/client"
-	"github.com/storacha/indexing-service/pkg/types"
 	"github.com/urfave/cli/v2"
+
+	"github.com/storacha/indexing-service/pkg/client"
+	"github.com/storacha/indexing-service/pkg/telemetry"
+	"github.com/storacha/indexing-service/pkg/types"
 )
 
 var queryCmd = &cli.Command{
@@ -45,6 +48,11 @@ var queryCmd = &cli.Command{
 			Aliases: []string{"d"},
 			Usage:   "a delegation allowing the indexer to fetch content from the space",
 		},
+		&cli.BoolFlag{
+			Name:    "enabled-telemetry",
+			Usage:   "propagate tracing context on query requests",
+			EnvVars: []string{"INDEXER_CLIENT_TELEMETRY_ENABLED"},
+		},
 	},
 	Action: func(cCtx *cli.Context) error {
 		serviceURL, err := url.Parse(cCtx.String("url"))
@@ -57,7 +65,17 @@ var queryCmd = &cli.Command{
 			return fmt.Errorf("parsing service DID: %w", err)
 		}
 
-		c, err := client.New(serviceDID, *serviceURL)
+		// if telemetry is enabled for this query, setup the provider
+		type otelCloser = func(context.Context) error
+		var otelClose otelCloser
+		if cCtx.Bool("telemetry") {
+			otelClose, err = telemetry.SetupClientTelemetry(cCtx.Context)
+			if err != nil {
+				return fmt.Errorf("setting up telemetry: %w", err)
+			}
+		}
+
+		c, err := client.New(serviceDID, *serviceURL, client.WithTelemetryEnabled(cCtx.Bool("telemetry")))
 		if err != nil {
 			return fmt.Errorf("creating client: %w", err)
 		}
@@ -227,6 +245,11 @@ var queryCmd = &cli.Command{
 			}
 		}
 
+		if otelClose != nil {
+			if err := otelClose(cCtx.Context); err != nil {
+				log.Warnf("failed to close telemetry provider: %s", err)
+			}
+		}
 		return nil
 	},
 }
