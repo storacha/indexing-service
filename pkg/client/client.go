@@ -47,8 +47,19 @@ type ErrFailedResponse struct {
 
 func errFromResponse(res *http.Response) ErrFailedResponse {
 	err := ErrFailedResponse{StatusCode: res.StatusCode}
+	// Handle gzip decompression if needed
+	var reader io.ReadCloser = res.Body
+	if res.Header.Get("Content-Encoding") == "gzip" {
+		gzReader, gerr := gzip.NewReader(res.Body)
+		if gerr != nil {
+			err.Body = fmt.Sprintf("creating gzip reader: %v", gerr)
+			return err
+		}
+		defer gzReader.Close()
+		reader = gzReader
+	}
 
-	message, merr := io.ReadAll(res.Body)
+	message, merr := io.ReadAll(reader)
 	if merr != nil {
 		err.Body = merr.Error()
 	} else {
