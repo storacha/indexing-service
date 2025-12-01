@@ -186,6 +186,8 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		}
 		return nil, fmt.Errorf("sending query to server: %w", err)
 	}
+	defer res.Body.Close()
+
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		if span != nil {
 			span.RecordError(errFromResponse(res))
