@@ -47,6 +47,12 @@ else
   BASE_TRACE_SAMPLE_RATIO="1.0"
 fi
 
+if [[ "$TF_WORKSPACE" == "forge-prod" || "$TF_WORKSPACE" == "forge-staging" || "$TF_WORKSPACE" == "warm-staging" ]]; then
+  SUPPORT_LEGACY_SERVICES="false"
+else
+  SUPPORT_LEGACY_SERVICES="true"
+fi
+
 # Set up telemetry
 if [[ -z "${TELEMETRY_DISABLED-}" ]]; then
   if [[ -n "${HONEYCOMB_API_KEY-}" ]]; then
