@@ -68,10 +68,51 @@ func mustGetFloat(envVar string) float64 {
 	return value
 }
 
+type LegacyConfig struct {
+	LegacyClaimsTableName          string
+	LegacyClaimsTableRegion        string
+	LegacyClaimsBucket             string
+	LegacyBlockIndexTableName      string
+	LegacyBlockIndexTableRegion    string
+	LegacyStoreTableName           string
+	LegacyStoreTableRegion         string
+	LegacyBlobRegistryTableName    string
+	LegacyBlobRegistryTableRegion  string
+	LegacyAllocationsTableName     string
+	LegacyAllocationsTableRegion   string
+	LegacyDotStorageBucketPrefixes []string // legacy .storage buckets
+	LegacyDataBucketURL            string
+}
+
+func readLegacyConfig() LegacyConfig {
+	var legacyDotStorageBucketPrefixes []string
+	err := json.Unmarshal([]byte(mustGetEnv("LEGACY_DOT_STORAGE_BUCKET_PREFIXES")), &legacyDotStorageBucketPrefixes)
+	if err != nil {
+		panic(fmt.Errorf("parsing legacy dot storage bucket prefixes JSON: %w", err))
+	}
+	return LegacyConfig{
+		LegacyClaimsTableName:          mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
+		LegacyClaimsTableRegion:        mustGetEnv("LEGACY_CLAIMS_TABLE_REGION"),
+		LegacyClaimsBucket:             mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
+		LegacyBlockIndexTableName:      mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
+		LegacyBlockIndexTableRegion:    mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
+		LegacyStoreTableName:           mustGetEnv("LEGACY_STORE_TABLE_NAME"),
+		LegacyStoreTableRegion:         mustGetEnv("LEGACY_STORE_TABLE_REGION"),
+		LegacyBlobRegistryTableName:    mustGetEnv("LEGACY_BLOB_REGISTRY_TABLE_NAME"),
+		LegacyBlobRegistryTableRegion:  mustGetEnv("LEGACY_BLOB_REGISTRY_TABLE_REGION"),
+		LegacyAllocationsTableName:     mustGetEnv("LEGACY_ALLOCATIONS_TABLE_NAME"),
+		LegacyAllocationsTableRegion:   mustGetEnv("LEGACY_ALLOCATIONS_TABLE_REGION"),
+		LegacyDataBucketURL:            mustGetEnv("LEGACY_DATA_BUCKET_URL"),
+		LegacyDotStorageBucketPrefixes: legacyDotStorageBucketPrefixes,
+	}
+}
+
 // Config describes all the values required to setup AWS from the environment
 type Config struct {
 	construct.ServiceConfig
 	aws.Config
+	LegacyConfig
+	SupportLegacyServices             bool
 	ProvidersCacheExpirationSeconds   int64
 	NoProvidersCacheExpirationSeconds int64
 	ClaimsCacheExpirationSeconds      int64
@@ -90,19 +131,6 @@ type Config struct {
 	NotifierTopicArn                  string
 	ClaimStoreBucket                  string
 	ClaimStorePrefix                  string
-	LegacyClaimsTableName             string
-	LegacyClaimsTableRegion           string
-	LegacyClaimsBucket                string
-	LegacyBlockIndexTableName         string
-	LegacyBlockIndexTableRegion       string
-	LegacyStoreTableName              string
-	LegacyStoreTableRegion            string
-	LegacyBlobRegistryTableName       string
-	LegacyBlobRegistryTableRegion     string
-	LegacyAllocationsTableName        string
-	LegacyAllocationsTableRegion      string
-	LegacyDotStorageBucketPrefixes    []string // legacy .storage buckets
-	LegacyDataBucketURL               string
 	BaseTraceSampleRatio              float64
 	SentryDSN                         string
 	SentryEnvironment                 string
@@ -177,15 +205,17 @@ func FromEnv(ctx context.Context) Config {
 		ipniPublisherDirectAnnounceURLs = presets.IPNIAnnounceURLs
 	}
 
-	var legacyDotStorageBucketPrefixes []string
-	err = json.Unmarshal([]byte(mustGetEnv("LEGACY_DOT_STORAGE_BUCKET_PREFIXES")), &legacyDotStorageBucketPrefixes)
-	if err != nil {
-		panic(fmt.Errorf("parsing legacy dot storage bucket prefixes JSON: %w", err))
+	supportLegacyServices := mustGetEnv("SUPPORT_LEGACY_SERVICES") == "true"
+	var legacyConfig LegacyConfig
+	if supportLegacyServices {
+		legacyConfig = readLegacyConfig()
 	}
 
 	return Config{
-		Config: awsConfig,
-		Signer: id,
+		Config:                awsConfig,
+		SupportLegacyServices: supportLegacyServices,
+		LegacyConfig:          legacyConfig,
+		Signer:                id,
 		ServiceConfig: construct.ServiceConfig{
 			ID:         id,
 			PrivateKey: cryptoPrivKey,
@@ -246,19 +276,6 @@ func FromEnv(ctx context.Context) Config {
 		NotifierHeadBucket:                mustGetEnv("NOTIFIER_HEAD_BUCKET_NAME"),
 		ClaimStoreBucket:                  mustGetEnv("CLAIM_STORE_BUCKET_NAME"),
 		ClaimStorePrefix:                  os.Getenv("CLAIM_STORE_KEY_PREFIX"),
-		LegacyClaimsTableName:             mustGetEnv("LEGACY_CLAIMS_TABLE_NAME"),
-		LegacyClaimsTableRegion:           mustGetEnv("LEGACY_CLAIMS_TABLE_REGION"),
-		LegacyClaimsBucket:                mustGetEnv("LEGACY_CLAIMS_BUCKET_NAME"),
-		LegacyBlockIndexTableName:         mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_NAME"),
-		LegacyBlockIndexTableRegion:       mustGetEnv("LEGACY_BLOCK_INDEX_TABLE_REGION"),
-		LegacyStoreTableName:              mustGetEnv("LEGACY_STORE_TABLE_NAME"),
-		LegacyStoreTableRegion:            mustGetEnv("LEGACY_STORE_TABLE_REGION"),
-		LegacyBlobRegistryTableName:       mustGetEnv("LEGACY_BLOB_REGISTRY_TABLE_NAME"),
-		LegacyBlobRegistryTableRegion:     mustGetEnv("LEGACY_BLOB_REGISTRY_TABLE_REGION"),
-		LegacyAllocationsTableName:        mustGetEnv("LEGACY_ALLOCATIONS_TABLE_NAME"),
-		LegacyAllocationsTableRegion:      mustGetEnv("LEGACY_ALLOCATIONS_TABLE_REGION"),
-		LegacyDataBucketURL:               mustGetEnv("LEGACY_DATA_BUCKET_URL"),
-		LegacyDotStorageBucketPrefixes:    legacyDotStorageBucketPrefixes,
 		BaseTraceSampleRatio:              mustGetFloat("BASE_TRACE_SAMPLE_RATIO"),
 		SentryDSN:                         os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:                 os.Getenv("SENTRY_ENVIRONMENT"),
@@ -295,59 +312,9 @@ func Construct(cfg Config) (types.Service, error) {
 
 	publishingQueue := awspublisherqueue.NewSQSPublishingQueue(cfg.Config, cfg.SQSPublishingQueueID, cfg.PublishingBucket)
 	queuePublisher := publisherqueue.NewQueuePublisher(publishingQueue)
-
-	legacyDataBucketURL, err := url.Parse(cfg.LegacyDataBucketURL)
-	if err != nil {
-		return nil, fmt.Errorf("parsing carpark url: %s", err)
-	}
-	// legacy claims mapper
-	legacyClaimsCfg := cfg.Config.Copy()
-	legacyClaimsCfg.Region = cfg.LegacyClaimsTableRegion
-	legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName)
-
-	// bucket fallback mapper
-	allocationsCfg := cfg.Config.Copy()
-	allocationsCfg.Region = cfg.LegacyAllocationsTableRegion
-	legacyAllocationsStore := NewDynamoAllocationsTable(dynamodb.NewFromConfig(allocationsCfg), cfg.LegacyAllocationsTableName)
-	bucketFallbackMapper := NewBucketFallbackMapper(
-		cfg.Signer,
-		httpClient,
-		legacyDataBucketURL,
-		legacyAllocationsStore,
-		func() []delegation.Option {
-			return []delegation.Option{delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix()))}
-		},
-	)
-
-	// block index table mapper
-	blockIndexCfg := cfg.Config.Copy()
-	blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
-	legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
-	storeTableCfg := cfg.Config.Copy()
-	storeTableCfg.Region = cfg.LegacyStoreTableRegion
-	blobRegistryTableCfg := cfg.Config.Copy()
-	blobRegistryTableCfg.Region = cfg.LegacyBlobRegistryTableRegion
-	legacyMigratedShardChecker := NewDynamoMigratedShardChecker(
-		cfg.LegacyStoreTableName,
-		dynamodb.NewFromConfig(storeTableCfg),
-		cfg.LegacyBlobRegistryTableName,
-		dynamodb.NewFromConfig(blobRegistryTableCfg),
-		legacyAllocationsStore,
-	)
-	// allow claims synthethized from the block index table to live longer after they are expired in the cache
-	// so that the service doesn't return cached but expired delegations
-	synthetizedClaimExp := time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second + 1*time.Hour
-	blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, legacyMigratedShardChecker, cfg.LegacyDataBucketURL, synthetizedClaimExp, cfg.LegacyDotStorageBucketPrefixes)
-	if err != nil {
-		return nil, fmt.Errorf("creating block index table mapper: %w", err)
-	}
-
-	legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(legacyClaimsCfg, cfg.LegacyClaimsBucket, ""))
-	legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
-
 	var provIndexLog logging.EventLogger
 	if cfg.SentryDSN != "" && cfg.SentryEnvironment != "" {
-		err = sentry.Init(sentry.ClientOptions{
+		err := sentry.Init(sentry.ClientOptions{
 			Dsn:           cfg.SentryDSN,
 			Environment:   cfg.SentryEnvironment,
 			Release:       build.Version,
@@ -359,26 +326,80 @@ func Construct(cfg Config) (types.Service, error) {
 		}
 		provIndexLog = telemetry.NewSentryLogger("providerindex")
 	}
-
-	service, err := construct.Construct(
-		cfg.ServiceConfig,
+	opts := []construct.Option{
 		construct.SkipNotification(),
 		construct.WithCachingQueue(cachingQueue),
 		construct.WithPublisherStore(publisherStore),
 		construct.WithAsyncPublisher(queuePublisher),
 		construct.WithStartIPNIServer(false),
 		construct.WithClaimsStore(claimBucketStore),
-		construct.WithLegacyClaims([]legacy.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL),
 		construct.WithHTTPClient(httpClient),
 		construct.WithProvidersClient(redis.NewClusterClientAdapter(providersClient)),
 		construct.WithNoProvidersClient(noProvidersClient),
 		construct.WithClaimsClient(claimsClient),
 		construct.WithIndexesClient(indexesClient),
-		construct.WithProvidersCacheOptions(redis.ExpirationTime(time.Duration(cfg.ProvidersCacheExpirationSeconds)*time.Second)),
-		construct.WithNoProvidersCacheOptions(redis.ExpirationTime(time.Duration(cfg.NoProvidersCacheExpirationSeconds)*time.Second)),
-		construct.WithClaimsCacheOptions(redis.ExpirationTime(time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second)),
-		construct.WithIndexesCacheOptions(redis.ExpirationTime(time.Duration(cfg.IndexesCacheExpirationSeconds)*time.Second)),
+		construct.WithProvidersCacheOptions(redis.ExpirationTime(time.Duration(cfg.ProvidersCacheExpirationSeconds) * time.Second)),
+		construct.WithNoProvidersCacheOptions(redis.ExpirationTime(time.Duration(cfg.NoProvidersCacheExpirationSeconds) * time.Second)),
+		construct.WithClaimsCacheOptions(redis.ExpirationTime(time.Duration(cfg.ClaimsCacheExpirationSeconds) * time.Second)),
+		construct.WithIndexesCacheOptions(redis.ExpirationTime(time.Duration(cfg.IndexesCacheExpirationSeconds) * time.Second)),
 		construct.WithProviderIndexLogger(provIndexLog),
+	}
+
+	if cfg.SupportLegacyServices {
+		legacyDataBucketURL, err := url.Parse(cfg.LegacyDataBucketURL)
+		if err != nil {
+			return nil, fmt.Errorf("parsing carpark url: %s", err)
+		}
+		// legacy claims mapper
+		legacyClaimsCfg := cfg.Config.Copy()
+		legacyClaimsCfg.Region = cfg.LegacyClaimsTableRegion
+		legacyClaimsMapper := NewDynamoContentToClaimsMapper(dynamodb.NewFromConfig(legacyClaimsCfg), cfg.LegacyClaimsTableName)
+
+		// bucket fallback mapper
+		allocationsCfg := cfg.Config.Copy()
+		allocationsCfg.Region = cfg.LegacyAllocationsTableRegion
+		legacyAllocationsStore := NewDynamoAllocationsTable(dynamodb.NewFromConfig(allocationsCfg), cfg.LegacyAllocationsTableName)
+		bucketFallbackMapper := NewBucketFallbackMapper(
+			cfg.Signer,
+			httpClient,
+			legacyDataBucketURL,
+			legacyAllocationsStore,
+			func() []delegation.Option {
+				return []delegation.Option{delegation.WithExpiration(int(time.Now().Add(time.Hour).Unix()))}
+			},
+		)
+
+		// block index table mapper
+		blockIndexCfg := cfg.Config.Copy()
+		blockIndexCfg.Region = cfg.LegacyBlockIndexTableRegion
+		legacyBlockIndexStore := NewDynamoProviderBlockIndexTable(dynamodb.NewFromConfig(blockIndexCfg), cfg.LegacyBlockIndexTableName)
+		storeTableCfg := cfg.Config.Copy()
+		storeTableCfg.Region = cfg.LegacyStoreTableRegion
+		blobRegistryTableCfg := cfg.Config.Copy()
+		blobRegistryTableCfg.Region = cfg.LegacyBlobRegistryTableRegion
+		legacyMigratedShardChecker := NewDynamoMigratedShardChecker(
+			cfg.LegacyStoreTableName,
+			dynamodb.NewFromConfig(storeTableCfg),
+			cfg.LegacyBlobRegistryTableName,
+			dynamodb.NewFromConfig(blobRegistryTableCfg),
+			legacyAllocationsStore,
+		)
+		// allow claims synthethized from the block index table to live longer after they are expired in the cache
+		// so that the service doesn't return cached but expired delegations
+		synthetizedClaimExp := time.Duration(cfg.ClaimsCacheExpirationSeconds)*time.Second + 1*time.Hour
+		blockIndexTableMapper, err := NewBlockIndexTableMapper(cfg.Signer, legacyBlockIndexStore, legacyMigratedShardChecker, cfg.LegacyDataBucketURL, synthetizedClaimExp, cfg.LegacyDotStorageBucketPrefixes)
+		if err != nil {
+			return nil, fmt.Errorf("creating block index table mapper: %w", err)
+		}
+
+		legacyClaimsBucket := contentclaims.NewStoreFromBucket(NewS3Store(legacyClaimsCfg, cfg.LegacyClaimsBucket, ""))
+		legacyClaimsURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{claim}/{claim}.car", cfg.LegacyClaimsBucket, cfg.Config.Region)
+		opts = append(opts, construct.WithLegacyClaims([]legacy.ContentToClaimsMapper{legacyClaimsMapper, bucketFallbackMapper, blockIndexTableMapper}, legacyClaimsBucket, legacyClaimsURL))
+	}
+
+	service, err := construct.Construct(
+		cfg.ServiceConfig,
+		opts...,
 	)
 	if err != nil {
 		return nil, err
