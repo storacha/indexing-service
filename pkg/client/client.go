@@ -1,7 +1,6 @@
 package client
 
 import (
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -47,19 +46,8 @@ type ErrFailedResponse struct {
 
 func errFromResponse(res *http.Response) ErrFailedResponse {
 	err := ErrFailedResponse{StatusCode: res.StatusCode}
-	// Handle gzip decompression if needed
-	var reader io.ReadCloser = res.Body
-	if res.Header.Get("Content-Encoding") == "gzip" {
-		gzReader, gerr := gzip.NewReader(res.Body)
-		if gerr != nil {
-			err.Body = fmt.Sprintf("creating gzip reader: %v", gerr)
-			return err
-		}
-		defer gzReader.Close()
-		reader = gzReader
-	}
 
-	message, merr := io.ReadAll(reader)
+	message, merr := io.ReadAll(res.Body)
 	if merr != nil {
 		err.Body = merr.Error()
 	} else {
@@ -172,8 +160,7 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 	if c.telemetryEnabled {
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	}
-	// Request gzip compression
-	req.Header.Set("Accept-Encoding", "gzip")
+
 	// If there are query delegations, then add them to an X-Agent-Message header.
 	if len(query.Delegations) > 0 {
 		invs := make([]invocation.Invocation, 0, len(query.Delegations))
@@ -190,6 +177,7 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		}
 		req.Header.Set(hcmsg.HeaderName, headerValue)
 	}
+
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		if span != nil {
@@ -198,6 +186,8 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		}
 		return nil, fmt.Errorf("sending query to server: %w", err)
 	}
+	defer res.Body.Close()
+
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		if span != nil {
 			span.RecordError(errFromResponse(res))
@@ -206,18 +196,7 @@ func (c *Client) QueryClaims(ctx context.Context, query types.Query) (types.Quer
 		return nil, errFromResponse(res)
 	}
 
-	// Handle gzip decompression if needed
-	var reader io.ReadCloser = res.Body
-	if res.Header.Get("Content-Encoding") == "gzip" {
-		gzReader, err := gzip.NewReader(res.Body)
-		if err != nil {
-			return nil, fmt.Errorf("creating gzip reader: %w", err)
-		}
-		defer gzReader.Close()
-		reader = gzReader
-	}
-
-	return queryresult.Extract(reader)
+	return queryresult.Extract(res.Body)
 }
 
 type Option func(*Client)
