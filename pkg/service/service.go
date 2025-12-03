@@ -361,7 +361,7 @@ func urlForResource(provider peer.AddrInfo, replacements []replacement) (*url.UR
 		}
 	}
 	placeholders := strings.Join(slices.Collect(iterable.Map(func(r replacement) string { return r.resourcePlaceholder }, slices.Values(replacements))), " or ")
-	return nil, fmt.Errorf("no %s endpoint found", placeholders)
+	return nil, fmt.Errorf("no %s endpoint found in %d addresses", placeholders, len(provider.Addrs))
 }
 
 func fetchClaimURL(provider peer.AddrInfo, claimCid cid.Cid) (*url.URL, error) {
