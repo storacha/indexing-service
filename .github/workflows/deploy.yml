@@ -26,8 +26,20 @@ permissions:
   contents: read # This is required for actions/checkout
 
 jobs:
+  # First run the tests for pushes to main
+  run-tests:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/go-test.yml
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  
+  run-checks:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/go-check.yml
+
   # apply staging on pushes to main, plan otherwise
   staging:
+    needs: [run-tests, run-checks]
     uses: ./.github/workflows/terraform.yml
     with:
       env: staging
@@ -49,6 +61,7 @@ jobs:
       sentry-dsn: ${{ secrets.STAGING_SENTRY_DSN }}
 
   warm-staging:
+    needs: [run-tests, run-checks]
     uses: ./.github/workflows/terraform.yml
     with:
       env: warm-staging
@@ -71,6 +84,7 @@ jobs:
 
   # apply prod on successful release, plan otherwise
   production:
+    needs: [run-tests, run-checks]
     uses: ./.github/workflows/terraform.yml
     with:
       env: production
