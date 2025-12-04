@@ -1,7 +1,9 @@
 package client
 
 import (
+	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -9,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -138,7 +141,7 @@ func TestClient(t *testing.T) {
 			indexingUCANInvocations = append(indexingUCANInvocations, inv)
 		})
 		indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
-		indexingQueryServer := mockQueryServer(indexingQueryResults)
+		indexingQueryServer := mockQueryServer(indexingQueryResults, config{})
 		t.Cleanup(indexingQueryServer.Close)
 
 		c, err := New(indexingID, indexingURL)
@@ -180,132 +183,159 @@ func TestClient(t *testing.T) {
 		require.Equal(t, cassert.IndexAbility, assertIndexInvocation.Capabilities()[0].Can())
 	})
 
-	t.Run("query", func(t *testing.T) {
-		indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
-		indexingQueryServer := mockQueryServer(indexingQueryResults)
-		t.Cleanup(indexingQueryServer.Close)
-
-		c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
-		require.NoError(t, err)
-
-		claims := map[cid.Cid]delegation.Delegation{
-			link.ToCID(locationClaim.Link()):      locationClaim,
-			link.ToCID(indexLocationClaim.Link()): indexLocationClaim,
+	t.Run("query claims", func(t *testing.T) {
+		var testCases = []struct {
+			name       string
+			detectGzip bool
+		}{
+			{name: "without gzip", detectGzip: false},
+			{name: "with gzip", detectGzip: true},
 		}
-		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
-		spaceDID := space.DID()
-		contextID := types.ContextID{Space: &spaceDID, Hash: rootDigest}
-		indexes.Set(testutil.Must(contextID.ToEncoded())(t), index)
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Run("basic", func(t *testing.T) {
+					indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
+					indexingQueryServer := mockQueryServer(indexingQueryResults, config{detectGzip: tc.detectGzip})
+					t.Cleanup(indexingQueryServer.Close)
 
-		indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
+					c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
+					require.NoError(t, err)
 
-		res, err := c.QueryClaims(context.Background(), types.Query{
-			Hashes: []multihash.Multihash{rootDigest},
-		})
-		require.NoError(t, err)
+					claims := map[cid.Cid]delegation.Delegation{
+						link.ToCID(locationClaim.Link()):      locationClaim,
+						link.ToCID(indexLocationClaim.Link()): indexLocationClaim,
+					}
+					indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+					spaceDID := space.DID()
+					contextID := types.ContextID{Space: &spaceDID, Hash: rootDigest}
+					indexes.Set(testutil.Must(contextID.ToEncoded())(t), index)
 
-		require.NotEmpty(t, res.Claims())
-		require.True(t, slices.ContainsFunc(res.Claims(), func(c datamodel.Link) bool {
-			return c.String() == locationClaim.Link().String()
-		}))
-		require.True(t, slices.ContainsFunc(res.Claims(), func(c datamodel.Link) bool {
-			return c.String() == indexLocationClaim.Link().String()
-		}))
-		require.Equal(t, 1, len(res.Indexes()))
-		require.Equal(t, indexLink.String(), res.Indexes()[0].String())
-	})
+					indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
 
-	t.Run("query requests the right type", func(t *testing.T) {
-		indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
-		indexingQueryServer := mockQueryServer(indexingQueryResults)
-		t.Cleanup(indexingQueryServer.Close)
+					res, err := c.QueryClaims(context.Background(), types.Query{
+						Hashes: []multihash.Multihash{rootDigest},
+					})
+					require.NoError(t, err)
 
-		c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
-		require.NoError(t, err)
+					require.NotEmpty(t, res.Claims())
+					require.True(t, slices.ContainsFunc(res.Claims(), func(c datamodel.Link) bool {
+						return c.String() == locationClaim.Link().String()
+					}))
+					require.True(t, slices.ContainsFunc(res.Claims(), func(c datamodel.Link) bool {
+						return c.String() == indexLocationClaim.Link().String()
+					}))
+					require.Equal(t, 1, len(res.Indexes()))
+					require.Equal(t, indexLink.String(), res.Indexes()[0].String())
+				})
 
-		claims := map[cid.Cid]delegation.Delegation{}
-		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+				t.Run("query requests the right type", func(t *testing.T) {
+					indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
+					indexingQueryServer := mockQueryServer(indexingQueryResults, config{detectGzip: tc.detectGzip})
+					t.Cleanup(indexingQueryServer.Close)
 
-		indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
+					c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
+					require.NoError(t, err)
 
-		t.Run("standard", func(t *testing.T) {
-			_, err := c.QueryClaims(context.Background(), types.Query{
-				Hashes: []multihash.Multihash{rootDigest},
+					claims := map[cid.Cid]delegation.Delegation{}
+					indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+
+					indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
+
+					t.Run("standard", func(t *testing.T) {
+						_, err := c.QueryClaims(context.Background(), types.Query{
+							Hashes: []multihash.Multihash{rootDigest},
+						})
+						require.NoError(t, err)
+						require.Contains(t, indexingQueryServer.lastRequestedURL, "type=standard")
+					})
+
+					t.Run("location", func(t *testing.T) {
+						_, err := c.QueryClaims(context.Background(), types.Query{
+							Type:   types.QueryTypeLocation,
+							Hashes: []multihash.Multihash{rootDigest},
+						})
+						require.NoError(t, err)
+						require.Contains(t, indexingQueryServer.lastRequestedURL, "type=location")
+					})
+
+					t.Run("index_or_location", func(t *testing.T) {
+						_, err := c.QueryClaims(context.Background(), types.Query{
+							Type:   types.QueryTypeIndexOrLocation,
+							Hashes: []multihash.Multihash{rootDigest},
+						})
+						require.NoError(t, err)
+						require.Contains(t, indexingQueryServer.lastRequestedURL, "type=index_or_location")
+					})
+				})
+
+				t.Run("query with delegation", func(t *testing.T) {
+					indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
+					indexingQueryServer := mockQueryServer(indexingQueryResults, config{detectGzip: tc.detectGzip})
+					t.Cleanup(indexingQueryServer.Close)
+
+					c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
+					require.NoError(t, err)
+
+					claims := map[cid.Cid]delegation.Delegation{
+						link.ToCID(locationClaim.Link()):      locationClaim,
+						link.ToCID(indexLocationClaim.Link()): indexLocationClaim,
+					}
+					indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
+					spaceDID := space.DID()
+					contextID := types.ContextID{Space: &spaceDID, Hash: rootDigest}
+					indexes.Set(testutil.Must(contextID.ToEncoded())(t), index)
+
+					indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
+
+					dlg, err := delegation.Delegate(
+						space,
+						indexingID,
+						[]ucan.Capability[ucan.NoCaveats]{
+							ucan.NewCapability(content.RetrieveAbility, space.DID().String(), ucan.NoCaveats{}),
+						},
+					)
+					require.NoError(t, err)
+
+					_, err = c.QueryClaims(context.Background(), types.Query{
+						Hashes:      []multihash.Multihash{rootDigest},
+						Match:       types.Match{Subject: []did.DID{spaceDID}},
+						Delegations: []delegation.Delegation{dlg},
+					})
+					require.NoError(t, err)
+
+					agentMsgHeader := indexingQueryServer.lastRequestedHeader.Get(hcmsg.HeaderName)
+					require.NotEmpty(t, agentMsgHeader)
+
+					msg, err := hcmsg.DecodeHeader(agentMsgHeader)
+					require.NoError(t, err)
+
+					lastURL := testutil.Must(url.Parse(indexingQueryServer.lastRequestedURL))(t)
+					require.NotEmpty(t, lastURL.Query().Get("spaces"))
+
+					dlg, _, err = msg.Invocation(msg.Invocations()[0])
+					require.NoError(t, err)
+
+					cap := dlg.Capabilities()[0]
+					require.Equal(t, content.RetrieveAbility, cap.Can())
+					require.Equal(t, spaceDID.String(), cap.With())
+					// Authorized-ish!
+				})
+				t.Run("query throws error", func(t *testing.T) {
+					indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
+					indexingQueryServer := mockQueryServer(indexingQueryResults, config{detectGzip: tc.detectGzip, throwError: errors.New("something went terribly wrong")})
+					t.Cleanup(indexingQueryServer.Close)
+
+					c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
+					require.NoError(t, err)
+
+					_, err = c.QueryClaims(context.Background(), types.Query{
+						Hashes: []multihash.Multihash{rootDigest},
+					})
+					require.Error(t, err)
+					require.EqualError(t, err, "http request failed, status: 500 Internal Server Error, message: something went terribly wrong\n")
+				})
 			})
-			require.NoError(t, err)
-			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=standard")
-		})
-
-		t.Run("location", func(t *testing.T) {
-			_, err := c.QueryClaims(context.Background(), types.Query{
-				Type:   types.QueryTypeLocation,
-				Hashes: []multihash.Multihash{rootDigest},
-			})
-			require.NoError(t, err)
-			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=location")
-		})
-
-		t.Run("index_or_location", func(t *testing.T) {
-			_, err := c.QueryClaims(context.Background(), types.Query{
-				Type:   types.QueryTypeIndexOrLocation,
-				Hashes: []multihash.Multihash{rootDigest},
-			})
-			require.NoError(t, err)
-			require.Contains(t, indexingQueryServer.lastRequestedURL, "type=index_or_location")
-		})
-	})
-
-	t.Run("query with delegation", func(t *testing.T) {
-		indexingQueryResults := bytemap.NewByteMap[multihash.Multihash, types.QueryResult](-1)
-		indexingQueryServer := mockQueryServer(indexingQueryResults)
-		t.Cleanup(indexingQueryServer.Close)
-
-		c, err := New(indexingID, *testutil.Must(url.Parse(indexingQueryServer.URL))(t))
-		require.NoError(t, err)
-
-		claims := map[cid.Cid]delegation.Delegation{
-			link.ToCID(locationClaim.Link()):      locationClaim,
-			link.ToCID(indexLocationClaim.Link()): indexLocationClaim,
 		}
-		indexes := bytemap.NewByteMap[types.EncodedContextID, blobindex.ShardedDagIndexView](-1)
-		spaceDID := space.DID()
-		contextID := types.ContextID{Space: &spaceDID, Hash: rootDigest}
-		indexes.Set(testutil.Must(contextID.ToEncoded())(t), index)
-
-		indexingQueryResults.Set(rootDigest, testutil.Must(queryresult.Build(claims, indexes))(t))
-
-		dlg, err := delegation.Delegate(
-			space,
-			indexingID,
-			[]ucan.Capability[ucan.NoCaveats]{
-				ucan.NewCapability(content.RetrieveAbility, space.DID().String(), ucan.NoCaveats{}),
-			},
-		)
-		require.NoError(t, err)
-
-		_, err = c.QueryClaims(context.Background(), types.Query{
-			Hashes:      []multihash.Multihash{rootDigest},
-			Match:       types.Match{Subject: []did.DID{spaceDID}},
-			Delegations: []delegation.Delegation{dlg},
-		})
-		require.NoError(t, err)
-
-		agentMsgHeader := indexingQueryServer.lastRequestedHeader.Get(hcmsg.HeaderName)
-		require.NotEmpty(t, agentMsgHeader)
-
-		msg, err := hcmsg.DecodeHeader(agentMsgHeader)
-		require.NoError(t, err)
-
-		lastURL := testutil.Must(url.Parse(indexingQueryServer.lastRequestedURL))(t)
-		require.NotEmpty(t, lastURL.Query().Get("spaces"))
-
-		dlg, _, err = msg.Invocation(msg.Invocations()[0])
-		require.NoError(t, err)
-
-		cap := dlg.Capabilities()[0]
-		require.Equal(t, content.RetrieveAbility, cap.Can())
-		require.Equal(t, spaceDID.String(), cap.With())
-		// Authorized-ish!
 	})
 }
 
@@ -353,7 +383,12 @@ type mockServer struct {
 	lastRequestedHeader http.Header
 }
 
-func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryResult]) *mockServer {
+type config struct {
+	throwError error
+	detectGzip bool
+}
+
+func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryResult], config config) *mockServer {
 	ms := &mockServer{}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -372,6 +407,11 @@ func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryRes
 			return
 		}
 
+		if config.throwError != nil {
+			http.Error(w, config.throwError.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		qr := results.Get(digest)
 		if qr == nil {
 			qr, _ = queryresult.Build(
@@ -385,9 +425,45 @@ func mockQueryServer(results bytemap.ByteMap[multihash.Multihash, types.QueryRes
 		io.Copy(w, body)
 	})
 
+	if config.detectGzip {
+		handler = withGzip(handler)
+	}
+
 	ms.Server = httptest.NewServer(handler)
 
 	return ms
+}
+
+// gzipResponseWriter wraps http.ResponseWriter to support gzip compression
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+}
+
+func (w gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+// withGzip wraps a handler to support gzip compression if the client accepts it
+func withGzip(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if client accepts gzip encoding
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			handler(w, r)
+			return
+		}
+
+		// Set the content encoding header
+		w.Header().Set("Content-Encoding", "gzip")
+
+		// Create gzip writer
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+
+		// Wrap the response writer
+		gzw := gzipResponseWriter{Writer: gz, ResponseWriter: w}
+		handler(gzw, r)
+	}
 }
 
 func randomLocalURL(t *testing.T) url.URL {
