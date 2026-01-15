@@ -222,7 +222,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					url, err := fetchRetrievalURL(*result.Provider, *shard)
 					if err != nil {
 						telemetry.Error(s, err, "fetching index retrieval URL")
-						return err
+						return fmt.Errorf("fetching retrieval URL for index %q: %w", shard, err)
 					}
 
 					s.AddEvent("fetching index")
@@ -361,7 +361,8 @@ func urlForResource(provider peer.AddrInfo, replacements []replacement) (*url.UR
 		}
 	}
 	placeholders := strings.Join(slices.Collect(iterable.Map(func(r replacement) string { return r.resourcePlaceholder }, slices.Values(replacements))), " or ")
-	return nil, fmt.Errorf("no %s endpoint found in %d addresses", placeholders, len(provider.Addrs))
+	addrs := strings.Join(slices.Collect(iterable.Map(func(a multiaddr.Multiaddr) string { return a.String() }, slices.Values(provider.Addrs))), ", ")
+	return nil, fmt.Errorf("no %s endpoint found in %d addresses: %s", placeholders, len(provider.Addrs), addrs)
 }
 
 func fetchClaimURL(provider peer.AddrInfo, claimCid cid.Cid) (*url.URL, error) {
