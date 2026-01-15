@@ -135,6 +135,11 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 	}
 
 	s.AddEvent(fmt.Sprintf("processing %d results", len(results)))
+	
+	var indexFetchAttempted bool
+	var indexFetchSucceeded bool
+	var lastIndexFetchErr error
+	
 	for _, result := range results {
 		// unmarshall metadata for this provider
 		md := metadata.MetadataContext.New()
@@ -211,9 +216,12 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			case *metadata.LocationCommitmentMetadata:
 				s.AddEvent("processing location claim")
 
-				// for a location claim, we just store it, unless its for an index CID, in which case get the full idnex
+				// for a location claim, we just store it, unless its for an index CID, in which case get the full index
 				if j.indexForMh != nil {
-					// fetch (from URL or cache) the full index
+					indexFetchAttempted = true
+					
+					// Try to fetch the index from this provider result
+					// If it fails, we'll continue to the next result instead of failing the entire query
 					shard := typedProtocol.Shard
 					if shard == nil {
 						c := cid.NewCidV1(cid.Raw, j.mh)
@@ -222,14 +230,18 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					url, err := fetchRetrievalURL(*result.Provider, *shard)
 					if err != nil {
 						telemetry.Error(s, err, "fetching index retrieval URL")
-						return fmt.Errorf("fetching retrieval URL for index %q: %w", shard, err)
+						log.Warnw("failed to fetch retrieval URL, will try next provider result if available", "shard", shard, "provider", result.Provider.ID, "err", err)
+						lastIndexFetchErr = fmt.Errorf("fetching retrieval URL for index %q from provider %s: %w", shard, result.Provider.ID, err)
+						continue // Try next provider result
 					}
 
 					s.AddEvent("fetching index")
 					var auth *types.RetrievalAuth
 					match, err := assert.Location.Match(validator.NewSource(claim.Capabilities()[0], claim))
 					if err != nil {
-						return fmt.Errorf("failed to match claim to location commitment: %w", err)
+						log.Warnw("failed to match claim to location commitment, will try next provider result if available", "err", err)
+						lastIndexFetchErr = fmt.Errorf("failed to match claim to location commitment: %w", err)
+						continue
 					}
 					lcCaveats := match.Value().Nb()
 					space := lcCaveats.Space
@@ -261,10 +273,13 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					index, err := is.blobIndexLookup.Find(mhCtx, result.ContextID, *j.indexProviderRecord, req)
 					if err != nil {
 						telemetry.Error(s, err, "fetching index blob")
-						return err
+						log.Warnw("failed to fetch index blob, will try next provider result if available", "provider", result.Provider.ID, "err", err)
+						lastIndexFetchErr = fmt.Errorf("fetching index blob from provider %s: %w", result.Provider.ID, err)
+						continue // Try next provider result
 					}
 
-					// Add the index to the query results, if we don't already have it
+					// Success! Add the index to the query results, if we don't already have it
+					indexFetchSucceeded = true
 					state.CmpSwap(
 						func(qs queryState) bool {
 							return !qs.qr.Indexes.Has(result.ContextID)
@@ -288,6 +303,11 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 				}
 			}
 		}
+	}
+	
+	// If we attempted to fetch an index but all attempts failed, return the last error
+	if indexFetchAttempted && !indexFetchSucceeded {
+		return fmt.Errorf("failed to fetch index from all provider results: %w", lastIndexFetchErr)
 	}
 	return nil
 }
