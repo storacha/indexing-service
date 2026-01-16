@@ -136,7 +136,6 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 
 	s.AddEvent(fmt.Sprintf("processing %d results", len(results)))
 	
-	var indexFetchAttempted bool
 	var indexFetchSucceeded bool
 	var lastIndexFetchErr error
 	
@@ -218,8 +217,6 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 
 				// for a location claim, we just store it, unless its for an index CID, in which case get the full index
 				if j.indexForMh != nil {
-					indexFetchAttempted = true
-					
 					// Try to fetch the index from this provider result
 					// If it fails, we'll continue to the next result instead of failing the entire query
 					shard := typedProtocol.Shard
@@ -306,7 +303,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 	}
 	
 	// If we attempted to fetch an index but all attempts failed, return the last error
-	if indexFetchAttempted && !indexFetchSucceeded {
+	if lastIndexFetchErr != nil && !indexFetchSucceeded {
 		return fmt.Errorf("failed to fetch index from all provider results: %w", lastIndexFetchErr)
 	}
 	return nil
