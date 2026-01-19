@@ -422,9 +422,192 @@ func TestQuery(t *testing.T) {
 
 		require.Error(t, err)
 	})
+
+	t.Run("succeeds when at least one provider result is valid despite others having incomplete addresses", func(t *testing.T) {
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+
+		// First provider has incomplete addresses (only claim endpoint, missing blob endpoint)
+		// This simulates the real-world issue from cid.contact
+		badProviderAddr := &peer.AddrInfo{
+			ID: testutil.RandomPeer(t),
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/indexer.storacha.network/https/http-path/claim%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		// Second provider has valid addresses but will return wrong claim type
+		wrongClaimProviderAddr := &peer.AddrInfo{
+			ID: testutil.RandomPeer(t),
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/wrong.storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/wrong.storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+			},
+		}
+
+		// Third provider has valid addresses (both claim and blob endpoints)
+		goodProviderAddr := &peer.AddrInfo{
+			ID: testutil.RandomPeer(t),
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fclaims%2F%7Bclaim%7D"))(t),
+				testutil.Must(ma.NewMultiaddr("/dns/storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
+			},
+		}
+
+		contentLink := testutil.RandomCID(t)
+		contentHash := contentLink.(cidlink.Link).Hash()
+		space := testutil.RandomDID(t)
+
+		// content will have a location claim and an index claim
+		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), goodProviderAddr, space, rand.Uint64N(5000))
+		indexDelegationCid, indexDelegation, indexResult, indexCid, index := buildTestIndexClaim(t, contentLink.(cidlink.Link), goodProviderAddr)
+
+		contentResults := []model.ProviderResult{locationProviderResult, indexResult}
+
+		// expect a call to find records for content
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Hash:         contentHash,
+			TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+		}).Return(contentResults, nil)
+
+		// the results for content should make the IndexingService ask for both claims
+		locationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", locationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, locationDelegationCid, locationClaimUrl).Return(locationDelegation, nil)
+		indexClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", indexDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, indexDelegationCid, indexClaimUrl).Return(indexDelegation, nil)
+
+		// then attempt to find records for the index referenced in the index claim
+		// This returns THREE provider results:
+		// 1. First one with bad addresses and nil shard (fails at fetchRetrievalURL)
+		// 2. Second one with valid addresses but returns wrong claim type (fails at assert.Location.Match)
+		// 3. Third one with good addresses and valid claim (succeeds)
+		indexSize := rand.Uint64N(5000)
+		// First provider has nil shard to test the shard == nil code path, fails at fetchRetrievalURL
+		badIndexLocationDelegationCid, badIndexLocationDelegation, badIndexLocationProviderResult := buildTestLocationClaimWithShard(t, indexCid, badProviderAddr, space, indexSize, nil)
+		// Second provider has valid addresses but we'll return wrong claim type (index delegation instead of location)
+		wrongClaimLocationDelegationCid, _, wrongClaimProviderResult := buildTestLocationClaim(t, indexCid, wrongClaimProviderAddr, space, indexSize)
+		// Third provider is valid
+		goodIndexLocationDelegationCid, goodIndexLocationDelegation, goodIndexLocationProviderResult := buildTestLocationClaim(t, indexCid, goodProviderAddr, space, indexSize)
+
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Hash:         indexCid.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{badIndexLocationProviderResult, wrongClaimProviderResult, goodIndexLocationProviderResult}, nil)
+
+		// fetch the first index's location claim (bad provider - fails at fetchRetrievalURL)
+		// Note: http-path encoding produces paths without leading slash
+		badIndexLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://indexer.storacha.network/claim/%s", badIndexLocationDelegationCid.String())))(t)
+		badIndexLocationClaimUrl.Path = fmt.Sprintf("claim/%s", badIndexLocationDelegationCid.String()) // Remove leading slash
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, badIndexLocationDelegationCid, badIndexLocationClaimUrl).Return(badIndexLocationDelegation, nil)
+
+		// fetch the second index's location claim (wrong claim provider - returns index delegation instead of location)
+		// This will cause assert.Location.Match to fail, covering lines 239-240
+		wrongClaimLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://wrong.storacha.network/claims/%s", wrongClaimLocationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, wrongClaimLocationDelegationCid, wrongClaimLocationClaimUrl).Return(indexDelegation, nil) // Return index delegation instead of location
+
+		// fetch the third index's location claim (good provider)
+		goodIndexLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", goodIndexLocationDelegationCid.String())))(t)
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, goodIndexLocationDelegationCid, goodIndexLocationClaimUrl).Return(goodIndexLocationDelegation, nil)
+
+		// The first provider result will fail to build a retrieval URL (no blob endpoint)
+		// The second provider result will fail at assert.Location.Match (wrong claim type)
+		// The third provider result should succeed
+		goodIndexBlobUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/blobs/%s", digestutil.Format(indexCid.Hash()))))(t)
+		retrievalReq := types.NewRetrievalRequest(goodIndexBlobUrl, &metadata.Range{Length: &indexSize}, nil)
+		mockBlobIndexLookup.EXPECT().Find(extmocks.AnyContext, types.EncodedContextID(goodIndexLocationProviderResult.ContextID), indexResult, retrievalReq).Return(index, nil)
+
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+
+		result, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
+
+		// Should succeed despite the first two provider results failing
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Indexes(), 1, "should have successfully fetched the index from the third provider result")
+	})
+
+	t.Run("returns error when all provider results are invalid (have incomplete addresses)", func(t *testing.T) {
+		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
+		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
+		mockProviderIndex := providerindex.NewMockProviderIndex(t)
+
+		// Both providers have incomplete addresses (only claim endpoint, missing blob endpoint)
+		badProviderAddr1 := &peer.AddrInfo{
+			ID: testutil.RandomPeer(t),
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/indexer.storacha.network/https/http-path/claim%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		badProviderAddr2 := &peer.AddrInfo{
+			ID: testutil.RandomPeer(t),
+			Addrs: []ma.Multiaddr{
+				testutil.Must(ma.NewMultiaddr("/dns/other.storacha.network/https/http-path/claim%2F%7Bclaim%7D"))(t),
+			},
+		}
+
+		contentLink := testutil.RandomCID(t)
+		contentHash := contentLink.(cidlink.Link).Hash()
+		space := testutil.RandomDID(t)
+
+		// content will have a location claim and an index claim
+		locationDelegationCid, locationDelegation, locationProviderResult := buildTestLocationClaim(t, contentLink.(cidlink.Link), badProviderAddr1, space, rand.Uint64N(5000))
+		indexDelegationCid, indexDelegation, indexResult, indexCid, _ := buildTestIndexClaim(t, contentLink.(cidlink.Link), badProviderAddr1)
+
+		contentResults := []model.ProviderResult{locationProviderResult, indexResult}
+
+		// expect a call to find records for content
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Hash:         contentHash,
+			TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
+		}).Return(contentResults, nil)
+
+		// the results for content should make the IndexingService ask for both claims
+		locationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://indexer.storacha.network/claim/%s", locationDelegationCid.String())))(t)
+		locationClaimUrl.Path = fmt.Sprintf("claim/%s", locationDelegationCid.String())
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, locationDelegationCid, locationClaimUrl).Return(locationDelegation, nil)
+		indexClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://indexer.storacha.network/claim/%s", indexDelegationCid.String())))(t)
+		indexClaimUrl.Path = fmt.Sprintf("claim/%s", indexDelegationCid.String())
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, indexDelegationCid, indexClaimUrl).Return(indexDelegation, nil)
+
+		// then attempt to find records for the index - both have bad addresses
+		indexSize := rand.Uint64N(5000)
+		badIndexLocationDelegationCid1, badIndexLocationDelegation1, badIndexLocationProviderResult1 := buildTestLocationClaim(t, indexCid, badProviderAddr1, space, indexSize)
+		badIndexLocationDelegationCid2, badIndexLocationDelegation2, badIndexLocationProviderResult2 := buildTestLocationClaim(t, indexCid, badProviderAddr2, space, indexSize)
+
+		mockProviderIndex.EXPECT().Find(extmocks.AnyContext, providerindex.QueryKey{
+			Hash:         indexCid.Hash(),
+			TargetClaims: []multicodec.Code{metadata.LocationCommitmentID},
+		}).Return([]model.ProviderResult{badIndexLocationProviderResult1, badIndexLocationProviderResult2}, nil)
+
+		// fetch both location claims (both bad providers)
+		badIndexLocationClaimUrl1 := testutil.Must(url.Parse(fmt.Sprintf("https://indexer.storacha.network/claim/%s", badIndexLocationDelegationCid1.String())))(t)
+		badIndexLocationClaimUrl1.Path = fmt.Sprintf("claim/%s", badIndexLocationDelegationCid1.String())
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, badIndexLocationDelegationCid1, badIndexLocationClaimUrl1).Return(badIndexLocationDelegation1, nil)
+
+		badIndexLocationClaimUrl2 := testutil.Must(url.Parse(fmt.Sprintf("https://other.storacha.network/claim/%s", badIndexLocationDelegationCid2.String())))(t)
+		badIndexLocationClaimUrl2.Path = fmt.Sprintf("claim/%s", badIndexLocationDelegationCid2.String())
+		mockClaimsService.EXPECT().Find(extmocks.AnyContext, badIndexLocationDelegationCid2, badIndexLocationClaimUrl2).Return(badIndexLocationDelegation2, nil)
+
+		// Both provider results will fail to build a retrieval URL (no blob endpoint)
+		// No mockBlobIndexLookup expectations because we never get that far
+
+		service := NewIndexingService(testutil.Service, mockBlobIndexLookup, mockClaimsService, peer.AddrInfo{ID: testutil.RandomPeer(t)}, mockProviderIndex)
+
+		_, err := service.Query(t.Context(), types.Query{Hashes: []mh.Multihash{contentHash}})
+
+		// Should fail because all provider results have incomplete addresses
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to fetch index from all provider results")
+	})
 }
 
 func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo, space did.DID, size uint64) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
+	return buildTestLocationClaimWithShard(t, contentLink, providerAddr, space, size, &contentLink.Cid)
+}
+
+func buildTestLocationClaimWithShard(t *testing.T, contentLink cidlink.Link, providerAddr *peer.AddrInfo, space did.DID, size uint64, shard *cid.Cid) (cidlink.Link, delegation.Delegation, model.ProviderResult) {
 	locationClaim := cassert.Location.New(testutil.Alice.DID().String(), cassert.LocationCaveats{
 		Content:  ctypes.FromHash(contentLink.Hash()),
 		Location: []url.URL{*testutil.Must(url.Parse("https://storacha.network"))(t)},
@@ -441,7 +624,7 @@ func buildTestLocationClaim(t *testing.T, contentLink cidlink.Link, providerAddr
 	}.Sum(testutil.Must(io.ReadAll(delegation.Archive(locationDelegation)))(t)))(t)
 
 	locationMetadata := metadata.LocationCommitmentMetadata{
-		Shard:      &contentLink.Cid,
+		Shard:      shard,
 		Claim:      locationDelegationCid,
 		Range:      &metadata.Range{Length: &size},
 		Expiration: time.Now().Add(time.Hour).Unix(),

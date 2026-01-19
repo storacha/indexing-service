@@ -123,14 +123,6 @@ func createAllocationsTable(t *testing.T, c *dynamodb.Client, tableName string) 
 				AttributeType: types.ScalarAttributeTypeS,
 			},
 			{
-				AttributeName: aws.String("size"),
-				AttributeType: types.ScalarAttributeTypeN,
-			},
-			{
-				AttributeName: aws.String("invocation"),
-				AttributeType: types.ScalarAttributeTypeS,
-			},
-			{
 				AttributeName: aws.String("insertedAt"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
