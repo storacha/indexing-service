@@ -135,10 +135,10 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 	}
 
 	s.AddEvent(fmt.Sprintf("processing %d results", len(results)))
-	
+
 	var indexFetchSucceeded bool
 	var lastIndexFetchErr error
-	
+
 	for _, result := range results {
 		// unmarshall metadata for this provider
 		md := metadata.MetadataContext.New()
@@ -301,7 +301,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			}
 		}
 	}
-	
+
 	// If we attempted to fetch an index but all attempts failed, return the last error
 	if lastIndexFetchErr != nil && !indexFetchSucceeded {
 		return fmt.Errorf("failed to fetch index from all provider results: %w", lastIndexFetchErr)

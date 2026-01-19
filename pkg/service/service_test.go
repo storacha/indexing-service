@@ -427,7 +427,7 @@ func TestQuery(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
-		
+
 		// First provider has incomplete addresses (only claim endpoint, missing blob endpoint)
 		// This simulates the real-world issue from cid.contact
 		badProviderAddr := &peer.AddrInfo{
@@ -445,7 +445,7 @@ func TestQuery(t *testing.T) {
 				testutil.Must(ma.NewMultiaddr("/dns/wrong.storacha.network/tls/http/http-path/%2Fblobs%2F%7Bblob%7D"))(t),
 			},
 		}
-		
+
 		// Third provider has valid addresses (both claim and blob endpoints)
 		goodProviderAddr := &peer.AddrInfo{
 			ID: testutil.RandomPeer(t),
@@ -505,7 +505,7 @@ func TestQuery(t *testing.T) {
 		// This will cause assert.Location.Match to fail, covering lines 239-240
 		wrongClaimLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://wrong.storacha.network/claims/%s", wrongClaimLocationDelegationCid.String())))(t)
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, wrongClaimLocationDelegationCid, wrongClaimLocationClaimUrl).Return(indexDelegation, nil) // Return index delegation instead of location
-		
+
 		// fetch the third index's location claim (good provider)
 		goodIndexLocationClaimUrl := testutil.Must(url.Parse(fmt.Sprintf("https://storacha.network/claims/%s", goodIndexLocationDelegationCid.String())))(t)
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, goodIndexLocationDelegationCid, goodIndexLocationClaimUrl).Return(goodIndexLocationDelegation, nil)
@@ -531,7 +531,7 @@ func TestQuery(t *testing.T) {
 		mockBlobIndexLookup := blobindexlookup.NewMockBlobIndexLookup(t)
 		mockClaimsService := contentclaims.NewMockContentClaimsService(t)
 		mockProviderIndex := providerindex.NewMockProviderIndex(t)
-		
+
 		// Both providers have incomplete addresses (only claim endpoint, missing blob endpoint)
 		badProviderAddr1 := &peer.AddrInfo{
 			ID: testutil.RandomPeer(t),
@@ -539,7 +539,7 @@ func TestQuery(t *testing.T) {
 				testutil.Must(ma.NewMultiaddr("/dns/indexer.storacha.network/https/http-path/claim%2F%7Bclaim%7D"))(t),
 			},
 		}
-		
+
 		badProviderAddr2 := &peer.AddrInfo{
 			ID: testutil.RandomPeer(t),
 			Addrs: []ma.Multiaddr{
@@ -585,7 +585,7 @@ func TestQuery(t *testing.T) {
 		badIndexLocationClaimUrl1 := testutil.Must(url.Parse(fmt.Sprintf("https://indexer.storacha.network/claim/%s", badIndexLocationDelegationCid1.String())))(t)
 		badIndexLocationClaimUrl1.Path = fmt.Sprintf("claim/%s", badIndexLocationDelegationCid1.String())
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, badIndexLocationDelegationCid1, badIndexLocationClaimUrl1).Return(badIndexLocationDelegation1, nil)
-		
+
 		badIndexLocationClaimUrl2 := testutil.Must(url.Parse(fmt.Sprintf("https://other.storacha.network/claim/%s", badIndexLocationDelegationCid2.String())))(t)
 		badIndexLocationClaimUrl2.Path = fmt.Sprintf("claim/%s", badIndexLocationDelegationCid2.String())
 		mockClaimsService.EXPECT().Find(extmocks.AnyContext, badIndexLocationDelegationCid2, badIndexLocationClaimUrl2).Return(badIndexLocationDelegation2, nil)
