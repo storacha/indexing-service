@@ -93,6 +93,7 @@ var targetClaims = map[types.QueryType][]multicodec.Code{
 	types.QueryTypeStandardCompressed: {metadata.EqualsClaimID, metadata.IndexClaimID, metadata.LocationCommitmentID},
 	types.QueryTypeLocation:           {metadata.LocationCommitmentID},
 	types.QueryTypeIndexOrLocation:    {metadata.IndexClaimID, metadata.LocationCommitmentID},
+	types.QueryTypeEqualsOrLocation:   {metadata.EqualsClaimID, metadata.LocationCommitmentID},
 }
 
 type queryResult struct {
