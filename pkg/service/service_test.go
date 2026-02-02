@@ -308,15 +308,15 @@ func TestQuery(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run("equals query: equals only", func(t *testing.T) {
+		t.Run("equals_or_location: equals and location", func(t *testing.T) {
 			query := types.Query{
-				Type:   types.QueryTypeEquals,
+				Type:   types.QueryTypeEqualsOrLocation,
 				Hashes: []mh.Multihash{contentHash},
 			}
 
 			expectedQueryKey := providerindex.QueryKey{
 				Hash:         contentHash,
-				TargetClaims: []multicodec.Code{metadata.EqualsClaimID},
+				TargetClaims: []multicodec.Code{metadata.EqualsClaimID, metadata.LocationCommitmentID},
 			}
 
 			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
