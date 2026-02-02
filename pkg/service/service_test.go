@@ -307,6 +307,23 @@ func TestQuery(t *testing.T) {
 			_, err := service.Query(t.Context(), query)
 			require.NoError(t, err)
 		})
+
+		t.Run("equals query: equals only", func(t *testing.T) {
+			query := types.Query{
+				Type:   types.QueryTypeEquals,
+				Hashes: []mh.Multihash{contentHash},
+			}
+
+			expectedQueryKey := providerindex.QueryKey{
+				Hash:         contentHash,
+				TargetClaims: []multicodec.Code{metadata.EqualsClaimID},
+			}
+
+			mockProviderIndex.EXPECT().Find(extmocks.AnyContext, expectedQueryKey).Return([]model.ProviderResult{}, nil)
+
+			_, err := service.Query(t.Context(), query)
+			require.NoError(t, err)
+		})
 	})
 
 	t.Run("returns error when ProviderIndex service errors", func(t *testing.T) {

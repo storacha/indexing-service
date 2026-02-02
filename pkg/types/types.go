@@ -114,6 +114,7 @@ const (
 	QueryTypeLocation
 	QueryTypeIndexOrLocation
 	QueryTypeStandardCompressed
+	QueryTypeEquals
 )
 
 func (qt QueryType) String() string {
@@ -126,6 +127,8 @@ func (qt QueryType) String() string {
 		return "index_or_location"
 	case QueryTypeStandardCompressed:
 		return "standard_compressed"
+	case QueryTypeEquals:
+		return "equals"
 	default:
 		return "invalid"
 	}
