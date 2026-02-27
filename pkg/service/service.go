@@ -160,8 +160,13 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 
 			// fetch (from cache or url) the actual content claim
 			claimCid := hasClaimCid.GetClaim()
+			log.Infow("query: fetching claim", "claimCid", claimCid, "providerId", result.Provider.ID, "numAddrs", len(result.Provider.Addrs))
+			for i, addr := range result.Provider.Addrs {
+				log.Infow("query: provider address", "index", i, "addr", addr.String())
+			}
 			url, err := fetchClaimURL(*result.Provider, claimCid)
 			if err != nil {
+				log.Errorw("query: failed to build claim URL", "error", err)
 				telemetry.Error(s, err, "building claim URL")
 				return err
 			}
