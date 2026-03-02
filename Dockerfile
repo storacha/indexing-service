@@ -1,18 +1,82 @@
+# ============================================
+# Build stage (shared)
+# ============================================
 FROM golang:1.25-bookworm AS build
 
-WORKDIR /indexing-service
+# Docker sets TARGETARCH automatically during multi-platform builds
+ARG TARGETARCH
+
+WORKDIR /go/src/indexing-service
 
 COPY go.* .
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o indexer ./cmd
+# Production build - with symbol stripping
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} make indexer-prod
 
-FROM scratch
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=build /indexing-service/indexer /usr/bin/
+# ============================================
+# Debug build stage
+# ============================================
+FROM build AS build-debug
 
-EXPOSE 8080
+ARG TARGETARCH
+
+# Install delve debugger for target architecture
+RUN GOARCH=${TARGETARCH} go install github.com/go-delve/delve/cmd/dlv@latest
+
+# Debug build - no optimizations, no inlining
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} make indexer-debug
+
+# ============================================
+# Production image
+# ============================================
+FROM debian:bookworm-slim AS prod
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /go/src/indexing-service/indexer /usr/bin/indexer
 
 ENTRYPOINT ["/usr/bin/indexer"]
-CMD ["aws", "--port", "8080"]
+
+# ============================================
+# Development image
+# ============================================
+FROM debian:bookworm-slim AS dev
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    # Shell experience
+    bash-completion \
+    less \
+    vim-tiny \
+    # Process debugging
+    procps \
+    htop \
+    strace \
+    # Network debugging
+    iputils-ping \
+    dnsutils \
+    net-tools \
+    tcpdump \
+    # Data tools
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Delve debugger
+COPY --from=build-debug /go/bin/dlv /usr/bin/dlv
+
+# Debug binary (with symbols, no optimizations)
+COPY --from=build-debug /go/src/indexing-service/indexer /usr/bin/indexer
+
+# Shell niceties
+ENV TERM=xterm-256color
+RUN echo 'alias ll="ls -la"' >> /etc/bash.bashrc && \
+    echo 'PS1="\[\e[32m\][indexer-dev]\[\e[m\] \w# "' >> /etc/bash.bashrc
+
+SHELL ["/bin/bash", "-c"]
+ENTRYPOINT ["/usr/bin/indexer"]

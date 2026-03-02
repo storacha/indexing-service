@@ -34,3 +34,42 @@ release:
   mode: keep-existing
 changelog:
   disable: true
+
+dockers:
+  # AMD64 image
+  - image_templates:
+      - "ghcr.io/storacha/indexing-service:{{ .Version }}-amd64"
+    dockerfile: Dockerfile.release
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+    goarch: amd64
+
+  # ARM64 image
+  - image_templates:
+      - "ghcr.io/storacha/indexing-service:{{ .Version }}-arm64"
+    dockerfile: Dockerfile.release
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "ghcr.io/storacha/indexing-service:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/storacha/indexing-service:{{ .Version }}-amd64"
+      - "ghcr.io/storacha/indexing-service:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/storacha/indexing-service:latest"
+    image_templates:
+      - "ghcr.io/storacha/indexing-service:{{ .Version }}-amd64"
+      - "ghcr.io/storacha/indexing-service:{{ .Version }}-arm64"
