@@ -17,8 +17,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w
 
 FROM alpine:latest AS prod
 
-RUN adduser -D -H appuser
-USER appuser
+USER nobody
 
 COPY --from=build /app /usr/bin/indexer
 
