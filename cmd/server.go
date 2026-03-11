@@ -66,6 +66,11 @@ var serverCmd = &cli.Command{
 					Usage:       "HTTP endpoint of the IPNI instance used to discover providers.",
 				},
 				&cli.StringFlag{
+					Name:  "ipni-fallback-endpoints",
+					Value: `["https://cid2.contact"]`,
+					Usage: "JSON array of IPNI node URLs to use as fallback endpoints.",
+				},
+				&cli.StringFlag{
 					Name:  "ipni-announce-urls",
 					Value: `["https://cid.contact/announce"]`,
 					Usage: "JSON array of IPNI node URLs to announce chain updates to.",
@@ -141,6 +146,15 @@ var serverCmd = &cli.Command{
 					Password: cCtx.String("redis-passwd"),
 				}
 				sc.IPNIFindURL = cCtx.String("ipni-endpoint")
+
+				if cCtx.String("ipni-fallback-endpoints") != "" {
+					var urls []string
+					err := json.Unmarshal([]byte(cCtx.String("ipni-fallback-endpoints")), &urls)
+					if err != nil {
+						return fmt.Errorf("parsing IPNI fallback endpoints JSON: %w", err)
+					}
+					sc.IPNIFindFallbackURLs = urls
+				}
 
 				if cCtx.String("ipni-announce-urls") != "" {
 					var urls []string

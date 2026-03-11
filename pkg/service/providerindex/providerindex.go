@@ -31,7 +31,10 @@ import (
 const (
 	// MaxBatchSize is the maximum number of items that'll be added to a batch.
 	MaxBatchSize = 10_000
-	IPNITimeout  = 1500 * time.Millisecond
+	// IPNITimeout is the duration after which an IPNI query will be cancelled.
+	// It is set relatively high, since the IPNI client is tiered, with individual
+	// timeouts set at 1.5s.
+	IPNITimeout = 5 * time.Second
 )
 
 type QueryKey struct {

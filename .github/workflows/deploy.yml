@@ -34,6 +34,7 @@ jobs:
       workspace: staging
       did: did:web:staging.indexer.storacha.network
       ipni-endpoint: ${{ vars.STAGING_IPNI_ENDPOINT }}
+      ipni-fallback-endpoints: ${{ vars.STAGING_IPNI_FALLBACK_ENDPOINTS }}
       ipni-announce-urls: ${{ vars.STAGING_IPNI_ANNOUNCE_URLS }}
       ipni-format-peer-id: ${{ vars.STAGING_IPNI_FORMAT_PEER_ID }}
       ipni-format-endpoint: ${{ vars.STAGING_IPNI_FORMAT_ENDPOINT }}
@@ -56,6 +57,7 @@ jobs:
       network: warm
       did: did:web:staging.indexer.warm.storacha.network
       ipni-endpoint: ${{ vars.WARM_STAGING_IPNI_ENDPOINT }}
+      ipni-fallback-endpoints: ${{ vars.WARM_STAGING_IPNI_FALLBACK_ENDPOINTS }}
       ipni-announce-urls: ${{ vars.WARM_STAGING_IPNI_ANNOUNCE_URLS }}
       ipni-format-peer-id: ${{ vars.WARM_STAGING_IPNI_FORMAT_PEER_ID }}
       ipni-format-endpoint: ${{ vars.WARM_STAGING_IPNI_FORMAT_ENDPOINT }}
@@ -77,6 +79,7 @@ jobs:
       workspace: prod
       did: did:web:indexer.storacha.network
       ipni-endpoint: ${{ vars.PROD_IPNI_ENDPOINT }}
+      ipni-fallback-endpoints: ${{ vars.PROD_IPNI_FALLBACK_ENDPOINTS }}
       ipni-announce-urls: ${{ vars.PROD_IPNI_ANNOUNCE_URLS }}
       ipni-format-peer-id: ${{ vars.PROD_IPNI_FORMAT_PEER_ID }}
       ipni-format-endpoint: ${{ vars.PROD_IPNI_FORMAT_ENDPOINT }}
@@ -99,6 +102,7 @@ jobs:
       network: forge
       did: did:web:indexer.forge.storacha.network
       ipni-endpoint: ${{ vars.FORGE_PROD_IPNI_ENDPOINT }}
+      ipni-fallback-endpoints: ${{ vars.FORGE_PROD_IPNI_FALLBACK_ENDPOINTS }}
       ipni-announce-urls: ${{ vars.FORGE_PROD_IPNI_ANNOUNCE_URLS }}
       ipni-format-peer-id: ${{ vars.FORGE_PROD_IPNI_FORMAT_PEER_ID }}
       ipni-format-endpoint: ${{ vars.FORGE_PROD_IPNI_FORMAT_ENDPOINT }}

@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/storacha/go-libstoracha/ipniclient"
 	"github.com/storacha/go-libstoracha/ipnipublisher/notifier"
 	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
 	"github.com/storacha/go-libstoracha/ipnipublisher/server"
@@ -36,6 +37,8 @@ import (
 	"github.com/storacha/indexing-service/pkg/service/providerindex/remotesyncer"
 	"github.com/storacha/indexing-service/pkg/types"
 )
+
+const IPNIFindTimeout = 1500 * time.Millisecond
 
 var log = logging.Logger("service")
 var providerIndexNamespace = datastore.NewKey("providerindex/")
@@ -64,6 +67,9 @@ type ServiceConfig struct {
 
 	// IPNIFindURL is the URL of an IPNI node to use for find queries.
 	IPNIFindURL string
+	// IPNIFindFallbackURLs are the URL(s) of IPNI nodes to use for find queries
+	// if the main URL is unavailable or returning no results.
+	IPNIFindFallbackURLs []string
 
 	// IPNIDirectAnnounceURLs are the URL(s) of IPNI nodes that
 	// advertisement announcements should be sent to. Defaults to IndexerURL if
@@ -381,9 +387,24 @@ func Construct(sc ServiceConfig, opts ...Option) (Service, error) {
 
 	// setup IPNI
 	// TODO: switch to double hashed client for reader privacy?
+	var findClient ipnifind.Finder
 	findClient, err := ipnifind.New(sc.IPNIFindURL, ipnifind.WithClient(httpClient))
 	if err != nil {
 		return nil, err
+	}
+	if len(sc.IPNIFindFallbackURLs) > 0 {
+		tiers := []ipnifind.Finder{findClient}
+		for _, url := range sc.IPNIFindFallbackURLs {
+			finder, err := ipnifind.New(url, ipnifind.WithClient(httpClient))
+			if err != nil {
+				return nil, fmt.Errorf("creating IPNI fallback find client for %s: %w", url, err)
+			}
+			tiers = append(tiers, finder)
+		}
+		findClient, err = ipniclient.NewTieredFinder(tiers, ipniclient.WithTierFindTimeout(IPNIFindTimeout))
+		if err != nil {
+			return nil, fmt.Errorf("creating tiered IPNI find client: %w", err)
+		}
 	}
 
 	var ds datastore.Batching

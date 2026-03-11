@@ -195,6 +195,14 @@ func FromEnv(ctx context.Context) Config {
 		ipniFindURL = presets.IPNIFindURL
 	}
 
+	var ipniFindFallbackURLs []string
+	if os.Getenv("IPNI_FALLBACK_ENDPOINTS") != "" {
+		err := json.Unmarshal([]byte(os.Getenv("IPNI_FALLBACK_ENDPOINTS")), &ipniFindFallbackURLs)
+		if err != nil {
+			panic(fmt.Errorf("parsing IPNI fallback endpoints JSON: %w", err))
+		}
+	}
+
 	var ipniPublisherDirectAnnounceURLs []string
 	if os.Getenv("IPNI_ANNOUNCE_URLS") != "" {
 		err := json.Unmarshal([]byte(os.Getenv("IPNI_ANNOUNCE_URLS")), &ipniPublisherDirectAnnounceURLs)
@@ -257,6 +265,7 @@ func FromEnv(ctx context.Context) Config {
 				},
 			},
 			IPNIFindURL:            ipniFindURL,
+			IPNIFindFallbackURLs:   ipniFindFallbackURLs,
 			IPNIAnnounceAddrs:      []string{ipniPublisherAnnounceAddress},
 			IPNIDirectAnnounceURLs: ipniPublisherDirectAnnounceURLs,
 		},
