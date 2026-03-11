@@ -1,16 +1,26 @@
-FROM golang:1.25-bookworm AS build
+# Build stage - use native platform for faster cross-compilation
+FROM --platform=$BUILDPLATFORM golang:1.25-bookworm AS build
 
-WORKDIR /indexing-service
+ARG TARGETARCH
+ARG TARGETOS=linux
 
-COPY go.* .
+WORKDIR /src
+
+# Copy dependency files first for better layer caching
+COPY go.mod go.sum ./
 RUN go mod download
+
+# Copy source code
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-w -s" -o indexer ./cmd
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /app ./cmd
 
-FROM scratch
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=build /indexing-service/indexer /usr/bin/
+FROM alpine:latest AS prod
+
+RUN adduser -D -H appuser
+USER appuser
+
+COPY --from=build /app /usr/bin/indexer
 
 EXPOSE 8080
 
