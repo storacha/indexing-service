@@ -14,6 +14,7 @@ HONEYCOMB_API_KEY= # optional - if you want telemetry data sent to Honeycomb, se
 SENTRY_DSN= # optional - Sentry DSN for error reporting. Obtain from sentry.io. Leave blank to disable error reporting.
 SENTRY_ENVIRONMENT= # optional - Sentry environment to use for error reporting. Defaults to the terraform workspace being used if not set.
 IPNI_ENDPOINT= # optional - if you want to find data on a custom IPNI node, defaults to https://cid.contact
+IPNI_FALLBACK_ENDPOINTS= # optional - set to a JSON array of IPNI endpoints to use as fallback nodes for provider discovery (e.g. ["https://cid2.contact"])
 IPNI_ANNOUNCE_URLS= # optional - JSON array of IPNI announce URLs, defaults to ["https://cid.contact/announce"]
 IPNI_FORMAT_PEER_ID= # optional - When set along with IPNI_FORMAT_ENDPOINT, enables mimicking IPNI on /cid/<cid> requests
 IPNI_FORMAT_ENDPOINT= # optional - When set along with IPNI_FORMAT_PEER_ID, enables mimicking IPNI on /cid/<cid> requests

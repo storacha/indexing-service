@@ -21,6 +21,9 @@ on:
       ipni-endpoint:
         required: false
         type: string
+      ipni-fallback-endpoints:
+        required: false
+        type: string
       ipni-announce-urls:
         required: false
         type: string
@@ -70,6 +73,7 @@ env:
   TF_VAR_cloudflare_zone_id: ${{ secrets.cloudflare-zone-id }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.cloudflare-api-token }}
   IPNI_ENDPOINT: ${{ inputs.ipni-endpoint }}
+  IPNI_FALLBACK_ENDPOINTS: ${{ inputs.ipni-fallback-endpoints }}
   IPNI_ANNOUNCE_URLS: ${{ inputs.ipni-announce-urls }}
   IPNI_FORMAT_PEER_ID: ${{ inputs.ipni-format-peer-id }}
   IPNI_FORMAT_ENDPOINT: ${{ inputs.ipni-format-endpoint }}
