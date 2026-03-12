@@ -38,7 +38,7 @@ import (
 	"github.com/storacha/indexing-service/pkg/types"
 )
 
-const IPNIFindTimeout = 1500 * time.Millisecond
+const IPNIFindTimeout = 2500 * time.Millisecond
 
 var log = logging.Logger("service")
 var providerIndexNamespace = datastore.NewKey("providerindex/")
