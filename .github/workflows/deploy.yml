@@ -26,6 +26,25 @@ permissions:
   contents: read # This is required for actions/checkout
 
 jobs:
+  # Detect if this is a release PR (version.json changed)
+  check-release-pr:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    outputs:
+      is-release: ${{ steps.check.outputs.is-release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check if version.json changed
+        id: check
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "^version.json$"; then
+            echo "is-release=true" >> $GITHUB_OUTPUT
+          else
+            echo "is-release=false" >> $GITHUB_OUTPUT
+          fi
+
   # apply staging on pushes to main, plan otherwise
   staging:
     uses: ./.github/workflows/terraform.yml
@@ -71,8 +90,14 @@ jobs:
       cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
       sentry-dsn: ${{ secrets.WARM_STAGING_SENTRY_DSN }}
 
-  # apply prod on successful release, plan otherwise
+  # Only run on: release PRs (plan), Releaser completion (apply), or manual dispatch
   production:
+    needs: [check-release-pr]
+    if: ${{ always() && (
+      github.event_name == 'workflow_run' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && needs.check-release-pr.outputs.is-release == 'true')
+      ) }}
     uses: ./.github/workflows/terraform.yml
     with:
       env: production
@@ -94,7 +119,14 @@ jobs:
       honeycomb-api-key: ${{ secrets.PROD_HONEYCOMB_API_KEY }}
       sentry-dsn: ${{ secrets.PROD_SENTRY_DSN }}
 
+  # Only run on: release PRs (plan), Releaser completion (apply), or manual dispatch
   forge-production:
+    needs: [check-release-pr]
+    if: ${{ always() && (
+      github.event_name == 'workflow_run' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && needs.check-release-pr.outputs.is-release == 'true')
+      ) }}
     uses: ./.github/workflows/terraform.yml
     with:
       env: forge-prod
