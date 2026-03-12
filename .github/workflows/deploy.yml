@@ -121,6 +121,7 @@ jobs:
       network: test
       did: did:web:indexer.test.storacha.network
       ipni-endpoint: ${{ vars.FORGE_TEST_IPNI_ENDPOINT }}
+      ipni-fallback-endpoints: ${{ vars.FORGE_TEST_IPNI_FALLBACK_ENDPOINTS }}
       ipni-announce-urls: ${{ vars.FORGE_TEST_IPNI_ANNOUNCE_URLS }}
       ipni-format-peer-id: ${{ vars.FORGE_TEST_IPNI_FORMAT_PEER_ID }}
       ipni-format-endpoint: ${{ vars.FORGE_TEST_IPNI_FORMAT_ENDPOINT }}
