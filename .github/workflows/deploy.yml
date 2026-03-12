@@ -20,6 +20,7 @@ on:
         options:
           - production
           - forge-production
+          - forge-test
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -69,7 +70,7 @@ jobs:
       cloudflare-api-token: ${{ secrets.WARM_STAGING_CLOUDFLARE_API_TOKEN }}
       sentry-dsn: ${{ secrets.WARM_STAGING_SENTRY_DSN }}
 
-  # apply prod on successful release, plan otherwise
+  # apply prod and test on successful release, plan otherwise
   production:
     uses: ./.github/workflows/terraform.yml
     with:
@@ -111,3 +112,24 @@ jobs:
       cloudflare-zone-id: ${{ secrets.FORGE_PROD_CLOUDFLARE_ZONE_ID }}
       cloudflare-api-token: ${{ secrets.FORGE_PROD_CLOUDFLARE_API_TOKEN }}
       sentry-dsn: ${{ secrets.FORGE_PROD_SENTRY_DSN }}
+
+  forge-test:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      env: forge-test
+      workspace: forge-test
+      network: test
+      did: did:web:indexer.test.storacha.network
+      ipni-endpoint: ${{ vars.FORGE_TEST_IPNI_ENDPOINT }}
+      ipni-announce-urls: ${{ vars.FORGE_TEST_IPNI_ANNOUNCE_URLS }}
+      ipni-format-peer-id: ${{ vars.FORGE_TEST_IPNI_FORMAT_PEER_ID }}
+      ipni-format-endpoint: ${{ vars.FORGE_TEST_IPNI_FORMAT_ENDPOINT }}
+      apply: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && contains(github.ref, 'refs/tags')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'forge-test') }}
+    secrets:
+      aws-account-id: ${{ secrets.FORGE_TEST_AWS_ACCOUNT_ID }}
+      aws-region: ${{ secrets.FORGE_TEST_AWS_REGION }}
+      region: ${{ secrets.FORGE_TEST_AWS_REGION }}
+      private-key: ${{ secrets.FORGE_TEST_PRIVATE_KEY }}
+      cloudflare-zone-id: ${{ secrets.FORGE_TEST_CLOUDFLARE_ZONE_ID }}
+      cloudflare-api-token: ${{ secrets.FORGE_TEST_CLOUDFLARE_API_TOKEN }}
+      sentry-dsn: ${{ secrets.FORGE_TEST_SENTRY_DSN }}
