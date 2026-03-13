@@ -279,7 +279,7 @@ func TestGetProviderResults(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("error fetching from IPNI returns an error", func(t *testing.T) {
+	t.Run("error fetching from IPNI returns empty results", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
 		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
@@ -294,10 +294,13 @@ func TestGetProviderResults(t *testing.T) {
 		mockNoProviderStore.EXPECT().Members(extmocks.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
 		mockLegacyClaims.EXPECT().Find(extmocks.AnyContext, someHash, []multicodec.Code{0}).Return(nil, nil)
 		mockIpniFinder.EXPECT().Find(extmocks.AnyContext, someHash).Return(nil, errors.New("some error"))
+		mockNoProviderStore.EXPECT().Add(extmocks.AnyContext, someHash, multicodec.Code(0)).Return(1, nil)
+		mockNoProviderStore.EXPECT().SetExpirable(extmocks.AnyContext, someHash, true).Return(nil)
 
-		_, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
+		results, err := providerIndex.getProviderResults(context.Background(), someHash, []multicodec.Code{0})
 
-		require.Error(t, err)
+		require.NoError(t, err)
+		require.Empty(t, results)
 	})
 
 	t.Run("error in legacy claims service returns an error", func(t *testing.T) {
@@ -323,7 +326,7 @@ func TestGetProviderResults(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("errors in both legacy claims service and IPNI returns wrapped error", func(t *testing.T) {
+	t.Run("errors in both legacy claims service and IPNI no providers cache returns wrapped error", func(t *testing.T) {
 		mockStore := types.NewMockProviderStore(t)
 		mockNoProviderStore := types.NewMockNoProviderStore(t)
 		mockIpniFinder := extmocks.NewMockIpniFinder(t)
@@ -337,17 +340,16 @@ func TestGetProviderResults(t *testing.T) {
 
 		// Simulate a cache miss.
 		mockStore.EXPECT().Members(extmocks.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
-		mockNoProviderStore.EXPECT().Members(extmocks.AnyContext, someHash).Return(nil, types.ErrKeyNotFound)
+		mockNoProviderStore.EXPECT().Members(extmocks.AnyContext, someHash).Return(nil, errors.New("no providers error"))
 
 		// Both queries error.
-		mockIpniFinder.EXPECT().Find(extmocks.AnyContext, someHash).Return(nil, errors.New("ipni error"))
 		mockLegacyClaims.EXPECT().Find(extmocks.AnyContext, someHash, targetClaim).Return(nil, errors.New("legacy error"))
 
 		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
 		require.Nil(t, results)
 		require.Error(t, err)
 		// Verify that the final error message contains both errors.
-		require.Contains(t, err.Error(), "fetching from IPNI failed: ipni error")
+		require.Contains(t, err.Error(), "fetching from IPNI failed: no providers error")
 		require.Contains(t, err.Error(), "fetching from legacy services failed: legacy error")
 	})
 
@@ -482,6 +484,9 @@ func TestGetProviderResults(t *testing.T) {
 		// Expect caching of the legacy result.
 		mockStore.EXPECT().Add(extmocks.AnyContext, someHash, expectedResult).Return(1, nil)
 		mockStore.EXPECT().SetExpirable(extmocks.AnyContext, someHash, true).Return(nil)
+		// Expect caching no IPNI results
+		mockNoProviderStore.EXPECT().Add(extmocks.AnyContext, someHash, multicodec.Code(metadata.LocationCommitmentID)).Return(1, nil)
+		mockNoProviderStore.EXPECT().SetExpirable(extmocks.AnyContext, someHash, true).Return(nil)
 
 		results, err := providerIndex.getProviderResults(context.Background(), someHash, targetClaim)
 		require.NoError(t, err)
@@ -543,6 +548,9 @@ func TestGetProviderResults(t *testing.T) {
 		// Expect caching of the legacy result.
 		mockStore.EXPECT().Add(extmocks.AnyContext, someHash, expectedResult).Return(1, nil)
 		mockStore.EXPECT().SetExpirable(extmocks.AnyContext, someHash, true).Return(nil)
+		// Expect caching no IPNI results
+		mockNoProviderStore.EXPECT().Add(extmocks.AnyContext, someHash, multicodec.Code(metadata.LocationCommitmentID)).Return(1, nil)
+		mockNoProviderStore.EXPECT().SetExpirable(extmocks.AnyContext, someHash, true).Return(nil)
 
 		resultChan := make(chan result.Result[[]model.ProviderResult, error], 1)
 		go func() {
