@@ -93,7 +93,8 @@
   ],
   "networks": [
     "warm",
-    "forge"
+    "forge",
+    "test"
   ],
   "writeToContainer": false
 }

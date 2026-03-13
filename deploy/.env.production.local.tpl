@@ -1,5 +1,5 @@
 <%
-if [[ "$TF_WORKSPACE" == "prod" || "$TF_WORKSPACE" == "forge-prod" || ${TF_VAR_use_prod_vars:-""} == "true" ]]; then
+if [[ "$TF_WORKSPACE" == "prod" || "$TF_WORKSPACE" == "forge-prod" || "$TF_WORKSPACE" == "forge-test" || ${TF_VAR_use_prod_vars:-""} == "true" ]]; then
   PROVIDERS_CACHE_EXPIRATION_SECONDS=$((30 * 24 * 60 * 60))
   NO_PROVIDERS_CACHE_EXPIRATION_SECONDS=$((24 * 60 * 60))
   INDEXES_CACHE_EXPIRATION_SECONDS=$((24 * 60 * 60))
@@ -47,7 +47,7 @@ else
   BASE_TRACE_SAMPLE_RATIO="1.0"
 fi
 
-if [[ "$TF_WORKSPACE" == "forge-prod" || "$TF_WORKSPACE" == "forge-staging" || "$TF_WORKSPACE" == "warm-staging" ]]; then
+if [[ "$TF_WORKSPACE" == "forge-prod" || "$TF_WORKSPACE" == "forge-test" || "$TF_WORKSPACE" == "forge-staging" || "$TF_WORKSPACE" == "warm-staging" ]]; then
   SUPPORT_LEGACY_SERVICES="false"
 else
   SUPPORT_LEGACY_SERVICES="true"
