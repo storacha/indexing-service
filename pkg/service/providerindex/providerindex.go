@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multicodec"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/storacha/go-libstoracha/digestutil"
 	"github.com/storacha/go-libstoracha/ipnipublisher/publisher"
 	"github.com/storacha/go-libstoracha/metadata"
 	"github.com/storacha/go-ucanto/did"
@@ -272,16 +273,16 @@ func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, s trace.Span,
 
 	findRes, err := pi.findClient.Find(ctx, mh)
 	if err != nil {
-		return nil, err
-	}
+		pi.log.Warnf("finding %s in IPNI: %s", digestutil.Format(mh), err)
+	} else {
+		for _, mhres := range findRes.MultihashResults {
+			results = append(results, mhres.ProviderResults...)
+		}
 
-	for _, mhres := range findRes.MultihashResults {
-		results = append(results, mhres.ProviderResults...)
-	}
-
-	results, err = filterCodecs(results, targetClaims)
-	if err != nil {
-		return nil, err
+		results, err = filterCodecs(results, targetClaims)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(results) == 0 {
 		pi.cacheNoProviderResults(ctx, s, mh, targetClaims)
