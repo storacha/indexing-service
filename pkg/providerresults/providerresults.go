@@ -60,14 +60,18 @@ func UnmarshalCBOR(data []byte) (model.ProviderResult, error) {
 	var pr model.ProviderResult
 	_, err := ipld.Unmarshal([]byte(data), dagcbor.Decode, &pr, providerResultType, peerIDConverter, multiaddrConverter)
 	if err != nil {
-		return model.ProviderResult{}, err
+		return model.ProviderResult{}, fmt.Errorf("unmarshaling provider result: %w", err)
 	}
 	return pr, nil
 }
 
 // MarshalCBOR encodes a provider result in CBOR
 func MarshalCBOR(providerResult model.ProviderResult) ([]byte, error) {
-	return ipld.Marshal(dagcbor.Encode, &providerResult, providerResultType, peerIDConverter, multiaddrConverter)
+	bytes, err := ipld.Marshal(dagcbor.Encode, &providerResult, providerResultType, peerIDConverter, multiaddrConverter)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling provider result: %w", err)
+	}
+	return bytes, nil
 }
 
 func equalProvider(a, b *peer.AddrInfo) bool {
