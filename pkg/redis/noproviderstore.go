@@ -22,7 +22,7 @@ type NoProviderStore = Store[multihash.Multihash, multicodec.Code]
 
 // NewNoProviderStore returns a new instance of an IPNI store using the given redis client
 func NewNoProviderStore(client Client, opts ...Option) *NoProviderStore {
-	return NewStore(noProviderResultFromRedis, noProviderResultToRedis, multihashKeyString, client, opts...)
+	return NewStore(noProviderResultFromRedis, noProviderResultToRedis, noProviderMultihashKeyString, client, opts...)
 }
 
 func noProviderResultFromRedis(data string) (multicodec.Code, error) {
@@ -37,4 +37,12 @@ func noProviderResultToRedis(record multicodec.Code) (string, error) {
 	buf := make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, uint64(record))
 	return string(buf), nil
+}
+
+// noProviderMultihashKeyString is a helper function to generate a Redis key for
+// a multihash in the no provider cache. It prefixes the key with "no/" to
+// distinguish it from the regular ProviderStore keys, in case the same Redis
+// instance is being used for both.
+func noProviderMultihashKeyString(k multihash.Multihash) string {
+	return "no/" + multihashKeyString(k)
 }

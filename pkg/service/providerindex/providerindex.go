@@ -120,7 +120,7 @@ func (pi *ProviderIndexService) Find(ctx context.Context, qk QueryKey) ([]model.
 	results, err := pi.getProviderResults(ctx, qk.Hash, qk.TargetClaims)
 	if err != nil {
 		telemetry.Error(s, err, "finding ProviderResults")
-		return nil, err
+		return nil, fmt.Errorf("getting provider results: %w", err)
 	}
 
 	s.AddEvent("filtering results by space")
@@ -281,7 +281,7 @@ func (pi *ProviderIndexService) fetchFromIPNI(ctx context.Context, s trace.Span,
 
 		results, err = filterCodecs(results, targetClaims)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("filtering codecs: %w", err)
 		}
 	}
 	if len(results) == 0 {

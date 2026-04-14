@@ -131,7 +131,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 	})
 	if err != nil {
 		telemetry.Error(s, err, "finding ProviderResults")
-		return err
+		return fmt.Errorf("finding provider results: %w", err)
 	}
 
 	s.AddEvent(fmt.Sprintf("processing %d results", len(results)))
@@ -145,7 +145,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 		err = md.UnmarshalBinary(result.Metadata)
 		if err != nil {
 			telemetry.Error(s, err, "unmarshaling metadata")
-			return err
+			return fmt.Errorf("unmarshaling metadata: %w", err)
 		}
 
 		// the provider may list one or more protocols for this CID
@@ -168,14 +168,14 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 			if err != nil {
 				log.Errorw("query: failed to build claim URL", "error", err)
 				telemetry.Error(s, err, "building claim URL")
-				return err
+				return fmt.Errorf("fetching claim URL: %w", err)
 			}
 
 			s.AddEvent("fetching claims")
 			claim, err := is.claims.Find(mhCtx, cidlink.Link{Cid: claimCid}, url)
 			if err != nil {
 				telemetry.Error(s, err, "fetching claims")
-				return err
+				return fmt.Errorf("fetching claims: %w", err)
 			}
 			// add the fetched claim to the results, if we don't already have it
 			state.CmpSwap(
@@ -199,13 +199,13 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 					// lookup was the content hash, queue the equals hash
 					if err := spawn(job{typedProtocol.Equals.Hash(), nil, nil, types.QueryTypeLocation}); err != nil {
 						telemetry.Error(s, err, "queing job for equals hash")
-						return err
+						return fmt.Errorf("queuing job for equals hash: %w", err)
 					}
 				} else {
 					// lookup was the equals hash, queue the content hash
 					if err := spawn(job{multihash.Multihash(result.ContextID), nil, nil, types.QueryTypeLocation}); err != nil {
 						telemetry.Error(s, err, "queuing job for content hash")
-						return err
+						return fmt.Errorf("queuing job for content hash: %w", err)
 					}
 				}
 			case *metadata.IndexClaimMetadata:
@@ -215,7 +215,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 				mh := j.mh
 				if err := spawn(job{typedProtocol.Index.Hash(), &mh, &result, types.QueryTypeLocation}); err != nil {
 					telemetry.Error(s, err, "queuing job for the index's location claim")
-					return err
+					return fmt.Errorf("queuing job for index location claim: %w", err)
 				}
 			case *metadata.LocationCommitmentMetadata:
 				s.AddEvent("processing location claim")
@@ -298,7 +298,7 @@ func (is *IndexingService) jobHandler(mhCtx context.Context, j job, spawn func(j
 						if index.Has(*j.indexForMh) {
 							if err := spawn(job{shard, nil, nil, types.QueryTypeLocation}); err != nil {
 								telemetry.Error(s, err, "queuing location job for shard")
-								return err
+								return fmt.Errorf("queuing location job for shard: %w", err)
 							}
 						}
 					}
@@ -746,7 +746,7 @@ func validateLocationCommitment(ctx context.Context, claim delegation.Delegation
 	// TODO: support verifiers for other key types?
 	vfr, err := verifier.Parse(claim.Issuer().DID().String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parsing claim issuer DID: %w", err)
 	}
 
 	vctx := validator.NewValidationContext(
@@ -763,7 +763,7 @@ func validateLocationCommitment(ctx context.Context, claim delegation.Delegation
 
 	auth, err := validator.Access(ctx, claim, vctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validating access: %w", err)
 	}
 
 	return auth, nil
